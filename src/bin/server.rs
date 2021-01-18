@@ -1,15 +1,34 @@
-use std::collections::{btree_map::Values, BTreeMap};
 use std::io::{BufRead, BufReader, Read};
 use std::net::{TcpListener, TcpStream};
+use std::{
+    collections::{btree_map::Values, BTreeMap},
+    string,
+};
+
+enum Instruction {
+    NOP,
+    SET,
+    GET,
+}
+
+struct Process {
+    instruction: Instruction,
+    key: String,
+    value: String,
+}
 
 fn main() -> std::io::Result<()> {
-    let mut key_values: BTreeMap<&str, &str> = BTreeMap::new();
+    let mut key_values: BTreeMap<String, String> = BTreeMap::new();
+
     let listener = TcpListener::bind("127.0.0.1:8888")?;
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
-                let res = parse_instruction(stream);
-                println!("{:?}", res);
+                let inst = parse_instruction(stream)?;
+                let proc = get_process(inst);
+
+                let something = insert_into_map(&mut key_values, proc);
+                println!("{}", something);
             }
             Err(e) => {
                 println!("Somehow an error:\n{}\n", e);
@@ -18,6 +37,45 @@ fn main() -> std::io::Result<()> {
     }
 
     Ok(())
+}
+
+fn insert_into_map(map: &mut BTreeMap<String, String>, proc: Process) -> String {
+    let mut value_inserted = String::new();
+    match proc.instruction {
+        Instruction::GET => {
+            value_inserted.push_str(map.get(&proc.key).unwrap().as_str());
+        }
+        Instruction::SET => {
+            value_inserted.push_str(map.entry(proc.key).or_insert(proc.value).as_str());
+        }
+        Instruction::NOP => {}
+    }
+
+    value_inserted
+}
+
+fn get_process(instructions: (String, String, String)) -> Process {
+    match (
+        instructions.0.as_str(),
+        instructions.1.as_str(),
+        instructions.2.as_str(),
+    ) {
+        ("set", k, v) => Process {
+            instruction: Instruction::SET,
+            key: k.to_string(),
+            value: v.to_string(),
+        },
+        ("get", k, v) => Process {
+            instruction: Instruction::GET,
+            key: k.to_string(),
+            value: v.to_string(),
+        },
+        _ => Process {
+            instruction: Instruction::NOP,
+            key: String::new(),
+            value: String::new(),
+        },
+    }
 }
 
 fn parse_instruction(mut stream: TcpStream) -> std::io::Result<(String, String, String)> {
@@ -55,10 +113,5 @@ fn parse_instruction(mut stream: TcpStream) -> std::io::Result<(String, String, 
         }
     }
 
-    // let mut parsed = content.trim().splitn(3, ' ');
-    // let instruction = parsed.next().unwrap();
-    // let key = parsed.next().unwrap();
-    // let value: String = parsed.collect();
-
-    Ok((instruction.to_string(), key.to_string(), value))
+    Ok((instruction, key, value))
 }
