@@ -5,7 +5,7 @@ fn main() -> std::io::Result<()> {
     let stream = TcpStream::connect("127.0.0.1:8888")?;
     let mut writer = BufWriter::new(stream);
 
-    writer.write(b"      get          adros.eye0           Something about\n\nthe universe\t\tblablablablabla waksaksak ska sk aks")?;
+    writer.write(b"      set          adros.eye0           baraka")?;
     writer.flush()?;
 
     // writer.write(b"s adros.eye1 Something about her")?;

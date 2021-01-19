@@ -1,12 +1,8 @@
-use std::io::{BufRead, BufReader, Read};
+use std::collections::BTreeMap;
+use std::io::{BufReader, Read};
 use std::net::{TcpListener, TcpStream};
-use std::{
-    collections::{btree_map::Values, BTreeMap},
-    string,
-};
 
 enum Instruction {
-    NOP,
     SET,
     GET,
 }
@@ -24,11 +20,16 @@ fn main() -> std::io::Result<()> {
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
-                let inst = parse_instruction(stream)?;
+                let inst = parse_message(stream);
                 let proc = get_process(inst);
 
-                let something = insert_into_map(&mut key_values, proc);
-                println!("{}", something);
+                match proc {
+                    Ok(proc) => {
+                        let something = get_update_map(&mut key_values, proc);
+                        println!("{:?}", something);
+                    }
+                    Err(e) => println!("{}", e),
+                }
             }
             Err(e) => {
                 println!("Somehow an error:\n{}\n", e);
@@ -39,51 +40,40 @@ fn main() -> std::io::Result<()> {
     Ok(())
 }
 
-fn insert_into_map(map: &mut BTreeMap<String, String>, proc: Process) -> String {
-    let mut value_inserted = String::new();
+fn get_update_map(map: &mut BTreeMap<String, String>, proc: Process) -> Result<String, ()> {
     match proc.instruction {
-        Instruction::GET => {
-            value_inserted.push_str(map.get(&proc.key).unwrap().as_str());
-        }
+        Instruction::GET => Ok(map.entry(proc.key).or_insert(proc.value).to_string()),
         Instruction::SET => {
-            value_inserted.push_str(map.entry(proc.key).or_insert(proc.value).as_str());
+            let val = map.entry(proc.key.clone()).or_insert(proc.value.clone());
+            val.clear();
+            val.push_str(proc.value.as_str());
+            Ok(val.to_string())
         }
-        Instruction::NOP => {}
     }
-
-    value_inserted
 }
 
-fn get_process(instructions: (String, String, String)) -> Process {
-    match (
-        instructions.0.as_str(),
-        instructions.1.as_str(),
-        instructions.2.as_str(),
-    ) {
-        ("set", k, v) => Process {
+fn get_process(inst: (String, String, String)) -> Result<Process, String> {
+    match (inst.0.as_str(), inst.1.as_str(), inst.2.as_str()) {
+        ("set", k, v) => Result::Ok(Process {
             instruction: Instruction::SET,
             key: k.to_string(),
             value: v.to_string(),
-        },
-        ("get", k, v) => Process {
+        }),
+        ("get", k, v) => Result::Ok(Process {
             instruction: Instruction::GET,
             key: k.to_string(),
             value: v.to_string(),
-        },
-        _ => Process {
-            instruction: Instruction::NOP,
-            key: String::new(),
-            value: String::new(),
-        },
+        }),
+        _ => Result::Err(format!("Probably bad format.")),
     }
 }
 
-fn parse_instruction(mut stream: TcpStream) -> std::io::Result<(String, String, String)> {
+fn parse_message(mut stream: TcpStream) -> (String, String, String) {
     let mut reader = BufReader::new(&mut stream);
     let mut content = String::new();
-    reader.read_to_string(&mut content)?;
+    reader.read_to_string(&mut content);
 
-    let mut instruction = String::new();
+    let mut inst = String::new();
     let mut key = String::new();
     let mut value = String::new();
 
@@ -95,13 +85,13 @@ fn parse_instruction(mut stream: TcpStream) -> std::io::Result<(String, String, 
                     value.push(' ');
                 } else if key.len() > 0 {
                     found = 2;
-                } else if instruction.len() > 0 {
+                } else if inst.len() > 0 {
                     found = 1;
                 }
             }
             _ => match found {
                 0 => {
-                    instruction.push(c);
+                    inst.push(c);
                 }
                 1 => {
                     key.push(c);
@@ -113,5 +103,5 @@ fn parse_instruction(mut stream: TcpStream) -> std::io::Result<(String, String, 
         }
     }
 
-    Ok((instruction, key, value))
+    (inst.to_lowercase(), key, value)
 }

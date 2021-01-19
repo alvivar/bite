@@ -1,0 +1,8 @@
+
+    GET fails if empty, it should probably set a default
+
+
+    2021.01.18
+    x GEt to BTreeMap
+    x SET to BTreeMap
+    Prototype, single thread, like a chat, simple parsing
