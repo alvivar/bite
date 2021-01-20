@@ -7,23 +7,21 @@ messages to GET and SET values.
 
 To set the value:
 
-    SET somekeyname Whatever kind of string I guess
-    > Ok.
+    SET somekeyname Some string as a value I guess
+    > OK
 
 To get the value:
 
     GET somekeyname
-    > Whatever kind of string I guess
+    > Some string as a value I guess
 
-To get the value or default:
-
-    GET keyname Some kind of default, just in case
-    > Some kind of default, just in case
+    GET keywithoutvalue
+    >
 
 ## Why
 
-Sometimes I just need a quick and easy server to save data between multiplayer experiments.
+Sometimes I just need a quick and easy server to save data in experiments or prototypes.
 
 ## Tech
 
-Powered by Rust, basically a TcpListener chat over a BTreeMap, eventually serialized into a file with Serde.
+A Rust TcpListener over a BTreeMap for data, eventually serialized into a file with Serde.
