@@ -1,8 +1,7 @@
 # Bite
 
-Minimalist Key Value Store.
-
-It's basically a chat, a TcpListener waiting for messages to GET and SET values.
+Minimalistic Key Value Store. It's basically a chat, a TcpListener waiting for
+messages to GET and SET values.
 
 ## How to use
 
