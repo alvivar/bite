@@ -20,7 +20,7 @@ To get the value:
 
 ## Why
 
-Sometimes I just need a quick and easy server to save data in experiments.
+Sometimes I need a quick and easy server to save data in experiments.
 
 ## Tech
 
