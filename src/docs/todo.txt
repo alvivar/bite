@@ -1,6 +1,10 @@
 
-    Needs to send back the message to the client [!]
     User Error instead of unwrap
+
+
+    2021.01.22
+    x Happiness! PROD ready I guess!
+    x Needs to send back the message to the client [!]
 
     2021.01.20
     x Server writes over the BTreeMap withing a thread using Arc::new(RwLock::new(key_values)) as pointer, need more info
