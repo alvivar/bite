@@ -125,15 +125,21 @@ fn get_process(inst: (String, String, String)) -> Result<Process, String> {
     match (inst.0.as_str(), inst.1.as_str(), inst.2.as_str()) {
         ("set", k, v) => Ok(Process {
             instruction: Instruction::SET,
-            key: k.to_string(),
-            value: v.to_string(),
+            key: k.to_owned(),
+            value: v.to_owned(),
         }),
         ("get", k, v) => Ok(Process {
             instruction: Instruction::GET,
-            key: k.to_string(),
-            value: v.to_string(),
+            key: k.to_owned(),
+            value: v.to_owned(),
         }),
-        _ => Err(format!("{} NOP", Utc::now().format("%Y-%m-%d %H:%M:%S"))),
+        (i, k, v) => Err(format!(
+            "{} NOP {} {} {}",
+            Utc::now().format("%Y-%m-%d %H:%M:%S"),
+            i.to_owned(),
+            k.to_owned(),
+            v.to_owned()
+        )),
     }
 }
 
@@ -152,6 +158,7 @@ fn parse_message(stream: Arc<RwLock<TcpStream>>) -> std::io::Result<(String, Str
     for c in content.chars() {
         match c {
             ' ' => {
+                // Makes more sense in rever order.
                 if val.len() > 0 {
                     val.push(' ');
                 } else if key.len() > 0 {
