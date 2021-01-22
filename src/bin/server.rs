@@ -1,5 +1,5 @@
 use chrono::Utc;
-use std::io::{BufReader, Read};
+use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex, RwLock};
 use std::{collections::BTreeMap, thread};
@@ -24,14 +24,19 @@ fn main() -> std::io::Result<()> {
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
-                let instruction = parse_message(stream)?;
+                let stream = Arc::new(RwLock::new(stream));
+                let instruction = parse_message(Arc::clone(&stream))?;
                 let process = get_process(instruction);
 
                 match process {
                     Ok(proc) => {
                         let key_values = Arc::clone(&data);
                         let handle = thread::spawn(move || {
-                            update_map_worker_thread(proc, key_values);
+                            let result = update_map_worker_thread(proc, key_values);
+                            let mut stream = stream.write().unwrap();
+                            stream.write(result.as_bytes()).unwrap();
+                            stream.write(&[0xA]).unwrap(); // End of line \n
+                            stream.flush().unwrap();
                         });
                         handles.push(handle);
                     }
@@ -98,7 +103,7 @@ fn update_map_worker_thread(
                 content
             );
 
-            content
+            "OK".to_owned()
         }
     }
 }
@@ -132,21 +137,23 @@ fn get_process(inst: (String, String, String)) -> Result<Process, String> {
     }
 }
 
-fn parse_message(mut stream: TcpStream) -> std::io::Result<(String, String, String)> {
-    let mut reader = BufReader::new(&mut stream);
+fn parse_message(stream: Arc<RwLock<TcpStream>>) -> std::io::Result<(String, String, String)> {
+    // @bot Clone makes sense here? It's the only way I know how to do it
+    let stream = stream.write().unwrap();
+    let mut reader = BufReader::new(stream.try_clone().unwrap());
     let mut content = String::new();
-    reader.read_to_string(&mut content)?;
+    reader.read_line(&mut content).unwrap();
 
     let mut inst = String::new();
     let mut key = String::new();
-    let mut value = String::new();
+    let mut val = String::new();
 
     let mut found = 0;
     for c in content.chars() {
         match c {
             ' ' => {
-                if value.len() > 0 {
-                    value.push(' ');
+                if val.len() > 0 {
+                    val.push(' ');
                 } else if key.len() > 0 {
                     found = 2;
                 } else if inst.len() > 0 {
@@ -161,11 +168,15 @@ fn parse_message(mut stream: TcpStream) -> std::io::Result<(String, String, Stri
                     key.push(c);
                 }
                 _ => {
-                    value.push(c);
+                    val.push(c);
                 }
             },
         }
     }
 
-    Ok((inst.to_lowercase(), key, value))
+    Ok((
+        inst.trim().to_lowercase(),
+        key.trim().to_owned(),
+        val.trim().to_owned(),
+    ))
 }
