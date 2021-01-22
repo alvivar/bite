@@ -1,5 +1,6 @@
 
-    User Error instead of unwrap
+    Save to file!
+    User Error as results and stuff instead of unwrap
 
 
     2021.01.22
