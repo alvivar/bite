@@ -1,8 +1,12 @@
 use chrono::Utc;
-use std::io::{BufRead, BufReader, Write};
+use serde::{Deserialize, Serialize};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex, RwLock};
 use std::{collections::BTreeMap, thread};
+use std::{
+    fs::write,
+    io::{BufRead, BufReader, Write},
+};
 
 struct Process {
     instruction: Instruction,
@@ -32,7 +36,8 @@ fn main() -> std::io::Result<()> {
                     Ok(proc) => {
                         let key_values = Arc::clone(&data);
                         let handle = thread::spawn(move || {
-                            let result = update_map_worker_thread(proc, key_values);
+                            let result = update_map_worker_thread(proc, key_values.clone());
+                            save_map_to_disc(&key_values);
                             let mut stream = stream.write().unwrap();
                             stream.write(result.as_bytes()).unwrap();
                             stream.write(&[0xA]).unwrap(); // End of line \n
@@ -54,6 +59,11 @@ fn main() -> std::io::Result<()> {
     }
 
     Ok(())
+}
+
+fn save_map_to_disc(data: &Arc<RwLock<BTreeMap<String, Mutex<String>>>>) {
+    let mut map = data.into_inner().unwrap();
+    println!("btree: {}", serde_json::to_string(&mut map).unwrap());
 }
 
 fn update_map_worker_thread(
