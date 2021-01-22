@@ -24,4 +24,5 @@ Sometimes I need a quick and easy server to save data in experiments.
 
 ## Tech
 
-A Rust TcpListener over a BTreeMap for data, eventually serialized into a file with Serde.
+A Rust TcpListener over a BTreeMap for data, eventually serialized into a file
+with Serde.

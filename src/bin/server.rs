@@ -44,7 +44,7 @@ fn main() -> std::io::Result<()> {
                 }
             }
             Err(e) => {
-                println!("Somehow an error:\n{}\n", e);
+                println!("Somehow a listener.incoming() error?\n{}\n", e);
             }
         }
     }
