@@ -20,8 +20,8 @@ enum Instruction {
 }
 
 fn main() -> std::io::Result<()> {
-    let key_values: BTreeMap<String, Mutex<String>> = BTreeMap::new();
-    let data = Arc::new(RwLock::new(key_values));
+    let key_values: BTreeMap<String, String> = BTreeMap::new();
+    let data = Arc::new(Mutex::new(key_values));
     let mut handles = vec![];
 
     let listener = TcpListener::bind("127.0.0.1:1984")?;
@@ -29,8 +29,29 @@ fn main() -> std::io::Result<()> {
         match stream {
             Ok(stream) => {
                 let stream = Arc::new(RwLock::new(stream));
-                let instruction = parse_message(Arc::clone(&stream))?;
+                let instruction = parse_message(stream.clone())?;
                 let process = get_process(instruction);
+
+                // Current one:
+                // 1. [a] Lock the stream
+                // 2. [a] Read a message
+                // 3. Launch a thread that will process the message (expensive because launching a new thread is expensive)
+                // 4. [a] Lock the stream within this thread
+                // 5. [a] Send the reply within this thread
+                //
+                // Problems:
+                // 1. Lots of lockign between [a]
+                // 2. Launching a thread is expensive, we're doing it for every message
+
+                // Better one:
+                // 1. Thread pool for however many CPU cores you have to handle the messages
+                // 2. An non-blocking message queue to feed messages to the thread pool
+                // 3. A blocking message queue to feed results from the thread pool to main thread
+                // 4. Only your main thread handles any I/O (I/O is slow)
+                //
+                // Benefits:
+                // 1. The thread pool ..
+                // 2. One thread handles IO and n threads handle messages as fast as your CPU can do on each core (no locking, ever)
 
                 match process {
                     Ok(proc) => {
@@ -61,22 +82,16 @@ fn main() -> std::io::Result<()> {
     Ok(())
 }
 
-fn save_map_to_disc(data: &Arc<RwLock<BTreeMap<String, Mutex<String>>>>) {
-    let mut map = data.into_inner().unwrap();
-    println!("btree: {}", serde_json::to_string(&mut map).unwrap());
+fn save_map_to_disc(data: &Arc<Mutex<BTreeMap<String, String>>>) {
+    let map = data.lock().unwrap();
+    println!("btree: {:?}", serde_json::to_string(&*map).unwrap());
 }
 
-fn update_map_worker_thread(
-    proc: Process,
-    data: Arc<RwLock<BTreeMap<String, Mutex<String>>>>,
-) -> String {
-    let mut map = data.write().unwrap();
+fn update_map_worker_thread(proc: Process, data: Arc<Mutex<BTreeMap<String, String>>>) -> String {
+    let mut map = data.lock().unwrap();
     match proc.instruction {
         Instruction::GET => match map.get(&proc.key) {
-            Some(d) => {
-                let mutex = d.lock().unwrap();
-                let content = mutex.to_owned();
-
+            Some(content) => {
                 println!(
                     "{} GET {} {}",
                     Utc::now().format("%Y-%m-%d %H:%M:%S"),
@@ -84,7 +99,7 @@ fn update_map_worker_thread(
                     content
                 );
 
-                content
+                content.clone()
             }
             None => {
                 println!(
@@ -97,20 +112,13 @@ fn update_map_worker_thread(
             }
         },
         Instruction::SET => {
-            let data = map
-                .entry(proc.key.to_owned())
-                .or_insert(Mutex::new(proc.value.to_owned()));
-
-            *data.lock().unwrap() = proc.value.to_owned();
-
-            let mutex = data.lock().unwrap();
-            let content = mutex.to_owned();
+            map.insert(proc.key.to_owned(), proc.value.to_owned());
 
             println!(
                 "{} SET {} {}",
                 Utc::now().format("%Y-%m-%d %H:%M:%S"),
                 proc.key,
-                content
+                proc.value.to_owned()
             );
 
             "OK".to_owned()
@@ -155,8 +163,8 @@ fn get_process(inst: (String, String, String)) -> Result<Process, String> {
 
 fn parse_message(stream: Arc<RwLock<TcpStream>>) -> std::io::Result<(String, String, String)> {
     // @bot Clone makes sense here? It's the only way I know how to do it
-    let stream = stream.write().unwrap();
-    let mut reader = BufReader::new(stream.try_clone().unwrap());
+    let mut stream = &*stream.write().unwrap();
+    let mut reader = BufReader::new(&mut stream);
     let mut content = String::new();
     reader.read_line(&mut content).unwrap();
 
