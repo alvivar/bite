@@ -6,7 +6,53 @@ use std::{collections::BTreeMap, thread};
 use std::{
     fs::write,
     io::{BufRead, BufReader, Write},
+    sync::mpsc,
 };
+
+#[derive(Debug)]
+enum Command {
+    Get(String),
+    Set(String, String),
+}
+#[derive(Debug)]
+enum Message {
+    Resp(String),
+}
+
+struct Worker {
+    join_handle: thread::JoinHandle<()>,
+    cmd_sndr: mpsc::Sender<Command>,
+}
+
+impl Worker {
+    pub fn new(msg_sndr: mpsc::Sender<Message>) -> Self {
+        let (cmd_sndr, cmd_recv) = mpsc::channel::<Command>();
+        let join_handle = thread::spawn(move || Self::worker(cmd_recv, msg_sndr));
+        Self {
+            join_handle,
+            cmd_sndr,
+        }
+    }
+
+    pub fn command(&self, cmd: Command) {
+        self.cmd_sndr.send(cmd).unwrap()
+    }
+
+    fn worker(cmd_recv: mpsc::Receiver<Command>, msg_sndr: mpsc::Sender<Message>) {
+        loop {
+            let cmd = cmd_recv.recv().unwrap();
+            println!("{:?}", &cmd);
+            match cmd {
+                Command::Get(key) => {
+                    msg_sndr.send(Message::Resp("Got it".to_owned()));
+                }
+                Command::Set(key, val) => {
+                    msg_sndr.send(Message::Resp("Got it".to_owned()));
+                }
+            }
+        }
+    }
+}
 
 struct Process {
     instruction: Instruction,
@@ -24,13 +70,22 @@ fn main() -> std::io::Result<()> {
     let data = Arc::new(Mutex::new(key_values));
     let mut handles = vec![];
 
+    // TODO: Thread pool
+
+    let (msg_sndr, msg_recv) = mpsc::channel();
+    let worker = Worker::new(msg_sndr);
+
     let listener = TcpListener::bind("127.0.0.1:1984")?;
     for stream in listener.incoming() {
         match stream {
-            Ok(stream) => {
-                let stream = Arc::new(RwLock::new(stream));
-                let instruction = parse_message(stream.clone())?;
-                let process = get_process(instruction);
+            Ok(mut stream) => {
+                let process = parse_message(&mut stream).unwrap();
+
+                worker.command();
+
+                // Current: Listening on the same thread as you're processing things
+
+                // Better: Listen on one thread, handle connections on another
 
                 // Current one:
                 // 1. [a] Lock the stream
@@ -73,10 +128,6 @@ fn main() -> std::io::Result<()> {
                 println!("Somehow a listener.incoming() error?\n{}\n", e);
             }
         }
-    }
-
-    for handle in handles {
-        handle.join().unwrap();
     }
 
     Ok(())
@@ -161,10 +212,8 @@ fn get_process(inst: (String, String, String)) -> Result<Process, String> {
     }
 }
 
-fn parse_message(stream: Arc<RwLock<TcpStream>>) -> std::io::Result<(String, String, String)> {
-    // @bot Clone makes sense here? It's the only way I know how to do it
-    let mut stream = &*stream.write().unwrap();
-    let mut reader = BufReader::new(&mut stream);
+fn parse_message(stream: &mut TcpStream) -> std::io::Result<Process> {
+    let mut reader = BufReader::new(stream);
     let mut content = String::new();
     reader.read_line(&mut content).unwrap();
 
@@ -199,9 +248,14 @@ fn parse_message(stream: Arc<RwLock<TcpStream>>) -> std::io::Result<(String, Str
         }
     }
 
-    Ok((
-        inst.trim().to_lowercase(),
-        key.trim().to_owned(),
-        val.trim().to_owned(),
-    ))
+    let instruction = match inst.trim().to_lowercase().as_str() {
+        "get" => Instruction::GET,
+        "set" => Instruction::SET,
+    };
+
+    Ok(Process {
+        instruction,
+        key: key.trim().to_owned(),
+        value: val.trim().to_owned(),
+    })
 }
