@@ -1,55 +1,11 @@
 use chrono::Utc;
-use std::collections::BTreeMap;
+use rayon;
+use serde::de::value;
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
-
-#[derive(Debug)]
-enum Command {
-    Get(String),
-    Set(String, String),
-}
-
-#[derive(Debug)]
-enum Message {
-    Resp(String),
-}
-
-struct Worker {
-    join_handle: thread::JoinHandle<()>,
-    cmd_sndr: mpsc::Sender<Command>,
-}
-
-impl Worker {
-    pub fn new(msg_sndr: mpsc::Sender<Message>) -> Self {
-        let (cmd_sndr, cmd_recv) = mpsc::channel::<Command>();
-        let join_handle = thread::spawn(move || Self::worker(cmd_recv, msg_sndr));
-        Self {
-            join_handle,
-            cmd_sndr,
-        }
-    }
-
-    pub fn command(&self, cmd: Command) {
-        self.cmd_sndr.send(cmd).unwrap()
-    }
-
-    fn worker(cmd_recv: mpsc::Receiver<Command>, msg_sndr: mpsc::Sender<Message>) {
-        loop {
-            let cmd = cmd_recv.recv().unwrap();
-            println!("{:?}", &cmd);
-            match cmd {
-                Command::Get(key) => {
-                    msg_sndr.send(Message::Resp("GET".to_owned())).unwrap();
-                }
-                Command::Set(key, val) => {
-                    msg_sndr.send(Message::Resp("SET".to_owned())).unwrap();
-                }
-            }
-        }
-    }
-}
+use std::{collections::BTreeMap, net::SocketAddr};
 
 struct Process {
     instruction: Instruction,
@@ -63,147 +19,55 @@ enum Instruction {
     NOP,
 }
 
-fn main() -> std::io::Result<()> {
-    let key_values: BTreeMap<String, String> = BTreeMap::new();
-    let data = Arc::new(Mutex::new(key_values));
+struct Package {
+    socket: TcpStream,
+    address: SocketAddr,
+    process: Process,
+}
 
-    // @todo Thread pool
+fn main() {
+    let data = Arc::new(Mutex::new(BTreeMap::<String, String>::new()));
 
-    let mut workers = Vec::<Worker>::new();
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(4)
+        .build()
+        .unwrap();
 
-    let (msg_sndr, msg_recv) = mpsc::channel();
-    workers.push(Worker::new(msg_sndr.clone()));
-    workers.push(Worker::new(msg_sndr.clone()));
-    workers.push(Worker::new(msg_sndr.clone()));
-    workers.push(Worker::new(msg_sndr.clone()));
+    // Incoming
 
-    let server = TcpListener::bind("127.0.0.1:1984")?;
-    server.set_nonblocking(true)?;
+    let server = TcpListener::bind("127.0.0.1:1984").unwrap();
+    server.set_nonblocking(true).unwrap();
+
+    let (sender, receiver) = mpsc::channel::<Package>();
+
+    thread::spawn(move || loop {
+        if let Ok((mut socket, addr)) = server.accept() {
+            let result_sender = sender.clone();
+            pool.spawn(move || {
+                let process = parse_message(&mut socket);
+                result_sender
+                    .send(Package {
+                        socket: socket,
+                        address: addr,
+                        process: process.unwrap(),
+                    })
+                    .unwrap();
+            });
+        }
+    });
 
     loop {
-        if let Ok((mut socket, addr)) = server.accept() {
-            sleep();
+        match receiver.recv() {
+            Ok(p) => {
+                update_map_worker_thread(p, data.clone());
+            }
+            Err(_) => {}
         }
     }
 
-    // for
-
-    // for stream in server.incoming() {
-    //     match stream {
-    //         Ok(mut stream) => {
-    //             let key_values = Arc::clone(&data);
-    //             let process = parse_message(&mut stream)?;
-
-    //             match (process.instruction, process.key, process.value) {
-    //                 (Instruction::GET, k, _) => worker.command(Command::Get(k)),
-    //                 (Instruction::SET, k, v) => worker.command(Command::Set(k, v)),
-    //                 (Instruction::NOP, _, _) => {
-    //                     // @todo Handle nop
-    //                 }
-    //             }
-    //         }
-    //         Err(e) => {
-    //             println!("Somehow a listener.incoming() error?\n{}\n", e);
-    //         }
-    //     }
-    // }
-
-    Ok(())
+    // The main thread is going to process the I/O operations, based on
+    // responses from clients messages.
 }
-
-fn sleep() {
-    thread::sleep(::std::time::Duration::from_millis(100));
-}
-
-// fn save_map_to_disc(data: &Arc<Mutex<BTreeMap<String, String>>>) {
-//     let map = data.lock().unwrap();
-//     println!("btree: {:?}", serde_json::to_string(&*map).unwrap());
-// }
-
-// fn update_map_worker_thread(proc: Process, data: Arc<Mutex<BTreeMap<String, String>>>) -> String {
-//     let mut map = data.lock().unwrap();
-//     match proc.instruction {
-//         Instruction::GET => match map.get(&proc.key) {
-//             Some(content) => {
-//                 println!(
-//                     "{} GET {} {}",
-//                     Utc::now().format("%Y-%m-%d %H:%M:%S"),
-//                     proc.key,
-//                     content
-//                 );
-
-//                 content.clone()
-//             }
-//             None => {
-//                 println!(
-//                     "{} GET {}",
-//                     Utc::now().format("%Y-%m-%d %H:%M:%S"),
-//                     proc.key
-//                 );
-
-//                 "".to_owned()
-//             }
-//         },
-//         Instruction::SET => {
-//             map.insert(proc.key.to_owned(), proc.value.to_owned());
-
-//             println!(
-//                 "{} SET {} {}",
-//                 Utc::now().format("%Y-%m-%d %H:%M:%S"),
-//                 proc.key,
-//                 proc.value.to_owned()
-//             );
-
-//             "OK".to_owned()
-//         }
-//         Instruction::NOP => {
-//             println!(
-//                 "{} SET {} {}",
-//                 Utc::now().format("%Y-%m-%d %H:%M:%S"),
-//                 proc.key,
-//                 proc.value.to_owned()
-//             );
-
-//             "".to_owned()
-//         }
-//     }
-// }
-
-// @old Before threads.
-// fn get_update_map(map: &mut BTreeMap<String, String>, proc: Process) -> Result<String, ()> {
-//     match proc.instruction {
-//         Instruction::GET => Ok(map.entry(proc.key).or_insert(proc.value).to_string()),
-//         Instruction::SET => {
-//             let val = map.entry(proc.key.clone()).or_insert(proc.value.clone());
-//             val.clear();
-//             val.push_str(proc.value.as_str());
-//             Ok(val.to_string())
-//         }
-//     }
-// }
-
-// @old
-// fn get_process(inst: (String, String, String)) -> Result<Process, String> {
-//     match (inst.0.as_str(), inst.1.as_str(), inst.2.as_str()) {
-//         ("set", k, v) => Ok(Process {
-//             instruction: Instruction::SET,
-//             key: k.to_owned(),
-//             value: v.to_owned(),
-//         }),
-//         ("get", k, v) => Ok(Process {
-//             instruction: Instruction::GET,
-//             key: k.to_owned(),
-//             value: v.to_owned(),
-//         }),
-//         (i, k, v) => Err(format!(
-//             "{} NOP {} {} {}",
-//             Utc::now().format("%Y-%m-%d %H:%M:%S"),
-//             i.to_owned(),
-//             k.to_owned(),
-//             v.to_owned()
-//         )),
-//     }
-// }
 
 fn parse_message(stream: &mut TcpStream) -> std::io::Result<Process> {
     let mut reader = BufReader::new(stream);
@@ -252,4 +116,59 @@ fn parse_message(stream: &mut TcpStream) -> std::io::Result<Process> {
         key: key.trim().to_owned(),
         value: val.trim().to_owned(),
     })
+}
+
+fn update_map_worker_thread(
+    package: Package,
+    data: Arc<Mutex<BTreeMap<String, String>>>,
+) -> String {
+    let mut map = data.lock().unwrap();
+    match package.process.instruction {
+        Instruction::GET => match map.get(&package.process.key) {
+            Some(content) => {
+                println!(
+                    "{} GET {} {}",
+                    Utc::now().format("%Y-%m-%d %H:%M:%S"),
+                    package.process.key,
+                    content
+                );
+
+                content.clone()
+            }
+            None => {
+                println!(
+                    "{} GET {}",
+                    Utc::now().format("%Y-%m-%d %H:%M:%S"),
+                    package.process.key
+                );
+
+                "".to_owned()
+            }
+        },
+        Instruction::SET => {
+            map.insert(
+                package.process.key.to_owned(),
+                package.process.value.to_owned(),
+            );
+
+            println!(
+                "{} SET {} {}",
+                Utc::now().format("%Y-%m-%d %H:%M:%S"),
+                package.process.key,
+                package.process.value.to_owned()
+            );
+
+            "OK".to_owned()
+        }
+        Instruction::NOP => {
+            println!(
+                "{} SET {} {}",
+                Utc::now().format("%Y-%m-%d %H:%M:%S"),
+                package.process.key,
+                package.process.value.to_owned()
+            );
+
+            "".to_owned()
+        }
+    }
 }
