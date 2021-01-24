@@ -87,7 +87,7 @@ fn main() {
                     Instruction::Nop => "NOP",
                 };
 
-                println!("> {} {} {} {} {}", now, ip, i, k, v);
+                println!("{} | {} | {} {} {}", now, ip, i, k, v);
             }
             Err(_) => {
                 panic!("receiver.recv() Failed!")
