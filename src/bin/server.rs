@@ -44,15 +44,15 @@ fn main() {
     let (sender, receiver) = mpsc::channel::<Client>();
 
     thread::spawn(move || loop {
-        if let Ok((mut socket, addr)) = server.accept() {
+        if let Ok((mut socket, address)) = server.accept() {
             let result_sender = sender.clone();
             pool.spawn(move || {
-                let process = parse_message(&mut socket);
+                let process = parse_message(&mut socket).unwrap();
                 result_sender
                     .send(Client {
-                        socket: socket,
-                        address: addr,
-                        process: process.unwrap(),
+                        socket,
+                        address,
+                        process,
                     })
                     .unwrap();
             });
@@ -69,7 +69,6 @@ fn main() {
 
                 let mut socket = client.socket;
                 socket.write(update.result.as_bytes()).unwrap();
-                socket.write(&[0xA]).unwrap(); // End of line
                 socket.flush().unwrap();
 
                 let ip = client.address;
@@ -106,7 +105,7 @@ fn parse_message(stream: &mut TcpStream) -> std::io::Result<Process> {
     let mut val = String::new();
 
     let mut found = 0;
-    for c in content.chars() {
+    for c in content.trim().chars() {
         match c {
             ' ' => {
                 if val.len() > 0 {
@@ -131,6 +130,8 @@ fn parse_message(stream: &mut TcpStream) -> std::io::Result<Process> {
         }
     }
 
+    // println!("i[{}] k[{}] v[{}]", inst, key, val); // Debug
+
     let instruction = match inst.trim().to_lowercase().as_str() {
         "get" => Instruction::Get,
         "set" => Instruction::Set,
@@ -150,11 +151,11 @@ fn update_btreemap(process: Process, data: Arc<Mutex<BTreeMap<String, String>>>)
         Instruction::Get => match map.get(&process.key) {
             Some(content) => Update {
                 result: content.to_owned(),
-                process: process,
+                process,
             },
             None => Update {
                 result: "".to_owned(),
-                process: process,
+                process,
             },
         },
         Instruction::Set => {
@@ -162,12 +163,12 @@ fn update_btreemap(process: Process, data: Arc<Mutex<BTreeMap<String, String>>>)
 
             Update {
                 result: "OK".to_owned(),
-                process: process,
+                process,
             }
         }
         Instruction::Nop => Update {
             result: "NOP".to_owned(),
-            process: process,
+            process,
         },
     }
 }
