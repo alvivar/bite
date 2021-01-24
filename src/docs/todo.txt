@@ -1,4 +1,5 @@
 
+    Threads should be able to handle a pool of connections
     Save to file!
     SET without key, creates an empty key?
     User Error as results and stuff instead of unwrap
