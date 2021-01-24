@@ -76,17 +76,22 @@ fn main() {
                 let now = Utc::now().format("%Y-%m-%d %H:%M:%S");
                 let i = update.process.instruction;
                 let k = update.process.key;
-                let v = update.process.value;
+                let mut v = update.process.value;
 
                 let i = match i {
-                    Instruction::Get => "GET",
+                    Instruction::Get => {
+                        v = update.result;
+                        "GET"
+                    }
                     Instruction::Set => "SET",
                     Instruction::Nop => "NOP",
                 };
 
                 println!("> {} {} {} {} {}", now, ip, i, k, v);
             }
-            Err(_) => {}
+            Err(_) => {
+                panic!("receiver.recv() Failed!")
+            }
         }
     }
 }
