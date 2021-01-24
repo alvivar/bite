@@ -29,6 +29,18 @@ struct Update {
     process: Process,
 }
 
+enum WorkerMessage {}
+
+enum WorkerCommand {}
+
+struct Worker {
+    clients: Vec<Client>,
+}
+
+impl Worker {
+    pub fn new() {}
+}
+
 fn main() {
     let data = Arc::new(Mutex::new(BTreeMap::<String, String>::new()));
     let pool = rayon::ThreadPoolBuilder::new()
@@ -47,7 +59,12 @@ fn main() {
         if let Ok((mut socket, address)) = server.accept() {
             let result_sender = sender.clone();
             pool.spawn(move || {
-                let process = parse_message(&mut socket).unwrap();
+                let mut reader = BufReader::new(&mut socket);
+                let mut content = String::new();
+                reader.read_line(&mut content).unwrap();
+
+                let process = parse_message(&mut content).unwrap();
+
                 result_sender
                     .send(Client {
                         socket,
@@ -95,11 +112,7 @@ fn main() {
     }
 }
 
-fn parse_message(stream: &mut TcpStream) -> std::io::Result<Process> {
-    let mut reader = BufReader::new(stream);
-    let mut content = String::new();
-    reader.read_line(&mut content)?;
-
+fn parse_message(content: &mut String) -> std::io::Result<Process> {
     let mut inst = String::new();
     let mut key = String::new();
     let mut val = String::new();
