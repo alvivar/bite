@@ -69,7 +69,7 @@ fn main() {
 
                 let mut socket = client.socket;
                 socket.write(update.result.as_bytes()).unwrap();
-                socket.write(&[0xA]).unwrap(); // End of line \n
+                socket.write(&[0xA]).unwrap(); // End of line
                 socket.flush().unwrap();
 
                 let ip = client.address;
