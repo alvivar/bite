@@ -1,24 +1,72 @@
-// Current: Listening on the same thread as you're processing things
 
-// Better: Listen on one thread, handle connections on another
+Current: Listening on the same thread as you're processing things
 
-// Current one:
-// 1. [a] Lock the stream
-// 2. [a] Read a message
-// 3. Launch a thread that will process the message (expensive because launching a new thread is expensive)
-// 4. [a] Lock the stream within this thread
-// 5. [a] Send the reply within this thread
+Better: Listen on one thread, handle connections on another
+
+Current one:
+1. [a] Lock the stream
+2. [a] Read a message
+3. Launch a thread that will process the message (expensive because launching a new thread is expensive)
+4. [a] Lock the stream within this thread
+5. [a] Send the reply within this thread
 //
-// Problems:
-// 1. Lots of lockign between [a]
-// 2. Launching a thread is expensive, we're doing it for every message
+Problems:
+1. Lots of lockign between [a]
+2. Launching a thread is expensive, we're doing it for every message
 
-// Better one:
-// 1. Thread pool for however many CPU cores you have to handle the messages
-// 2. An non-blocking message queue to feed messages to the thread pool
-// 3. A blocking message queue to feed results from the thread pool to main thread
-// 4. Only your main thread handles any I/O (I/O is slow)
-//
-// Benefits:
-// 1. The thread pool ..
-// 2. One thread handles IO and n threads handle messages as fast as your CPU can do on each core (no locking, ever)
+Better one:
+1. Thread pool for however many CPU cores you have to handle the messages
+2. An non-blocking message queue to feed messages to the thread pool
+3. A blocking message queue to feed results from the thread pool to main thread
+4. Only your main thread handles any I/O (I/O is slow)
+
+Benefits:
+1. The thread pool ..
+2. One thread handles IO and n threads handle messages as fast as your CPU can do on each core (no locking, ever)
+
+
+#[derive(Debug)]
+enum Command {
+    Get(String),
+    Set(String, String),
+}
+
+#[derive(Debug)]
+enum Message {
+    Resp(String),
+}
+
+struct Worker {
+    join_handle: thread::JoinHandle<()>,
+    cmd_sndr: mpsc::Sender<Command>,
+}
+
+impl Worker {
+    pub fn new(msg_sndr: mpsc::Sender<Message>) -> Self {
+        let (cmd_sndr, cmd_recv) = mpsc::channel::<Command>();
+        let join_handle = thread::spawn(move || Self::worker(cmd_recv, msg_sndr));
+        Self {
+            join_handle,
+            cmd_sndr,
+        }
+    }
+
+    pub fn command(&self, cmd: Command) {
+        self.cmd_sndr.send(cmd).unwrap()
+    }
+
+    fn worker(cmd_recv: mpsc::Receiver<Command>, msg_sndr: mpsc::Sender<Message>) {
+        loop {
+            let cmd = cmd_recv.recv().unwrap();
+            println!("{:?}", &cmd);
+            match cmd {
+                Command::Get(key) => {
+                    msg_sndr.send(Message::Resp("GET".to_owned())).unwrap();
+                }
+                Command::Set(key, val) => {
+                    msg_sndr.send(Message::Resp("SET".to_owned())).unwrap();
+                }
+            }
+        }
+    }
+}
