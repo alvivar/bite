@@ -135,7 +135,10 @@ fn parse_message(stream: &mut TcpStream) -> std::io::Result<Process> {
     let instruction = match inst.trim().to_lowercase().as_str() {
         "get" => Instruction::Get,
         "set" => Instruction::Set,
-        _ => Instruction::Nop,
+        _ => {
+            key = format!("{} {}", inst, key);
+            Instruction::Nop
+        }
     };
 
     Ok(Process {
