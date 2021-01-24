@@ -32,7 +32,7 @@ struct Update {
 fn main() {
     let data = Arc::new(Mutex::new(BTreeMap::<String, String>::new()));
     let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(4)
+        .num_threads(3)
         .build()
         .unwrap();
 
