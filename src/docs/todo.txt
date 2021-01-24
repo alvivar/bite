@@ -3,6 +3,9 @@
     SET without key, creates an empty key?
     User Error as results and stuff instead of unwrap
 
+    2021.01.24
+    x NOP propagates the wrong instruction as key
+
     2021.01.23
     x Thread pool handles connections and parsing
     x Main thread process IO
