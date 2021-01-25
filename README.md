@@ -1,6 +1,6 @@
 # Bite
 
-Minimalistic Key Value Store. A socket waiting for messages to GET and SET
+Minimalistic Key-Value Store. A socket waiting for messages to GET and SET
 values.
 
 ## How to use
