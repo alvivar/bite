@@ -1,21 +1,23 @@
 
-    Clients listener thread
-        On Client
-            Send socket to the next Worker queue
+    v2
 
-    Worker
-        Thread
-            Listen to Messages Non blocking
-                On New client
-                    Add client to the client queue
+        Clients listener thread
+            On Client
+                Send socket to the next Worker queue
 
-            Loop over the socket queue
-                Read line socket message
-                Parse socket into Process
-                Send Process to Main thread
+        Worker
+            Thread
+                Listen to Messages Non blocking
+                    On New client
+                        Add client to the client queue
 
-    Main thread
-        Listening Worker messages
-            On Process
-                BTreeMap update
-                Write the result list in the Worker client socket
+                Loop over the socket queue
+                    Read line socket message
+                    Parse socket into Process
+                    Send Process to Main thread
+
+        Main thread
+            Listening Worker messages
+                On Process
+                    BTreeMap update
+                    Write the result list in the Worker client socket
