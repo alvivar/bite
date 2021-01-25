@@ -1,9 +1,10 @@
 use chrono::Utc;
-use std::collections::BTreeMap;
+use mpsc::Sender;
 use std::io::{self, BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
+use std::{collections::BTreeMap, net::SocketAddr};
 
 struct Process {
     instruction: Instruction,
@@ -23,27 +24,45 @@ struct Update {
 }
 
 enum Message {
-    Result(usize, mpsc::Sender<Command>, TcpStream, Process),
+    Result(Client, Process),
 }
 
-#[derive(Debug)]
 enum Command {
-    New(TcpStream),
-    Del(usize),
+    New(TcpStream, SocketAddr),
+}
+
+struct Client {
+    socket: TcpStream,
+    addr: SocketAddr,
+}
+
+struct WorkerPool {
+    pool: Mutex<Vec<Worker>>,
+}
+
+impl WorkerPool {
+    pub fn new() -> WorkerPool {
+        WorkerPool {
+            pool: Mutex::new(Vec::new()),
+        }
+    }
+
+    pub fn spawn(&self, worker: Worker) {
+        self.pool.lock().unwrap().push(worker);
+    }
 }
 
 struct Worker {
-    join_handle: thread::JoinHandle<()>,
+    handle: thread::JoinHandle<()>,
     sender: mpsc::Sender<Command>,
 }
 
 impl Worker {
     pub fn new(results: mpsc::Sender<Message>) -> Self {
         let (sender, receiver) = mpsc::channel::<Command>();
-        let sender_clone = sender.clone();
-        let join_handle = thread::spawn(move || Self::worker(receiver, sender_clone, results));
+        let join_handle = thread::spawn(move || Self::worker(receiver, results));
         Self {
-            join_handle,
+            handle: join_handle,
             sender,
         }
     }
@@ -52,24 +71,17 @@ impl Worker {
         self.sender.send(cmd).expect("Failed sending the command.");
     }
 
-    fn worker(
-        commands: mpsc::Receiver<Command>,
-        sender: mpsc::Sender<Command>,
-        results: mpsc::Sender<Message>,
-    ) {
-        let mut clients = Vec::<TcpStream>::new();
+    fn worker(commands: mpsc::Receiver<Command>, results: mpsc::Sender<Message>) {
+        let mut clients = Vec::<Client>::new();
 
         loop {
             // Commands
 
             if let Ok(command) = commands.try_recv() {
-                println!("Worker detected: {:?}", command);
                 match command {
-                    Command::New(socket) => {
-                        clients.push(socket.try_clone().expect("Failed push on new socket."));
-                    }
-                    Command::Del(index) => {
-                        clients.remove(index);
+                    Command::New(socket, addr) => {
+                        println!("{} | {} | Connected", Utc::now().format(UTC_FORMAT), addr);
+                        clients.push(Client { socket, addr });
                     }
                 }
             }
@@ -78,28 +90,40 @@ impl Worker {
 
             for i in 0..clients.len() {
                 let mut socket = clients[i]
+                    .socket
                     .try_clone()
                     .expect("Failed cloning the nonblocking socket.");
                 socket
                     .set_nonblocking(true)
                     .expect("Fail setting the nonblocking socket.");
+                let addr = clients[i].addr;
 
                 let mut reader = BufReader::new(&mut socket);
                 let mut content = String::new();
                 match reader.read_line(&mut content) {
                     Ok(_) => {
-                        println!("Content and length {} {}", content, content.len());
+                        // @ Socket closed
+                        if content.len() <= 0 {
+                            clients.remove(i);
+                            println!(
+                                "{} | {} | Disconnected",
+                                Utc::now().format(UTC_FORMAT),
+                                addr
+                            );
+                            continue;
+                        }
 
                         let process =
                             parse_message(&mut content).expect("Failed parsing the message.");
 
                         results
                             .send(Message::Result(
-                                i,
-                                sender.clone(),
-                                clients[i]
-                                    .try_clone()
-                                    .expect("Failed cloning when sending the result."),
+                                Client {
+                                    socket: socket
+                                        .try_clone()
+                                        .expect("Failed cloning when sending the result."),
+                                    addr,
+                                },
                                 process,
                             ))
                             .expect("Failed sending the result.");
@@ -116,10 +140,12 @@ impl Worker {
     }
 }
 
+const UTC_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
+
 fn main() {
     let data = Arc::new(Mutex::new(BTreeMap::<String, String>::new()));
 
-    // Incoming connections
+    // # Incoming connections.
 
     let server = TcpListener::bind("127.0.0.1:1984").expect("Failed binding the server.");
     server
@@ -128,30 +154,31 @@ fn main() {
 
     let (sender, receiver) = mpsc::channel::<Message>();
 
-    let mut worker_index = 0;
-    let mut workers = Vec::<Worker>::new();
-    workers.push(Worker::new(sender.clone()));
-    workers.push(Worker::new(sender.clone()));
-    workers.push(Worker::new(sender.clone()));
+    // let pool = WorkerPool::new();
+    // pool.spawn(Worker::new(sender.clone()));
+    // pool.spawn(Worker::new(sender.clone()));
+
+    let mut worker_i = 0;
+    let workers = [Worker::new(sender.clone()), Worker::new(sender.clone())];
+
+    // # New worker on incoming connections.
 
     thread::spawn(move || loop {
         if let Ok((socket, address)) = server.accept() {
-            workers[worker_index].command(Command::New(socket));
-            worker_index = (worker_index + 1) % workers.len();
-
-            println!("Connection {}", worker_index);
+            // @ How to ask for the worker handling less connections?
+            workers[worker_i].command(Command::New(socket, address));
+            worker_i = (worker_i + 1) % workers.len();
         }
     });
 
-    // The main thread is going to process the I/O operations, based on
-    // responses from the Thread pool.
+    // # The main thread process the map based on responses from the Thread pool.
 
     loop {
         match receiver.recv() {
             Ok(message) => {
                 match message {
-                    Message::Result(idx, sender, socket, process) => {
-                        let mut socket = socket.try_clone().expect("");
+                    Message::Result(client, process) => {
+                        let mut socket = client.socket.try_clone().expect("");
 
                         let update = update_btreemap(process, data.clone());
 
@@ -163,8 +190,8 @@ fn main() {
                             .expect("Failed writting in the socket.");
                         socket.flush().expect("Failed flusing in the socket.");
 
-                        let ip = 0; //address;
-                        let now = Utc::now().format("%Y-%m-%d %H:%M:%S");
+                        let ip = client.addr; //address;
+                        let now = Utc::now().format(UTC_FORMAT);
                         let i = update.process.instruction;
                         let k = update.process.key;
                         let mut v = update.process.value;
