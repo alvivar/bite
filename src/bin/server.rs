@@ -1,10 +1,14 @@
+mod some_module;
+
+use some_module::say_hello;
+
 use chrono::Utc;
-use std::collections::BTreeMap;
 use std::fs::OpenOptions;
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
+use std::{collections::BTreeMap, unimplemented};
 
 const DB_FILE: &str = "DB.json";
 const UTC_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
@@ -31,7 +35,9 @@ enum Message {
 }
 
 enum Command {
+    // This is not for clients connecting, this is for work done for clients
     New(TcpStream, SocketAddr),
+    End,
 }
 
 struct Client {
@@ -39,21 +45,30 @@ struct Client {
     addr: SocketAddr,
 }
 
-// struct WorkerPool {
-//     workers: Mutex<Vec<Worker>>,
-// }
+struct WorkerPool {
+    workers: Vec<Worker>,
+}
 
-// impl WorkerPool {
-//     pub fn new() -> WorkerPool {
-//         WorkerPool {
-//             workers: Mutex::new(Vec::new()),
-//         }
-//     }
+impl WorkerPool {
+    pub fn new() -> WorkerPool {
+        WorkerPool {
+            workers: Vec::new(),
+        }
+    }
 
-//     pub fn spawn(&self, worker: Worker) {
-//         self.workers.lock().unwrap().push(worker);
-//     }
-// }
+    pub fn spawn(&mut self, worker: Worker) {
+        self.workers.push(worker);
+    }
+
+    pub fn command(&self, cmd: Command) {
+        // send a command to the worker threads
+    }
+
+    pub fn message(&self) -> Message {
+        // receive a message from the worker threads (blocking)
+        unimplemented!()
+    }
+}
 
 struct Worker {
     handle: thread::JoinHandle<()>,
@@ -77,13 +92,12 @@ impl Worker {
         loop {
             // Commands
 
-            if let Ok(command) = command.try_recv() {
-                match command {
-                    Command::New(socket, addr) => {
-                        println!("{} | {} | Connected", Utc::now().format(UTC_FORMAT), addr);
-                        clients.push(Client { socket, addr });
-                    }
+            match command.try_recv().unwrap() {
+                Command::New(socket, addr) => {
+                    println!("{} | {} | Connected", Utc::now().format(UTC_FORMAT), addr);
+                    clients.push(Client { socket, addr });
                 }
+                Command::End => break,
             }
 
             // Instructions parse
@@ -132,6 +146,8 @@ impl Worker {
 }
 
 fn main() {
+    say_hello();
+
     let data = Arc::new(Mutex::new(BTreeMap::<String, String>::new()));
 
     // Read the DB file
@@ -155,12 +171,13 @@ fn main() {
     let server = TcpListener::bind("127.0.0.1:1984").unwrap();
     server.set_nonblocking(true).unwrap();
 
-    // ?
-    // let pool = WorkerPool::new();
-    // pool.spawn(Worker::new(sender.clone()));
-    // pool.spawn(Worker::new(sender.clone()));
-
     let (sender, result) = mpsc::channel::<Message>();
+
+    // ?
+    let mut pool = WorkerPool::new();
+    pool.spawn(Worker::new(sender.clone()));
+    pool.spawn(Worker::new(sender.clone()));
+
     let workers = [Worker::new(sender.clone()), Worker::new(sender.clone())];
     let mut indx = 0;
 

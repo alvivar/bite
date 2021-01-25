@@ -1,11 +1,14 @@
 
-    Exit correctly by joining handles
-    How to create modules or something to divide logic in files
-    How to create a WorkerPool
+    [ ] How to create modules or something to divide logic in files
+    [x] Exit correctly by joining handles
+    [x] How to create a WorkerPool
 
-    Sleeping some 100 ms between threads
-    Ask for the worker with less connections when assigning
-    Improve serialization so it can be written in blocks like a good BTreeMap on file?
+    [x] Sleeping some 100 ms between threads
+    [x] Ask for the worker with less connections when assigning
+
+    [ ] Improve serialization so it can be written in blocks like a good BTreeMap on file?
+
+    Auth
 
     DB file name by environment
     IP and port by environment

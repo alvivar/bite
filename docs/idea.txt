@@ -1,3 +1,60 @@
+    v4 (bananas and incomplete)
+        Data <- immutable, never changing, authoritative, no need for a lock data
+
+        Database thread  // this is still a limitation (less so)
+            OwnCopyOfData <- it is what is says
+            On changeset -> apply it on the local copy and swap the copy with Data atomically (maybe atomic pointer here?)
+
+        Handler threads
+            1. Receive an instruction (blocking)
+            2. Send a message to the database thread
+            3. If the message is a write
+                4. Compose a changeset and send it to the database thread
+                5. Reply with ACK
+            4. Else if the message is a read
+                6. Read and reply
+
+        Main thread
+            1. Listen to connections
+            2. Spawn handler threads for each connection (for now, no need to keep track of the handle) (no mutex needed for the socket)
+
+
+    v3 (simplest)
+        Data (this is not a thread)
+
+        Write to disk thred
+            1. On message -> Write Data to disk
+
+        Handler threads
+            1. Receive an instruction (blocking)
+            2. Execute the instruction (synchronously accessed data using an RwLock) <- this is also a source of inefficiency
+            3. Send a message to the Write-to-disk-thread
+            4. Send the result (blocking)
+
+        Main thread
+            1. Listen to connections
+            2. Spawn handler threads for each connection (for now, no need to keep track of the handle) (no mutex needed for the socket)
+
+
+    v3
+        Storage thread  // this is just to write the file
+            On Write Message => write to file
+
+        Database thread  // this is still a limitation
+            OnMsg -> do stuff and reply the sender
+
+        Handler threads
+            1. Receive an instruction (blocking)
+            2. Send a message to the database thread
+            3. If the message has a response
+                4. Wait for a message from the database thread (HOW? we could send our communication channel with the message) (blocking)
+                5. Send the result (blocking)
+            6. Else send an acknowledgement response (blocking)
+
+        Main thread
+            1. Listen to connections
+            2. Spawn handler threads for each connection (for now, no need to keep track of the handle) (no mutex needed for the socket)
+
 
     v2
 
@@ -17,8 +74,8 @@
                     Send Process and socket to Main thread
 
         Main thread
-            Listening Worker messages
-                On Process
+            [A] Listening Worker messages (blocking) // has to wait for B and C (bad)
+                On Process (Some message)
                     BTreeMap update
-                    BTreeMap file save
-                    Write the result in the Worker client socket
+                    [C] BTreeMap file save
+                    [B] Write the result in the Worker client socket
