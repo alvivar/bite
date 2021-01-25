@@ -1,11 +1,21 @@
 
-    Save to file!
+    Improve serialization so it can be written in blocks like a good BTreeMap?
+
+    How to create modules or something to divide logic in files
+    How to create a WorkerPool
+    Exit correctly by joining handles
+
+    Ask for the worker with less connections when assigning
+
     SET without key, creates an empty key?
     User Error as results and stuff instead of unwrap
 
 
-    2021.01.24
+    2021.01.25
+    x Save to file!
     x WorkerPool prototype
+
+    2021.01.24
     x Propagate ip address
     x Handle client disconnect because everything explodes
     x Threads should be able to handle a pool of connections

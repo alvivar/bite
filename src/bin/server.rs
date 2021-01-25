@@ -1,10 +1,13 @@
 use chrono::Utc;
-use mpsc::Sender;
-use std::io::{self, BufRead, BufReader, Write};
-use std::net::{TcpListener, TcpStream};
+use std::collections::BTreeMap;
+use std::fs::OpenOptions;
+use std::io::{self, BufRead, BufReader, Read, Write};
+use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
-use std::{collections::BTreeMap, net::SocketAddr};
+
+const DB_NAME: &str = "DB.json";
+const UTC_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
 struct Process {
     instruction: Instruction,
@@ -36,21 +39,21 @@ struct Client {
     addr: SocketAddr,
 }
 
-struct WorkerPool {
-    pool: Mutex<Vec<Worker>>,
-}
+// struct WorkerPool {
+//     workers: Mutex<Vec<Worker>>,
+// }
 
-impl WorkerPool {
-    pub fn new() -> WorkerPool {
-        WorkerPool {
-            pool: Mutex::new(Vec::new()),
-        }
-    }
+// impl WorkerPool {
+//     pub fn new() -> WorkerPool {
+//         WorkerPool {
+//             workers: Mutex::new(Vec::new()),
+//         }
+//     }
 
-    pub fn spawn(&self, worker: Worker) {
-        self.pool.lock().unwrap().push(worker);
-    }
-}
+//     pub fn spawn(&self, worker: Worker) {
+//         self.workers.lock().unwrap().push(worker);
+//     }
+// }
 
 struct Worker {
     handle: thread::JoinHandle<()>,
@@ -58,26 +61,23 @@ struct Worker {
 }
 
 impl Worker {
-    pub fn new(results: mpsc::Sender<Message>) -> Self {
+    pub fn new(result: mpsc::Sender<Message>) -> Self {
         let (sender, receiver) = mpsc::channel::<Command>();
-        let join_handle = thread::spawn(move || Self::worker(receiver, results));
-        Self {
-            handle: join_handle,
-            sender,
-        }
+        let handle = thread::spawn(move || Self::worker(receiver, result));
+        Self { handle, sender }
     }
 
     pub fn command(&self, cmd: Command) {
-        self.sender.send(cmd).expect("Failed sending the command.");
+        self.sender.send(cmd).unwrap();
     }
 
-    fn worker(commands: mpsc::Receiver<Command>, results: mpsc::Sender<Message>) {
+    fn worker(command: mpsc::Receiver<Command>, result: mpsc::Sender<Message>) {
         let mut clients = Vec::<Client>::new();
 
         loop {
             // Commands
 
-            if let Ok(command) = commands.try_recv() {
+            if let Ok(command) = command.try_recv() {
                 match command {
                     Command::New(socket, addr) => {
                         println!("{} | {} | Connected", Utc::now().format(UTC_FORMAT), addr);
@@ -86,23 +86,19 @@ impl Worker {
                 }
             }
 
-            // Parse the messages from the clients
+            // Instructions parse
 
             for i in 0..clients.len() {
-                let mut socket = clients[i]
-                    .socket
-                    .try_clone()
-                    .expect("Failed cloning the nonblocking socket.");
-                socket
-                    .set_nonblocking(true)
-                    .expect("Fail setting the nonblocking socket.");
+                // @ Non blocking read_line
+                let mut socket = clients[i].socket.try_clone().unwrap();
+                socket.set_nonblocking(true).unwrap();
                 let addr = clients[i].addr;
 
                 let mut reader = BufReader::new(&mut socket);
                 let mut content = String::new();
                 match reader.read_line(&mut content) {
                     Ok(_) => {
-                        // @ Socket closed
+                        // @ TcpStream disconnection
                         if content.len() <= 0 {
                             clients.remove(i);
                             println!(
@@ -113,24 +109,19 @@ impl Worker {
                             continue;
                         }
 
-                        let process =
-                            parse_message(&mut content).expect("Failed parsing the message.");
+                        let process = parse_message(&mut content).unwrap();
 
-                        results
+                        result
                             .send(Message::Result(
                                 Client {
-                                    socket: socket
-                                        .try_clone()
-                                        .expect("Failed cloning when sending the result."),
+                                    socket: socket.try_clone().unwrap(),
                                     addr,
                                 },
                                 process,
                             ))
-                            .expect("Failed sending the result.");
+                            .unwrap();
                     }
-                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                        // This is the kind of stuff we want to ignore
-                    }
+                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {}
                     Err(e) => {
                         panic!("reader.read_line failed:\n{}", e);
                     }
@@ -140,72 +131,102 @@ impl Worker {
     }
 }
 
-const UTC_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
-
 fn main() {
     let data = Arc::new(Mutex::new(BTreeMap::<String, String>::new()));
 
-    // # Incoming connections.
+    // Read the DB file
 
-    let server = TcpListener::bind("127.0.0.1:1984").expect("Failed binding the server.");
-    server
-        .set_nonblocking(true)
-        .expect("Failed setting the nonblocking on the server bind.");
+    let file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .open(DB_NAME);
 
-    let (sender, receiver) = mpsc::channel::<Message>();
+    let mut contents = String::new();
+    file.unwrap().read_to_string(&mut contents).unwrap();
+    if contents.len() > 0 {
+        let c = data.clone();
+        let mut map = c.lock().unwrap();
+        *map = serde_json::from_str(&contents).unwrap();
+    }
 
+    // New worker on incoming connections.
+
+    let server = TcpListener::bind("127.0.0.1:1984").unwrap();
+    server.set_nonblocking(true).unwrap();
+
+    // ?
     // let pool = WorkerPool::new();
     // pool.spawn(Worker::new(sender.clone()));
     // pool.spawn(Worker::new(sender.clone()));
 
-    let mut worker_i = 0;
+    let (sender, result) = mpsc::channel::<Message>();
     let workers = [Worker::new(sender.clone()), Worker::new(sender.clone())];
-
-    // # New worker on incoming connections.
+    let mut indx = 0;
 
     thread::spawn(move || loop {
-        if let Ok((socket, address)) = server.accept() {
-            // @ How to ask for the worker handling less connections?
-            workers[worker_i].command(Command::New(socket, address));
-            worker_i = (worker_i + 1) % workers.len();
+        if let Ok((socket, addr)) = server.accept() {
+            workers[indx].command(Command::New(socket, addr));
+            indx = (indx + 1) % workers.len();
         }
     });
 
-    // # The main thread process the map based on responses from the Thread pool.
+    // The main thread process the map based on responses from the Thread pool.
 
     loop {
-        match receiver.recv() {
+        match result.recv() {
             Ok(message) => {
                 match message {
                     Message::Result(client, process) => {
-                        let mut socket = client.socket.try_clone().expect("");
+                        let mut socket = client.socket.try_clone().unwrap();
+
+                        // Map update
 
                         let update = update_btreemap(process, data.clone());
 
-                        socket
-                            .write(update.result.as_bytes())
-                            .expect("Failed writting in the socket.");
-                        socket
-                            .write(&[0xA])
-                            .expect("Failed writting in the socket.");
-                        socket.flush().expect("Failed flusing in the socket.");
+                        // Client result
 
-                        let ip = client.addr; //address;
-                        let now = Utc::now().format(UTC_FORMAT);
-                        let i = update.process.instruction;
-                        let k = update.process.key;
-                        let mut v = update.process.value;
+                        socket.write(update.result.as_bytes()).unwrap();
+                        socket.write(&[0xA]).unwrap();
+                        socket.flush().unwrap();
 
-                        let i = match i {
+                        // Debug
+
+                        let inst = update.process.instruction;
+                        let mut val = update.process.value;
+
+                        let inst = match inst {
                             Instruction::Get => {
-                                v = update.result;
+                                val = update.result;
                                 "GET"
                             }
-                            Instruction::Set => "SET",
+                            Instruction::Set => {
+                                // Save to file
+
+                                let map = data.lock().unwrap();
+                                let file = OpenOptions::new()
+                                    .read(true)
+                                    .write(true)
+                                    .create(true)
+                                    .truncate(true)
+                                    .open(DB_NAME);
+
+                                let json = serde_json::to_string(&*map).unwrap();
+                                file.unwrap().write_all(json.as_bytes()).unwrap();
+
+                                "SET"
+                            }
                             Instruction::Nop => "NOP",
                         };
 
-                        println!("{} | {} | {} {} {}", now, ip, i, k, v);
+                        println!(
+                            "{} | {} | {} {} {}",
+                            Utc::now().format(UTC_FORMAT),
+                            client.addr,
+                            inst,
+                            update.process.key,
+                            val
+                        );
                     }
                 }
             }
@@ -266,7 +287,7 @@ fn parse_message(content: &mut String) -> std::io::Result<Process> {
 }
 
 fn update_btreemap(process: Process, data: Arc<Mutex<BTreeMap<String, String>>>) -> Update {
-    let mut map = data.lock().expect("Failed locking the mutex.");
+    let mut map = data.lock().unwrap();
     match process.instruction {
         Instruction::Get => match map.get(&process.key) {
             Some(content) => Update {
