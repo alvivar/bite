@@ -24,7 +24,7 @@ Runs on **127.0.0.1:1984**, just like me:
 
     cargo run --release --bin server
 
-A simple test client, that connects to **127.0.0.1:1984**. But you should be
+A simple test client that connects to **127.0.0.1:1984**. But you should be
 able to write from any TCP connection, just write complete lines before flush.
 
     cargo run --release --bin client
