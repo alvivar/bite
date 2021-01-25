@@ -3,7 +3,7 @@
 
         Clients listener thread
             On Client
-                Send socket to the next Worker queue
+                Send socket to the next Worker
 
         Worker
             Thread
@@ -11,13 +11,14 @@
                     On New client
                         Add client to the client queue
 
-                Loop over the socket queue
+                Loop over the socket queue Non blocking
                     Read line socket message
                     Parse socket into Process
-                    Send Process to Main thread
+                    Send Process and socket to Main thread
 
         Main thread
             Listening Worker messages
                 On Process
                     BTreeMap update
-                    Write the result list in the Worker client socket
+                    BTreeMap file save
+                    Write the result in the Worker client socket

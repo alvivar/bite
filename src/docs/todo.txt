@@ -3,6 +3,7 @@
     How to create modules or something to divide logic in files
     How to create a WorkerPool
 
+    Sleeping some 100 ms between threads
     Ask for the worker with less connections when assigning
     Improve serialization so it can be written in blocks like a good BTreeMap?
 
