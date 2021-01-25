@@ -1,7 +1,7 @@
 # Bite
 
-Minimalistic Key Value Store. It's basically a chat, a TcpListener waiting for
-messages to GET and SET values.
+Minimalistic Key Value Store. A socket waiting for messages to GET and SET
+values.
 
 ## How to use
 
@@ -18,11 +18,7 @@ To get the value:
     GET keywithoutvalue
     >
 
-## Why
-
-Sometimes I need a quick and easy server to save data in experiments.
-
 ## Tech
 
-A Rust TcpListener over a BTreeMap for data, eventually serialized into a file
-with Serde.
+A Rust TcpListener that stores data on a BTreeMap serialized into a file with
+Serde.

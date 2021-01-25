@@ -6,7 +6,7 @@ use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 
-const DB_NAME: &str = "DB.json";
+const DB_FILE: &str = "DB.json";
 const UTC_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
 struct Process {
@@ -140,7 +140,7 @@ fn main() {
         .read(true)
         .write(true)
         .create(true)
-        .open(DB_NAME);
+        .open(DB_FILE);
 
     let mut contents = String::new();
     file.unwrap().read_to_string(&mut contents).unwrap();
@@ -150,7 +150,7 @@ fn main() {
         *map = serde_json::from_str(&contents).unwrap();
     }
 
-    // New worker on incoming connections.
+    // New worker on incoming connections
 
     let server = TcpListener::bind("127.0.0.1:1984").unwrap();
     server.set_nonblocking(true).unwrap();
@@ -171,7 +171,7 @@ fn main() {
         }
     });
 
-    // The main thread process the map based on responses from the Thread pool.
+    // The main thread processes the I/O, waiting from Workers messages.
 
     loop {
         match result.recv() {
@@ -184,7 +184,7 @@ fn main() {
 
                         let update = update_btreemap(process, data.clone());
 
-                        // Client result
+                        // The Client result
 
                         socket.write(update.result.as_bytes()).unwrap();
                         socket.write(&[0xA]).unwrap();
@@ -201,7 +201,7 @@ fn main() {
                                 "GET"
                             }
                             Instruction::Set => {
-                                // Save to file
+                                // Save to DBfile
 
                                 let map = data.lock().unwrap();
                                 let file = OpenOptions::new()
@@ -209,7 +209,7 @@ fn main() {
                                     .write(true)
                                     .create(true)
                                     .truncate(true)
-                                    .open(DB_NAME);
+                                    .open(DB_FILE);
 
                                 let json = serde_json::to_string(&*map).unwrap();
                                 file.unwrap().write_all(json.as_bytes()).unwrap();
