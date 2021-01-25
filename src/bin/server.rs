@@ -1,10 +1,9 @@
 use chrono::Utc;
-use rayon;
-use std::io::{BufRead, BufReader, Write};
+use std::collections::BTreeMap;
+use std::io::{self, BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
-use std::{collections::BTreeMap, net::SocketAddr};
 
 struct Process {
     instruction: Instruction,
@@ -18,61 +17,103 @@ enum Instruction {
     Nop,
 }
 
-struct Client {
-    socket: TcpStream,
-    address: SocketAddr,
-    process: Process,
-}
-
 struct Update {
     result: String,
     process: Process,
 }
 
-enum WorkerMessage {}
+enum Message {
+    Result(TcpStream, Process),
+}
 
-enum WorkerCommand {}
+#[derive(Debug)]
+enum Command {
+    New(TcpStream),
+}
 
 struct Worker {
-    clients: Vec<Client>,
+    join_handle: thread::JoinHandle<()>,
+    sender: mpsc::Sender<Command>,
 }
 
 impl Worker {
-    pub fn new() {}
+    pub fn new(results: mpsc::Sender<Message>) -> Self {
+        let (sender, receiver) = mpsc::channel::<Command>();
+        let join_handle = thread::spawn(move || Self::worker(receiver, results));
+        Self {
+            join_handle,
+            sender,
+        }
+    }
+
+    pub fn command(&self, cmd: Command) {
+        self.sender.send(cmd).unwrap();
+    }
+
+    fn worker(commands: mpsc::Receiver<Command>, results: mpsc::Sender<Message>) {
+        let mut clients = Vec::<TcpStream>::new();
+
+        loop {
+            // Commands
+
+            if let Ok(command) = commands.try_recv() {
+                println!("Worker detected: {:?}", command);
+                match command {
+                    Command::New(socket) => {
+                        clients.push(socket.try_clone().unwrap());
+                    }
+                }
+            }
+
+            // Parse the messages from the clients
+
+            for i in 0..clients.len() {
+                let mut socket = clients[i].try_clone().unwrap();
+                socket.set_nonblocking(true).unwrap();
+
+                let mut reader = BufReader::new(&mut socket);
+                let mut content = String::new();
+                match reader.read_line(&mut content) {
+                    Ok(_) => {
+                        let process = parse_message(&mut content).unwrap();
+                        results
+                            .send(Message::Result(clients[i].try_clone().unwrap(), process))
+                            .unwrap();
+                    }
+                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                        // This is the kind of stuff we want to ignore
+                    }
+                    Err(e) => {
+                        panic!("reader.read_line failed:\n{}", e);
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn main() {
     let data = Arc::new(Mutex::new(BTreeMap::<String, String>::new()));
-    let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(3)
-        .build()
-        .unwrap();
 
     // Incoming connections
 
     let server = TcpListener::bind("127.0.0.1:1984").unwrap();
     server.set_nonblocking(true).unwrap();
 
-    let (sender, receiver) = mpsc::channel::<Client>();
+    let (sender, receiver) = mpsc::channel::<Message>();
+
+    let mut worker_index = 0;
+    let mut workers = Vec::<Worker>::new();
+    workers.push(Worker::new(sender.clone()));
+    workers.push(Worker::new(sender.clone()));
+    workers.push(Worker::new(sender.clone()));
 
     thread::spawn(move || loop {
-        if let Ok((mut socket, address)) = server.accept() {
-            let result_sender = sender.clone();
-            pool.spawn(move || {
-                let mut reader = BufReader::new(&mut socket);
-                let mut content = String::new();
-                reader.read_line(&mut content).unwrap();
+        if let Ok((socket, address)) = server.accept() {
+            workers[worker_index].command(Command::New(socket));
+            worker_index = (worker_index + 1) % workers.len();
 
-                let process = parse_message(&mut content).unwrap();
-
-                result_sender
-                    .send(Client {
-                        socket,
-                        address,
-                        process,
-                    })
-                    .unwrap();
-            });
+            println!("Connection {}", worker_index);
         }
     });
 
@@ -81,32 +122,37 @@ fn main() {
 
     loop {
         match receiver.recv() {
-            Ok(client) => {
-                let update = update_btreemap(client.process, data.clone());
+            Ok(message) => {
+                match message {
+                    Message::Result(socket, process) => {
+                        let update = update_btreemap(process, data.clone());
 
-                let mut socket = client.socket;
-                socket.write(update.result.as_bytes()).unwrap();
-                socket.flush().unwrap();
+                        let mut socket = socket.try_clone().unwrap();
+                        socket.write(update.result.as_bytes()).unwrap();
+                        socket.write(&[0xA]).unwrap();
+                        socket.flush().unwrap();
 
-                let ip = client.address;
-                let now = Utc::now().format("%Y-%m-%d %H:%M:%S");
-                let i = update.process.instruction;
-                let k = update.process.key;
-                let mut v = update.process.value;
+                        let ip = 0; //address;
+                        let now = Utc::now().format("%Y-%m-%d %H:%M:%S");
+                        let i = update.process.instruction;
+                        let k = update.process.key;
+                        let mut v = update.process.value;
 
-                let i = match i {
-                    Instruction::Get => {
-                        v = update.result;
-                        "GET"
+                        let i = match i {
+                            Instruction::Get => {
+                                v = update.result;
+                                "GET"
+                            }
+                            Instruction::Set => "SET",
+                            Instruction::Nop => "NOP",
+                        };
+
+                        println!("{} | {} | {} {} {}", now, ip, i, k, v);
                     }
-                    Instruction::Set => "SET",
-                    Instruction::Nop => "NOP",
-                };
-
-                println!("{} | {} | {} {} {}", now, ip, i, k, v);
+                }
             }
-            Err(_) => {
-                panic!("receiver.recv() Failed!")
+            Err(e) => {
+                panic!("receiver.recv() Failed:\n{}", e)
             }
         }
     }
@@ -143,7 +189,7 @@ fn parse_message(content: &mut String) -> std::io::Result<Process> {
         }
     }
 
-    // println!("i[{}] k[{}] v[{}]", inst, key, val); // Debug
+    println!("i[{}] k[{}] v[{}]", inst, key, val); // Debug
 
     let instruction = match inst.trim().to_lowercase().as_str() {
         "get" => Instruction::Get,
