@@ -6,6 +6,7 @@
     Ask for the worker with less connections when assigning
     Improve serialization so it can be written in blocks like a good BTreeMap?
 
+    IP and port by ENVIRONMENT
     SET without key, creates an empty key
     Use Error as results instead of unwrap
 
