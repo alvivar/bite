@@ -1,6 +1,6 @@
 use chrono::Utc;
 use std::collections::BTreeMap;
-use std::io::{self, BufRead, BufReader, Write};
+use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
@@ -23,12 +23,13 @@ struct Update {
 }
 
 enum Message {
-    Result(TcpStream, Process),
+    Result(usize, mpsc::Sender<Command>, TcpStream, Process),
 }
 
 #[derive(Debug)]
 enum Command {
     New(TcpStream),
+    Del(usize),
 }
 
 struct Worker {
@@ -39,7 +40,8 @@ struct Worker {
 impl Worker {
     pub fn new(results: mpsc::Sender<Message>) -> Self {
         let (sender, receiver) = mpsc::channel::<Command>();
-        let join_handle = thread::spawn(move || Self::worker(receiver, results));
+        let sender_clone = sender.clone();
+        let join_handle = thread::spawn(move || Self::worker(receiver, sender_clone, results));
         Self {
             join_handle,
             sender,
@@ -47,10 +49,14 @@ impl Worker {
     }
 
     pub fn command(&self, cmd: Command) {
-        self.sender.send(cmd).unwrap();
+        self.sender.send(cmd).expect("Failed sending the command.");
     }
 
-    fn worker(commands: mpsc::Receiver<Command>, results: mpsc::Sender<Message>) {
+    fn worker(
+        commands: mpsc::Receiver<Command>,
+        sender: mpsc::Sender<Command>,
+        results: mpsc::Sender<Message>,
+    ) {
         let mut clients = Vec::<TcpStream>::new();
 
         loop {
@@ -60,7 +66,10 @@ impl Worker {
                 println!("Worker detected: {:?}", command);
                 match command {
                     Command::New(socket) => {
-                        clients.push(socket.try_clone().unwrap());
+                        clients.push(socket.try_clone().expect("Failed push on new socket."));
+                    }
+                    Command::Del(index) => {
+                        clients.remove(index);
                     }
                 }
             }
@@ -68,17 +77,32 @@ impl Worker {
             // Parse the messages from the clients
 
             for i in 0..clients.len() {
-                let mut socket = clients[i].try_clone().unwrap();
-                socket.set_nonblocking(true).unwrap();
+                let mut socket = clients[i]
+                    .try_clone()
+                    .expect("Failed cloning the nonblocking socket.");
+                socket
+                    .set_nonblocking(true)
+                    .expect("Fail setting the nonblocking socket.");
 
                 let mut reader = BufReader::new(&mut socket);
                 let mut content = String::new();
                 match reader.read_line(&mut content) {
                     Ok(_) => {
-                        let process = parse_message(&mut content).unwrap();
+                        println!("Content and length {} {}", content, content.len());
+
+                        let process =
+                            parse_message(&mut content).expect("Failed parsing the message.");
+
                         results
-                            .send(Message::Result(clients[i].try_clone().unwrap(), process))
-                            .unwrap();
+                            .send(Message::Result(
+                                i,
+                                sender.clone(),
+                                clients[i]
+                                    .try_clone()
+                                    .expect("Failed cloning when sending the result."),
+                                process,
+                            ))
+                            .expect("Failed sending the result.");
                     }
                     Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                         // This is the kind of stuff we want to ignore
@@ -97,8 +121,10 @@ fn main() {
 
     // Incoming connections
 
-    let server = TcpListener::bind("127.0.0.1:1984").unwrap();
-    server.set_nonblocking(true).unwrap();
+    let server = TcpListener::bind("127.0.0.1:1984").expect("Failed binding the server.");
+    server
+        .set_nonblocking(true)
+        .expect("Failed setting the nonblocking on the server bind.");
 
     let (sender, receiver) = mpsc::channel::<Message>();
 
@@ -124,13 +150,18 @@ fn main() {
         match receiver.recv() {
             Ok(message) => {
                 match message {
-                    Message::Result(socket, process) => {
+                    Message::Result(idx, sender, socket, process) => {
+                        let mut socket = socket.try_clone().expect("");
+
                         let update = update_btreemap(process, data.clone());
 
-                        let mut socket = socket.try_clone().unwrap();
-                        socket.write(update.result.as_bytes()).unwrap();
-                        socket.write(&[0xA]).unwrap();
-                        socket.flush().unwrap();
+                        socket
+                            .write(update.result.as_bytes())
+                            .expect("Failed writting in the socket.");
+                        socket
+                            .write(&[0xA])
+                            .expect("Failed writting in the socket.");
+                        socket.flush().expect("Failed flusing in the socket.");
 
                         let ip = 0; //address;
                         let now = Utc::now().format("%Y-%m-%d %H:%M:%S");
@@ -189,7 +220,7 @@ fn parse_message(content: &mut String) -> std::io::Result<Process> {
         }
     }
 
-    println!("i[{}] k[{}] v[{}]", inst, key, val); // Debug
+    // println!("i[{}] k[{}] v[{}]", inst, key, val); // Debug
 
     let instruction = match inst.trim().to_lowercase().as_str() {
         "get" => Instruction::Get,
@@ -208,7 +239,7 @@ fn parse_message(content: &mut String) -> std::io::Result<Process> {
 }
 
 fn update_btreemap(process: Process, data: Arc<Mutex<BTreeMap<String, String>>>) -> Update {
-    let mut map = data.lock().unwrap();
+    let mut map = data.lock().expect("Failed locking the mutex.");
     match process.instruction {
         Instruction::Get => match map.get(&process.key) {
             Some(content) => Update {

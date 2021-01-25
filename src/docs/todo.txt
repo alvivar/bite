@@ -1,4 +1,6 @@
 
+    Handle client disconnect because everything explodes
+
     Save to file!
     SET without key, creates an empty key?
     User Error as results and stuff instead of unwrap
