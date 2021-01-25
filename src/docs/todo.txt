@@ -5,7 +5,7 @@
 
     Sleeping some 100 ms between threads
     Ask for the worker with less connections when assigning
-    Improve serialization so it can be written in blocks like a good BTreeMap?
+    Improve serialization so it can be written in blocks like a good BTreeMap on file?
 
     DB file name by environment
     IP and port by environment
