@@ -1,7 +1,3 @@
-mod some_module;
-
-use some_module::say_hello;
-
 use chrono::Utc;
 use std::fs::OpenOptions;
 use std::io::{self, BufRead, BufReader, Read, Write};
@@ -146,8 +142,6 @@ impl Worker {
 }
 
 fn main() {
-    say_hello();
-
     let data = Arc::new(Mutex::new(BTreeMap::<String, String>::new()));
 
     // Read the DB file
