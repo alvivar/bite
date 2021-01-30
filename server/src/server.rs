@@ -1,4 +1,5 @@
 use chrono::Utc;
+use mpsc::Sender;
 use std::collections::BTreeMap;
 use std::fs::OpenOptions;
 use std::io::{self, BufRead, BufReader, Read, Write};
@@ -30,20 +31,18 @@ enum Message {
     Result(Client, Process),
 }
 
-enum Command {
-    // This is not for clients connecting, this is for work done for clients
-    New(TcpStream, SocketAddr),
-    End,
-}
-
 struct Client {
     socket: TcpStream,
     addr: SocketAddr,
 }
 
 enum MapMessage {
-    Get(String),
-    Set,
+    Get(Sender<ToClient>, String),
+    Set(Sender<ToClient>, String, String),
+}
+
+enum ToClient {
+    Result(String),
 }
 
 fn main() {
@@ -51,54 +50,62 @@ fn main() {
 
     // Read the DB file
 
-    let file = OpenOptions::new()
+    let mut file = OpenOptions::new()
         .read(true)
         .write(true)
         .create(true)
-        .open(DB_FILE);
+        .open(DB_FILE)
+        .unwrap();
 
     let mut contents = String::new();
-    file.unwrap().read_to_string(&mut contents).unwrap();
+    file.read_to_string(&mut contents).unwrap();
     if contents.len() > 0 {
         let c = data.clone();
         let mut map = c.lock().unwrap();
         *map = serde_json::from_str(&contents).unwrap();
     }
 
-    // THREAD
-
-    // That returns information from the Map.
-
-    // THREAD
-
-    // That reads / writes data into the Map.
+    // Messenger
 
     let (map_sender, map_receiver) = mpsc::channel::<MapMessage>();
-    thread::spawn(move || loop {
-        match map_receiver.recv() {
-            Ok(message) => match message {
-                Get(key) => match map.get(key) {
-                    Some(content) => Update {
-                        result: content.to_owned(),
-                    },
-                    None => Update {
-                        result: "".to_owned(),
-                    },
+
+    // THREAD That returns information from the Map.
+
+    thread::spawn(move || {
+        let map = data.clone();
+
+        loop {
+            match map_receiver.recv() {
+                Ok(message) => match message {
+                    MapMessage::Get(sender, key) => {
+                        let map = map.lock().unwrap();
+                        match map.get(&key) {
+                            Some(value) => sender.send(ToClient::Result(value.to_owned())).unwrap(),
+                            None => sender.send(ToClient::Result("".to_owned())).unwrap(),
+                        }
+                    }
+                    MapMessage::Set(sender, key, value) => {
+                        let mut map = map.lock().unwrap();
+                        match map.insert(key, value) {
+                            Some(_) => sender.send(ToClient::Result("OK".to_owned())).unwrap(),
+                            None => sender.send(ToClient::Result("NOP".to_owned())).unwrap(),
+                        }
+                    }
                 },
-                Set => {}
-            },
-            Err(e) => {
-                panic!("{}", e);
+                Err(e) => {
+                    panic!("{}", e);
+                }
             }
         }
     });
 
-    // MAIN THREAD
+    // THREAD That reads / writes data into the Map.
 
-    // That listens for new connections, and spawns Connection Handlers Threads.
+    // MAIN THREAD That listens for new connections, and spawns Connection
+    // Handlers Threads.
 
     let server = TcpListener::bind("127.0.0.1:1984").unwrap();
-    server.set_nonblocking(true).unwrap();
+    // server.set_nonblocking(true).unwrap();
 
     let (sender, result) = mpsc::channel::<Message>();
     loop {
@@ -157,33 +164,33 @@ fn parse_message(content: &mut String) -> std::io::Result<Process> {
     })
 }
 
-fn update_btreemap(process: Process, data: Arc<Mutex<BTreeMap<String, String>>>) -> Update {
-    let mut map = data.lock().unwrap();
-    match process.instruction {
-        Instruction::Get => match map.get(&process.key) {
-            Some(content) => Update {
-                result: content.to_owned(),
-                process,
-            },
-            None => Update {
-                result: "".to_owned(),
-                process,
-            },
-        },
-        Instruction::Set => {
-            map.insert(process.key.to_owned(), process.value.to_owned());
+// fn update_btreemap(process: Process, data: Arc<Mutex<BTreeMap<String, String>>>) -> Update {
+//     let mut map = data.lock().unwrap();
+//     match process.instruction {
+//         Instruction::Get => match map.get(&process.key) {
+//             Some(content) => Update {
+//                 result: content.to_owned(),
+//                 process,
+//             },
+//             None => Update {
+//                 result: "".to_owned(),
+//                 process,
+//             },
+//         },
+//         Instruction::Set => {
+//             map.insert(process.key.to_owned(), process.value.to_owned());
 
-            Update {
-                result: "OK".to_owned(),
-                process,
-            }
-        }
-        Instruction::Nop => Update {
-            result: "NOP".to_owned(),
-            process,
-        },
-    }
-}
+//             Update {
+//                 result: "OK".to_owned(),
+//                 process,
+//             }
+//         }
+//         Instruction::Nop => Update {
+//             result: "NOP".to_owned(),
+//             process,
+//         },
+//     }
+// }
 
 // struct Worker {
 //     handle: thread::JoinHandle<()>,
