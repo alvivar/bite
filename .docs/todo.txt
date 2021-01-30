@@ -1,4 +1,5 @@
 
+    New threads should be created, if all of them are busy
     Use time and IP on the server log
     Use a decent log system instead of println?
 
