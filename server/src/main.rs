@@ -11,7 +11,7 @@ use std::{
 
 fn main() {
     let listener = TcpListener::bind("127.0.0.1:1984").unwrap();
-    let pool = work::ThreadPool::new(8);
+    let pool = work::ThreadPool::new(12);
 
     // Map & DB Thread.
     let map = map::Map::new();
