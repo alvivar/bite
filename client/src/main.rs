@@ -18,11 +18,12 @@ fn main() -> std::io::Result<()> {
         let mut message = String::new();
         reader.read_line(&mut message).unwrap();
 
-        if message.len() > 0 {
-            println!("> {}\n", message.trim());
-        } else {
-            println!("\n[!] Disconnected from the Server.\n");
-            break;
+        match message.len() > 0 {
+            true => println!("> {}\n", message.trim()),
+            false => {
+                println!("\n[!] Disconnected from the Server.\n");
+                break;
+            }
         }
     }
 
