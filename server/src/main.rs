@@ -1,3 +1,4 @@
+mod db;
 mod map;
 mod parse;
 mod work;
@@ -12,12 +13,18 @@ fn main() {
     let listener = TcpListener::bind("127.0.0.1:1984").unwrap();
     let pool = work::ThreadPool::new(8);
 
-    // Map Thread.
+    // Map & DB Thread.
     let map = map::Map::new();
     let map_sender = map.sender.clone();
-    pool.execute(move || map.handle());
 
-    // A thread for each incoming connection.
+    let db = db::DB::new(map.data.clone());
+    let db_sender = db.sender.clone();
+    db_sender.send(db::Command::Load).unwrap();
+
+    pool.execute(move || map.handle(db_sender.clone()));
+    pool.execute(move || db.handle());
+
+    // New job on incoming connections.
     for stream in listener.incoming() {
         let stream = stream.unwrap();
         let map = map_sender.clone();
