@@ -1,5 +1,5 @@
-pub struct Process {
-    pub instruction: Instr,
+pub struct Proc {
+    pub instr: Instr,
     pub key: String,
     pub value: String,
 }
@@ -10,7 +10,7 @@ pub enum Instr {
     Nop,
 }
 
-pub fn from_message(content: &str) -> Process {
+pub fn from_message(content: &str) -> Proc {
     let mut inst = String::new();
     let mut key = String::new();
     let mut val = String::new();
@@ -52,8 +52,8 @@ pub fn from_message(content: &str) -> Process {
         }
     };
 
-    Process {
-        instruction,
+    Proc {
+        instr: instruction,
         key: key.trim().to_owned(),
         value: val.trim().to_owned(),
     }
