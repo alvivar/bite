@@ -2,7 +2,7 @@ use serde_json;
 
 use std::{
     collections::BTreeMap,
-    fs::OpenOptions,
+    fs::{self, OpenOptions},
     io::{Read, Write},
     sync::{
         mpsc::{self, Receiver, Sender},
@@ -13,7 +13,8 @@ use std::{
     u64,
 };
 
-const DB_FILE: &str = "DB.json";
+const DB_PATH: &str = "./data";
+const DB_FILE: &str = "./data/DB.json";
 
 pub enum Command {
     Load,
@@ -67,6 +68,8 @@ impl DB {
     }
 
     fn load_from_file(&self) {
+        fs::create_dir_all(DB_PATH).unwrap();
+
         let mut file = OpenOptions::new()
             .read(true)
             .write(true)
