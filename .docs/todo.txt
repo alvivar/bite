@@ -1,5 +1,4 @@
 
-    Saving into the file should have a throtle
     Use time and IP on the server log
     Use a decent log system instead of println?
 
@@ -15,6 +14,7 @@
 
 
     2021.01.30
+    x Saving into the file should have a throtle
     x v3 Implemented [!]
     x How to create a WorkerPool
     x How to create modules or something to divide logic in files

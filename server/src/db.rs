@@ -8,6 +8,9 @@ use std::{
         mpsc::{self, Receiver, Sender},
         Arc, Mutex,
     },
+    thread::sleep,
+    time::{Duration, Instant},
+    u64,
 };
 
 const DB_FILE: &str = "DB.json";
@@ -21,26 +24,46 @@ pub struct DB {
     data: Arc<Mutex<BTreeMap<String, String>>>,
     pub sender: Sender<Command>,
     receiver: Receiver<Command>,
+    save_throttle: u64,
+    saving: bool,
+    timer: Instant,
 }
 
 impl DB {
-    pub fn new(data: Arc<Mutex<BTreeMap<String, String>>>) -> DB {
+    pub fn new(data: Arc<Mutex<BTreeMap<String, String>>>, save_throttle: u64) -> DB {
         let (sender, receiver) = mpsc::channel();
 
         DB {
             data,
             sender,
             receiver,
+            save_throttle,
+            timer: Instant::now(),
+            saving: false,
         }
     }
 
-    pub fn handle(&self) {
+    pub fn handle(&mut self) {
         loop {
-            let message = self.receiver.recv().unwrap();
-
+            let message = self.receiver.try_recv();
             match message {
-                Command::Load => self.load_from_file(),
-                Command::Save => self.save_to_file(),
+                Ok(m) => match m {
+                    Command::Load => self.load_from_file(),
+                    Command::Save => {
+                        self.saving = true;
+                        self.timer = Instant::now();
+                        println!("{:?}", self.timer.elapsed().as_secs());
+                    }
+                },
+                Err(_) => {
+                    if self.saving && self.timer.elapsed().as_secs() >= self.save_throttle {
+                        println!("{:?}", self.timer.elapsed().as_secs());
+                        self.saving = false;
+                        self.save_to_file();
+                    } else {
+                        sleep(Duration::new(0, 100000000)); // 0.1s
+                    }
+                }
             }
         }
     }

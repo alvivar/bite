@@ -17,7 +17,7 @@ fn main() {
     let map = map::Map::new();
     let map_sender = map.sender.clone();
 
-    let db = db::DB::new(map.data.clone());
+    let mut db = db::DB::new(map.data.clone(), 3);
     let db_sender = db.sender.clone();
     db_sender.send(db::Command::Load).unwrap();
 
@@ -61,10 +61,10 @@ fn handle_connection(
         }
 
         // Parse the message.
-        let process = parse::from_string(buffer.as_str());
-        let instr = process.instr;
-        let key = process.key;
-        let val = process.value;
+        let proc = parse::from_string(buffer.as_str());
+        let instr = proc.instr;
+        let key = proc.key;
+        let val = proc.value;
 
         let sender = sender.clone();
 
