@@ -1,3 +1,4 @@
+
     v4 (bananas and incomplete)
         Data <- immutable, never changing, authoritative, no need for a lock data
 
@@ -19,23 +20,6 @@
             2. Spawn handler threads for each connection (for now, no need to keep track of the handle) (no mutex needed for the socket)
 
 
-    v3 (simplest)
-        Data (this is not a thread)
-
-        Write to disk thred
-            1. On message -> Write Data to disk
-
-        Handler threads
-            1. Receive an instruction (blocking)
-            2. Execute the instruction (synchronously accessed data using an RwLock) <- this is also a source of inefficiency
-            3. Send a message to the Write-to-disk-thread
-            4. Send the result (blocking)
-
-        Main thread
-            1. Listen to connections
-            2. Spawn handler threads for each connection (for now, no need to keep track of the handle) (no mutex needed for the socket)
-
-
     v3
         Storage thread  // this is just to write the file
             On Write Message => write to file
@@ -50,6 +34,23 @@
                 4. Wait for a message from the database thread (HOW? we could send our communication channel with the message) (blocking)
                 5. Send the result (blocking)
             6. Else send an acknowledgement response (blocking)
+
+        Main thread
+            1. Listen to connections
+            2. Spawn handler threads for each connection (for now, no need to keep track of the handle) (no mutex needed for the socket)
+
+
+    v3 (simplest)
+        Data (this is not a thread)
+
+        Write to disk thred
+            1. On message -> Write Data to disk
+
+        Handler threads
+            1. Receive an instruction (blocking)
+            2. Execute the instruction (synchronously accessed data using an RwLock) <- this is also a source of inefficiency
+            3. Send a message to the Write-to-disk-thread
+            4. Send the result (blocking)
 
         Main thread
             1. Listen to connections
@@ -79,3 +80,8 @@
                     BTreeMap update
                     [C] BTreeMap file save
                     [B] Write the result in the Worker client socket
+
+
+    v1
+
+        A Hack.
