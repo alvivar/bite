@@ -11,7 +11,7 @@ use std::{
 
 fn main() {
     let listener = TcpListener::bind("127.0.0.1:1984").unwrap();
-    let mut pool = work::ThreadPool::new(4);
+    let mut pool = work::ThreadPool::new(3);
 
     // Map & DB Thread.
     let map = map::Map::new();
@@ -19,7 +19,8 @@ fn main() {
 
     let mut db = db::DB::new(map.data.clone(), 4);
     let db_sender = db.sender.clone();
-    db_sender.send(db::Command::Load).unwrap();
+
+    db_sender.send(db::Command::Load).unwrap(); // Load on start.
 
     pool.execute(move || map.handle(db_sender.clone()));
     pool.execute(move || db.handle());
@@ -79,7 +80,7 @@ fn handle_connection(
             }
         }
 
-        // Wait for the @map response.
+        // Wait for the Map response.
         let response = receiver.recv().unwrap();
 
         match response {

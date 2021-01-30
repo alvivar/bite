@@ -40,6 +40,8 @@ impl ThreadPool {
             workers.push(Worker::new(id, receiver.clone()));
         }
 
+        println!("{} workers waiting for jobs.", size);
+
         ThreadPool {
             workers,
             sender,
@@ -60,10 +62,10 @@ impl ThreadPool {
 
         if *self.active_jobs.lock().unwrap() >= workers_len {
             self.workers.push(Worker::new(id, self.receiver.clone()));
-            println!("Worker {} created.", id);
+            println!("Worker {} has been created.", id);
         }
 
-        // Queue Job.
+        // Job queue.
         self.sender
             .send(Message::NewJob(job, self.active_jobs.clone()))
             .unwrap();
@@ -72,7 +74,7 @@ impl ThreadPool {
 
 impl Drop for ThreadPool {
     fn drop(&mut self) {
-        println!("Sending terminate message to all workers.");
+        println!("Sending |Terminate| message to all workers.");
 
         for _ in &mut self.workers {
             self.sender.send(Message::Terminate).unwrap();
@@ -81,7 +83,7 @@ impl Drop for ThreadPool {
         println!("Shutting down all workers.");
 
         for worker in &mut self.workers {
-            println!("Shutting down worker {}", worker.id);
+            println!("Shutting down worker {}.", worker.id);
 
             if let Some(thread) = worker.thread.take() {
                 thread.join().unwrap();
@@ -108,7 +110,7 @@ impl Worker {
                     job.call_box();
 
                     *active_jobs.lock().unwrap() -= 1;
-                    println!("Worker {} job ended.", id);
+                    println!("Worker {} just finish his job.", id);
                 }
                 Message::Terminate => {
                     println!("Worker {} was told to terminate.", id);
