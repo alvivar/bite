@@ -1,6 +1,6 @@
 # Bite
 
-Minimalistic Key-Value Store. A socket waiting for messages to GET and SET
+Minimalistic Key-Value Store. Multi-threading sockets waiting for messages to GET and SET
 values.
 
 ## How to use
@@ -18,18 +18,20 @@ To get the value:
     GET keywithoutvalue
     >
 
+A **DB.json** file will be created with the information sorted.
+
 ## How to run
 
 Runs on **127.0.0.1:1984**, just like me:
 
-    cargo run --release --bin server
+    cargo run --release --p server
 
 A simple test client that connects to **127.0.0.1:1984**. But you should be able
-to write from any TCP connection, just write complete lines before flush.
+to write from any other TCP connection, just write complete lines before flush.
 
-    cargo run --release --bin client
+    cargo run --release --p client
 
 ## Tech
 
-A Rust TcpListener that stores data on a BTreeMap serialized into a json file
-with Serde.
+Multi-threading TcpListeners that stores data on a BTreeMap serialized into a json file
+with Serde. Made. in. Rust.
