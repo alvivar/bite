@@ -54,7 +54,7 @@ fn handle_connection(
         }
 
         // Parse the message.
-        let process = parse::from_message(buffer.as_str());
+        let process = parse::from_string(buffer.as_str());
         let instr = process.instr;
         let key = process.key;
         let val = process.value;
