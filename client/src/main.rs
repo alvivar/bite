@@ -1,6 +1,7 @@
-use std::io::{self, Write};
-use std::io::{BufRead, BufReader, BufWriter};
-use std::net::TcpStream;
+use std::{
+    io::{self, BufRead, BufReader, BufWriter, Write},
+    net::TcpStream,
+};
 
 fn main() -> std::io::Result<()> {
     let stream = TcpStream::connect("127.0.0.1:1984")?;
