@@ -11,13 +11,13 @@ use std::{
 
 fn main() {
     let listener = TcpListener::bind("127.0.0.1:1984").unwrap();
-    let mut pool = work::ThreadPool::new(3);
+    let mut pool = work::ThreadPool::new(4);
 
     // Map & DB Thread.
     let map = map::Map::new();
     let map_sender = map.sender.clone();
 
-    let mut db = db::DB::new(map.data.clone(), 4);
+    let mut db = db::DB::new(map.data.clone(), 2);
     let db_sender = db.sender.clone();
 
     db_sender.send(db::Command::Load).unwrap(); // Load on start.
