@@ -4,6 +4,8 @@
     Connection handles needs to be a module.
     Use a decent log system instead of println?
 
+    I'm using the Cargo.toml dependencies correctly?
+
     Thread waiting for q! in the input to quit.
     Improve serialization so it can be written in blocks like a good BTreeMap on file?
 
