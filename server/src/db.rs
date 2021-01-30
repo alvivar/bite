@@ -52,12 +52,10 @@ impl DB {
                     Command::Save => {
                         self.saving = true;
                         self.timer = Instant::now();
-                        println!("{:?}", self.timer.elapsed().as_secs());
                     }
                 },
                 Err(_) => {
                     if self.saving && self.timer.elapsed().as_secs() >= self.save_throttle {
-                        println!("{:?}", self.timer.elapsed().as_secs());
                         self.saving = false;
                         self.save_to_file();
                     } else {
