@@ -33,6 +33,9 @@ fn main() {
         pool.execute(move || {
             handle_connection(stream, map, sender, receiver);
         });
+
+        // @todo A signal around here to break the loop and quit the
+        // application.
     }
 
     // @todo Thread waiting for q! in the input to quit.

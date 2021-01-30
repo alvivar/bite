@@ -3,7 +3,7 @@
     Use time and IP on the server log
     Use a decent log system instead of println?
 
-    Exit correctly by joining handles
+    Thread waiting for q! in the input to quit.
     Improve serialization so it can be written in blocks like a good BTreeMap on file?
 
     Auth
@@ -15,6 +15,7 @@
 
 
     2021.01.30
+    x Exit correctly by joining handles
     x Saving into the file should have a throtle
     x v3 Implemented [!]
     x How to create a WorkerPool
