@@ -1,7 +1,6 @@
 # Bite
 
-Minimal Multi-Threading Key-Value Store. Sockets waiting for messages to GET and
-SET values.
+Minimal Key-Value Store. Sockets waiting for messages to GET and SET values.
 
 ## How to use
 
@@ -30,10 +29,10 @@ The test client connects to **127.0.0.1:1984**.
 
     cargo run --release --p client
 
-You should be able to write from any other TCP connection, just send complete
-lines before flush.
+You should be able to write from any TCP connection, just send complete lines
+before flush.
 
 ## Tech
 
-A Rust Multi-threading TcpListeners that stores data on a BTreeMap serialized
-into a json file with Serde.
+Rust Multi-thread TcpListeners storing data over a BTreeMap serialized into a
+json file with Serde.

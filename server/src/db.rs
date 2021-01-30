@@ -76,6 +76,7 @@ impl DB {
 
         let mut contents = String::new();
         file.read_to_string(&mut contents).unwrap();
+
         if contents.len() > 0 {
             let c = self.data.clone();
             let mut map = c.lock().unwrap();
