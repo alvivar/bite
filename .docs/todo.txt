@@ -1,6 +1,7 @@
 
     New threads should be created, if all of them are busy
     Use time and IP on the server log
+    Connection handles needs to be a module.
     Use a decent log system instead of println?
 
     Thread waiting for q! in the input to quit.
