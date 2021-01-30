@@ -1,12 +1,10 @@
 
-    [ ] How to create modules or something to divide logic in files
-    [x] Exit correctly by joining handles
-    [x] How to create a WorkerPool
+    Saving into the file should have a throtle
+    Use time and IP on the server log
+    Use a decent log system instead of println?
 
-    [x] Sleeping some 100 ms between threads
-    [x] Ask for the worker with less connections when assigning
-
-    [ ] Improve serialization so it can be written in blocks like a good BTreeMap on file?
+    Exit correctly by joining handles
+    Improve serialization so it can be written in blocks like a good BTreeMap on file?
 
     Auth
 
@@ -15,6 +13,11 @@
     SET without key, creates an empty key
     Use Error as results instead of unwrap
 
+
+    2021.01.30
+    x v3 Implemented [!]
+    x How to create a WorkerPool
+    x How to create modules or something to divide logic in files
 
     2021.01.25
     x Save to file!

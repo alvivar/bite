@@ -9,11 +9,9 @@ edition = "2018"
 [dependencies]
 chrono = "0.4.19"
 serde_json = "1.0.61"
-# serde = "1.0.121"
-# rayon = "1.5.0"
 
 [workspace]
-members = ["server", "client", "example"]
+members = ["server", "client"]
 
 [[bin]]
 name = "server"
@@ -22,7 +20,3 @@ path = "server/src/main.rs"
 [[bin]]
 name = "client"
 path = "client/src/main.rs"
-
-[[bin]]
-name = "example"
-path = "example/src/main.rs"
