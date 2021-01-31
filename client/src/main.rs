@@ -4,8 +4,10 @@ use std::{
 };
 
 fn main() {
-    // let stream = TcpStream::connect("142.93.180.20:8080")?;
-    let stream = TcpStream::connect("127.0.0.1:1984").unwrap();
+    let args: Vec<String> = env::args().collect();
+
+    let server = "142.93.180.20:1984";
+    let stream = TcpStream::connect(server).unwrap();
     let stream_clone = stream.try_clone().unwrap();
     let mut writer = BufWriter::new(stream);
     let mut reader = BufReader::new(stream_clone);
