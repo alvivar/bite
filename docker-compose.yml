@@ -1,0 +1,9 @@
+version: '3.8'
+services:
+  bite:
+    container_name: bt
+    build: ./bite/
+    ports:
+      - '1984:1984'
+    volumes:
+      - ./data:/data
