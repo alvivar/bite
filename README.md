@@ -1,6 +1,6 @@
 # Bite
 
-Minimal Key-Value Store. Sockets waiting for messages to GET and SET values.
+Minimal Key-Value Store. A socket waiting for messages to GET and SET values.
 
 ## How to use
 
@@ -17,7 +17,7 @@ To get the value:
     GET keywithoutvalue
     >
 
-A **DB.json** file will be created with the information sorted.
+A **./data/DB.json** file will be created with the information sorted.
 
 ## How to run
 
@@ -25,14 +25,29 @@ The server runs on **127.0.0.1:1984**, just like me:
 
     cargo run --release --p server
 
-The test client connects to **127.0.0.1:1984**.
+The client is just a simple test that connects to **127.0.0.1:1984** and
+send/receive messages.
 
     cargo run --release --p client
 
 You should be able to write from any TCP connection, just send complete lines
 before flush.
 
+## Docker installation
+
+It includes the **docker-compose** and **Dockerfile** to build and run the
+server.
+
+    docker-compose build
+    docker-compose up -d
+
+Or...
+
+    docker-compose up -d --build
+
+Then you can connect at **127.0.0.1:1984**.
+
 ## Tech
 
-Rust Multi-thread TcpListeners storing data over a BTreeMap serialized into a
-json file with Serde.
+Rust multi-thread **TcpListener** storing data over a **BTreeMap** serialized
+into a json file with **Serde**. Ready to run on **Docker**.
