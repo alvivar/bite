@@ -47,6 +47,7 @@ impl DB {
     pub fn handle(&mut self) {
         loop {
             let message = self.receiver.try_recv();
+
             match message {
                 Ok(m) => match m {
                     Command::Load => self.load_from_file(),
