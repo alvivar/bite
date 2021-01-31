@@ -10,7 +10,7 @@ use std::{
 };
 
 fn main() {
-    let listener = TcpListener::bind("127.0.0.1:1984").unwrap();
+    let listener = TcpListener::bind("0.0.0.0:1984").unwrap();
     let mut pool = work::ThreadPool::new(4);
 
     // Map & DB Thread.
