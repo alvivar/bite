@@ -12,7 +12,7 @@ use std::{
 fn main() {
     println!("\nBITE\n");
 
-    let listener = TcpListener::bind("0.0.0.0:1984").unwrap();
+    let listener = TcpListener::bind("0.0.0.0:1984").unwrap(); // Asumming Docker.
     let mut pool = work::ThreadPool::new(4);
 
     // Map & DB Thread.
