@@ -30,9 +30,9 @@ send/receive messages.
 
     cargo run --release --p client
 
-Or for a custom test server:
+Or for a custom test server, use the first argument:
 
-    cargo run --release && ./target/release/client 123.45.678.90:1234
+    cargo run --release -p client -- 123.45.678.90:1234
 
 You should be able to write from any TCP connection, just send complete lines
 before flush.
