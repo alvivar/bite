@@ -49,5 +49,11 @@ Then you can connect at **127.0.0.1:1984**.
 
 ## Tech
 
-Rust multi-thread **TcpListener** storing data over a **BTreeMap** serialized
-into a json file with **Serde**. Ready to run on **Docker**.
+Rust multi-thread **TcpListener** storing data on a **BTreeMap** serialized into
+a json file with **Serde**. Ready to run on **Docker**.
+
+## Things to do
+
+- Auth
+- Lists (Push, Pop)
+-
