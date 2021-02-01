@@ -56,4 +56,4 @@ a json file with **Serde**. Ready to run on **Docker**.
 
 - Auth
 - Lists (Push, Pop)
--
+- A smart way to handle json doc-like data?
