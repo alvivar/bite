@@ -1,12 +1,17 @@
 use std::{
+    env,
     io::{self, BufRead, BufReader, BufWriter, Write},
     net::TcpStream,
 };
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
+    let mut server = "127.0.0.1:1984".to_owned();
 
-    let server = "142.93.180.20:1984";
+    let args: Vec<String> = env::args().collect();
+    if args.len() > 1 {
+        server = args[1].to_owned();
+    }
+
     let stream = TcpStream::connect(server).unwrap();
     let stream_clone = stream.try_clone().unwrap();
     let mut writer = BufWriter::new(stream);
@@ -30,3 +35,5 @@ fn main() {
         }
     }
 }
+
+// Test server (maybe online) 142.93.180.20:1984

@@ -30,6 +30,10 @@ send/receive messages.
 
     cargo run --release --p client
 
+Or for a custom test server:
+
+    cargo run --release && ./target/release/client 123.45.678.90:1234
+
 You should be able to write from any TCP connection, just send complete lines
 before flush.
 
@@ -40,10 +44,6 @@ server.
 
     docker-compose build
     docker-compose up -d
-
-Or...
-
-    docker-compose up -d --build
 
 Then you can connect at **127.0.0.1:1984**.
 
