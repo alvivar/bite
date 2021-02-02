@@ -1,4 +1,7 @@
 
+    Current v3
+
+
     v4 (bananas and incomplete)
         Data <- immutable, never changing, authoritative, no need for a lock data
 
