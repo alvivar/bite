@@ -1,4 +1,5 @@
 
+    Handle dead threads
     Use time and IP on the server log
     Connection handles needs to be a module?
     Use a decent log system instead of println?
