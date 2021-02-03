@@ -25,31 +25,39 @@
     get user.1.profile.name ->
     This can be you!
 
-    get user ->
+    get user.0.workingOn ->
+    [{
+        "name": "The Eye of Minds",
+        "description": "A game about death and hell."
+    },
     {
-    	"user": [
-    		{
-    			"id": 20210202170229,
-    			"profile": {
-    				"name": "Andrés Villalobos",
-    				"twitter": "twitter.com/matnesis",
-    			},
-    			"workingOn": [
-    				{
-    					"name": "The Eye of Minds",
-    					"description": "A game about death and hell."
-    				},
-    				{
-    					"name": "Bite",
-    					"description": "Minimalist Key-Value Database for quick prototypes."
-    				}
-    			]
-    		},
-    		{
-    			"id": 20210202172717,
-    			"profile": {
-    				"name": "This can be you!"
-    			}
-    		}
-    	]
-    }
+        "name": "Bite",
+        "description": "Minimalist Key-Value Database for quick prototypes."
+    }]
+
+    get user ->
+    [
+        {
+            "id": 20210202170229,
+            "profile": {
+                "name": "Andrés Villalobos",
+                "twitter": "twitter.com/matnesis",
+            },
+            "workingOn": [
+                {
+                    "name": "The Eye of Minds",
+                    "description": "A game about death and hell."
+                },
+                {
+                    "name": "Bite",
+                    "description": "Minimalist Key-Value Database for quick prototypes."
+                }
+            ]
+        },
+        {
+            "id": 20210202172717,
+            "profile": {
+                "name": "This can be you!"
+            }
+        }
+    ]
