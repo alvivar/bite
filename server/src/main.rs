@@ -57,7 +57,7 @@ fn handle_connection(
         match reader.read_line(&mut buffer) {
             Ok(_) => {} // @todo Is doing nothing wrong?
             Err(e) => {
-                println!("{}.", e);
+                println!("Client disconnected: {}.", e);
                 break;
             }
         }
