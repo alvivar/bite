@@ -1,0 +1,52 @@
+
+    SET user.name Name -> { "user": { name: "Name" } }
+
+    [user] [name] Name
+
+    { k : @ }
+    { "user" : @ }
+    { "user" : { "name" : @ } }
+    { "user" : { "name" : "Name" } }
+
+    <>
+
+    SET user.name.len 4 -> { "user": { "name": { "len": 4 } } }
+
+    [user] [name] [len] 4
+
+    { k : @ }
+    { "user" : @ }
+    { "user" : { "name" : @ } }
+    { "user" : { "name" : { "len" : 4 } } }
+
+    <>
+
+    SET user.likes.1 She -> { "user": { likes: ["She"] } }
+
+    [user] [likes] #1 She
+
+    { k : @ }
+    { "user" : @ }
+    { "user" : { "likes" : @ } }
+    .
+    Get UNFINISHED
+    [ @ ]
+
+
+    GET user.likes.1 ->
+    GET user.likes.0 -> She
+
+    <>
+
+    GET user.name -> Name <- { "user": { name: "Name" } }
+    [user] [name]
+
+    value = map[user.name]
+    value = value[user]
+    value = value[name]
+    value = Name
+
+    <>
+
+    GET user.name.len -> 4 <- { "user": { "name": { "len": 4 } } }
+    [user] [name] [lem]
