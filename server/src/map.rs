@@ -44,7 +44,12 @@ impl Map {
                     let map = self.data.lock().unwrap();
 
                     match map.get(&key) {
-                        Some(value) => handle.send(Result::Message(value.to_owned())).unwrap(),
+                        Some(json) => {
+                            // @todo Value should be extracted from the JSON
+                            // based on the json-key.
+
+                            handle.send(Result::Message(json.to_owned())).unwrap();
+                        }
                         None => handle.send(Result::Message("".to_owned())).unwrap(),
                     }
                 }
