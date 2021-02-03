@@ -1,5 +1,14 @@
 
+
     Handle dead threads
+
+    Parse message for nested jsons into instructions
+    Get should read values from json instructions
+    Set should transform json instructions into a value
+
+    Push # value should insert into a list, transform normal values
+    Pop # should return and delete a value
+
     Use time and IP on the server log
     Connection handles needs to be a module?
     Use a decent log system instead of println?

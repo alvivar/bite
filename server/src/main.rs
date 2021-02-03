@@ -53,7 +53,10 @@ fn handle_connection(
 
     loop {
         let mut buffer = String::new();
-        reader.read_line(&mut buffer).unwrap();
+        match reader.read_line(&mut buffer) {
+            Ok(_) => {} // @todo Is doing nothing wrong?
+            Err(_) => println!("Client disconnected."),
+        }
 
         match buffer.len() > 0 {
             true => println!("> {}", buffer.trim()),
