@@ -43,7 +43,7 @@
             "id": 20210202170229,
             "profile": {
                 "name": "Andrés Villalobos",
-                "twitter": "twitter.com/matnesis",
+                "twitter": "twitter.com/matnesis"
             },
             "workingOn": [
                 {
