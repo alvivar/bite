@@ -58,3 +58,20 @@ pub fn proc_from_string(content: &str) -> Proc {
         value: val.trim().to_owned(),
     }
 }
+
+pub fn to_json(key: &str, value: &str) -> String {
+    let mut split = key.split(".");
+
+    let mut json = "@".to_owned();
+    let template = "{ k : @ }";
+
+    for (i, k) in split.enumerate() {
+        let keyed = template.replace("k", k);
+
+        // @todo Last element should be different, a value not a json.
+
+        json.push_str(&json.replace("@", keyed.as_str()));
+    }
+
+    return json.to_owned();
+}
