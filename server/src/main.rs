@@ -71,7 +71,7 @@ fn handle_connection(
         }
 
         // Parse the message.
-        let proc = parse::from_string(buffer.as_str());
+        let proc = parse::proc_from_string(buffer.as_str());
         let instr = proc.instr;
         let key = proc.key;
         let val = proc.value;

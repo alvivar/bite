@@ -10,7 +10,7 @@ pub enum Instr {
     Nop,
 }
 
-pub fn from_string(content: &str) -> Proc {
+pub fn proc_from_string(content: &str) -> Proc {
     let mut inst = String::new();
     let mut key = String::new();
     let mut val = String::new();
