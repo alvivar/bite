@@ -17,16 +17,18 @@
     set user.1.id              20210202172717
     set user.1.profile.name    This can be you!
 
+    > OK
+
 ## GET
 
-    get name ->
-    Bite
+    get name
+    > Bite
 
-    get user.1.profile.name ->
-    This can be you!
+    get user.1.profile.name
+    > This can be you!
 
-    get user.0.workingOn ->
-    [{
+    get user.0.workingOn
+    > [{
         "name": "The Eye of Minds",
         "description": "A game about death and hell."
     },
@@ -35,8 +37,8 @@
         "description": "Minimalist Key-Value Database for quick prototypes."
     }]
 
-    get user ->
-    [
+    get user
+    > [
         {
             "id": 20210202170229,
             "profile": {
