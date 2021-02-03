@@ -1,7 +1,4 @@
 
-
-    Handle dead threads
-
     Parse message for nested jsons into instructions
     Get should read values from json instructions
     Set should transform json instructions into a value
@@ -25,6 +22,9 @@
     SET without key, creates an empty key
     Use Error as results instead of unwrap
 
+
+    2021.02.02
+    x Handle dead threads
 
     2021.01.30
     x New threads should be created, if all of them are busy

@@ -48,7 +48,7 @@
             "workingOn": [
                 {
                     "name": "The Eye of Minds",
-                    "description": "A game about death and hell."
+                    "description": "A game about hell."
                 },
                 {
                     "name": "Bite",
