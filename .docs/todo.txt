@@ -1,7 +1,17 @@
 
-    Parse message for nested jsons into instructions
-    Get should read values from json instructions
+    SET user.name Name -> { "user": { name: "Name" } }
+    GET user.name -> Name
+
+    SET user.name.len 4 -> { "user": { "name": { "len": 4 } } }
+    GET user.name.len -> 4
+
+    SET user.likes.1 She -> { "user": { likes: ["She"] } }
+    GET user.likes.1 ->
+    GET user.likes.0 -> She
+
+    Get should read values using json instructions
     Set should transform json instructions into a value
+    Parse message for nested jsons into instructions
 
     Push # value should insert into a list, transform normal values
     Pop # should return and delete a value
