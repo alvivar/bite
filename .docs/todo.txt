@@ -9,9 +9,14 @@
     GET user.likes.1 ->
     GET user.likes.0 -> She
 
+    Maybe set should update the parent parent.child but leave the node with the value
+
     Get should read values using json instructions
     Set should transform json instructions into a value
     Parse message for nested jsons into instructions
+
+    Hand Value casting, it needs to be int, float eventually.
+    Probably, values needs to be sanitized, codified when converting to json?
 
     Push # value should insert into a list, transform normal values
     Pop # should return and delete a value
