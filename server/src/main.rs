@@ -53,9 +53,13 @@ fn handle_connection(
 
     loop {
         let mut buffer = String::new();
+
         match reader.read_line(&mut buffer) {
             Ok(_) => {} // @todo Is doing nothing wrong?
-            Err(e) => println!("{}.", e),
+            Err(e) => {
+                println!("{}.", e);
+                break;
+            }
         }
 
         match buffer.len() > 0 {
