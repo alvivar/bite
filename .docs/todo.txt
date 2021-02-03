@@ -1,9 +1,9 @@
 
     SET user.name Name -> { "user": { name: "Name" } }
-    GET user.name -> Name
-
     SET user.name.len 4 -> { "user": { "name": { "len": 4 } } }
-    GET user.name.len -> 4
+
+    GET user.name -> Name <- { "user": { name: "Name" } }
+    GET user.name.len -> 4 <- { "user": { "name": { "len": 4 } } }
 
     SET user.likes.1 She -> { "user": { likes: ["She"] } }
     GET user.likes.1 ->
