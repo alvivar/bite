@@ -81,6 +81,7 @@ fn handle_connection(
         match instr {
             parse::Instr::Get => map.send(map::Command::Get(sender, key)).unwrap(),
             parse::Instr::Set => map.send(map::Command::Set(sender, key, val)).unwrap(),
+            parse::Instr::Json => map.send(map::Command::Json(sender, key)).unwrap(),
             parse::Instr::Nop => {
                 writer.write("NOP".as_bytes()).unwrap();
                 writer.write(&[0xA]).unwrap(); // Write line.

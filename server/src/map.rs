@@ -1,8 +1,10 @@
+use parse::to_json_old;
+
 use crate::db;
 use crate::parse;
 
 use std::{
-    collections::BTreeMap,
+    collections::{btree_map::Range, BTreeMap},
     sync::{
         mpsc::{self, Receiver, Sender},
         Arc, Mutex,
@@ -12,6 +14,7 @@ use std::{
 pub enum Command {
     Get(Sender<Result>, String),
     Set(Sender<Result>, String, String),
+    Json(Sender<Result>, String),
 }
 
 pub enum Result {
@@ -41,16 +44,21 @@ impl Map {
             let message = self.receiver.recv().unwrap();
 
             match message {
+                Command::Json(handle, key) => {
+                    let map = self.data.lock().unwrap();
+
+                    let range = map.range(key.to_owned()..);
+                    let kv: Vec<(&String, &String)> =
+                        range.take_while(|(k, _)| k.starts_with(&key)).collect();
+
+                    let json = parse::kv_to_json_value(kv);
+                    handle.send(Result::Message(json)).unwrap();
+                }
                 Command::Get(handle, key) => {
                     let map = self.data.lock().unwrap();
 
                     match map.get(&key) {
-                        Some(json) => {
-                            // @todo Value should be extracted from the JSON
-                            // based on the json-key.
-
-                            handle.send(Result::Message(json.to_owned())).unwrap();
-                        }
+                        Some(json) => handle.send(Result::Message(json.to_owned())).unwrap(),
                         None => handle.send(Result::Message("".to_owned())).unwrap(),
                     }
                 }

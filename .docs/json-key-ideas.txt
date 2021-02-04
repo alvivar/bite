@@ -1,4 +1,22 @@
 
+    user : The persona using the system.
+    user.date.created : 2021.02.03 07.28 pm
+    user.date.modified : 2021.02.03 07.29 pm
+    user.id : 1984
+    user.profile.age : 36
+    user.profile.lastname : Villalobos
+    user.profile.name : Andrés
+
+    <>
+
+    user.profile.age 36
+    user.profile.lastname Villalobos
+    user.profile.name Andrés
+
+    { "user" : { "profile" : { "age" : "36", "lastname" : "Villalobos", "name" : "Andrés" } } }
+
+    <>
+
     SET user.name Name -> { "user": { name: "Name" } }
 
     [user] [name] Name
