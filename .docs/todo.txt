@@ -11,8 +11,6 @@
     GET user.likes.1 ->
     GET user.likes.0 -> She
 
-    Maybe set should update the parent parent.child but leave the node with the value
-
     Get should read values using json instructions
     Set should transform json instructions into a value
     Parse message for nested jsons into instructions
