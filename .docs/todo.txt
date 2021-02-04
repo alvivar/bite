@@ -1,4 +1,6 @@
 
+    Macros to deal with infinite json value propagation?
+
     SET user.name Name -> { "user": { name: "Name" } }
     SET user.name.len 4 -> { "user": { "name": { "len": 4 } } }
 
