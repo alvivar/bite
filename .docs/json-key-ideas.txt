@@ -7,6 +7,13 @@
     user.profile.lastname : Villalobos
     user.profile.name : Andrés
 
+    created = 2021.02.03 07.28 pm
+    date = ^
+    user = ^
+
+    user = null
+
+
     <>
 
     user.profile.age 36

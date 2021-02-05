@@ -63,64 +63,100 @@ pub fn proc_from_string(content: &str) -> Proc {
     }
 }
 
-pub fn to_json_old(key: &str, value: &str) -> String {
-    let split = key.split(".");
+// pub fn to_json_old(key: &str, value: &str) -> String {
+//     let split = key.split(".");
 
-    let mut json = "@".to_owned();
-    let template = "{ \"k\" : @ }";
+//     let mut json = "@".to_owned();
+//     let template = "{ \"k\" : @ }";
 
-    for k in split {
-        let keyed = template.replace("k", k);
-        json = json.replace("@", keyed.as_str());
-    }
+//     for k in split {
+//         let keyed = template.replace("k", k);
+//         json = json.replace("@", keyed.as_str());
+//     }
 
-    json = json.replace("@", "\"@\"");
-    json = json.replace("@", value);
+//     json = json.replace("@", "\"@\"");
+//     json = json.replace("@", value);
 
-    // @todo Value needs to be int and float eventually.
+//     // @todo Value needs to be int and float eventually.
 
-    return json;
-}
+//     return json;
+// }
 
-pub fn key_to_json_template(key: &str) -> String {
-    let split = key.split(".");
+// pub fn key_to_json_template(key: &str) -> String {
+//     let split = key.split(".");
 
-    let mut json = "@".to_owned();
-    let template = "{ \"k\" : @ }";
+//     let mut json = "@".to_owned();
+//     let template = "{ \"k\" : @ }";
 
-    for k in split {
-        let keyed = template.replace("k", k);
-        json = json.replace("@", keyed.as_str());
-    }
+//     for k in split {
+//         let keyed = template.replace("k", k);
+//         json = json.replace("@", keyed.as_str());
+//     }
 
-    return json;
-}
+//     return json;
+// }
 
 pub fn kv_to_json_value(kv: Vec<(&String, &String)>) -> String {
     let mut json: Value = json!(Value::Null);
 
     for (k, v) in kv {
         let ks: Vec<&str> = k.split(".").collect();
-        if ks.len() == 1 {
-            json[ks[0]] = json!(v);
-        }
 
-        if ks.len() == 2 {
-            json[ks[0]][ks[1]] = json!(v);
-        }
+        // println!("{:?}", ks);
+        json = mapjson(ks, v);
+        // println!("{}", json);
 
-        if ks.len() == 3 {
-            json[ks[0]][ks[1]][ks[2]] = json!(v);
-        }
+        // if ks.len() == 1 {
+        //     json[ks[0]] = json!(v);
+        // }
 
-        if ks.len() == 4 {
-            json[ks[0]][ks[1]][ks[2]][ks[3]] = json!(v);
-        }
+        // if ks.len() == 2 {
+        //     json[ks[0]][ks[1]] = json!(v);
+        // }
 
-        if ks.len() == 5 {
-            json[ks[0]][ks[1]][ks[2]][ks[3]][ks[4]] = json!(v);
-        }
+        // if ks.len() == 3 {
+        //     json[ks[0]][ks[1]][ks[2]] = json!(v);
+        // }
+
+        // if ks.len() == 4 {
+        //     json[ks[0]][ks[1]][ks[2]][ks[3]] = json!(v);
+        // }
+
+        // if ks.len() == 5 {
+        //     json[ks[0]][ks[1]][ks[2]][ks[3]][ks[4]] = json!(v);
+        // }
     }
 
     return json.to_string();
+}
+
+// pub fn inside(mut json: Value, mut kv: Vec<&str>) -> Value {
+//     match kv.len() <= 0 {
+//         true => Value::Null,
+//         false => {
+//             json[kv[0]] = json.clone();
+//             kv.drain(0..0);
+//             inside(json, kv)
+//         }
+//     }
+// }
+
+pub fn mapjson(ks: Vec<&str>, val: &str) -> Value {
+    let mut result: Value = Value::Null;
+
+    for k in ks.iter().rev() {
+        println!("{}", k);
+
+        if result == Value::Null {
+            result = json!(val);
+        }
+
+        let mut temp = Value::Null;
+        temp[k] = result;
+        println!("{}\n", temp);
+
+        result = temp;
+    }
+
+    result
 }

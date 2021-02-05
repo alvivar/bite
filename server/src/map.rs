@@ -1,10 +1,8 @@
-use parse::to_json_old;
-
 use crate::db;
 use crate::parse;
 
 use std::{
-    collections::{btree_map::Range, BTreeMap},
+    collections::BTreeMap,
     sync::{
         mpsc::{self, Receiver, Sender},
         Arc, Mutex,
