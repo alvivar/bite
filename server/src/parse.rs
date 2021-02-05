@@ -102,29 +102,18 @@ pub fn kv_to_json_value(kv: Vec<(&String, &String)>) -> String {
     for (k, v) in kv {
         let ks: Vec<&str> = k.split(".").collect();
 
-        // println!("{:?}", ks);
-        json = mapjson(ks, v);
-        // println!("{}", json);
-
-        // if ks.len() == 1 {
-        //     json[ks[0]] = json!(v);
-        // }
-
-        // if ks.len() == 2 {
-        //     json[ks[0]][ks[1]] = json!(v);
-        // }
-
-        // if ks.len() == 3 {
-        //     json[ks[0]][ks[1]][ks[2]] = json!(v);
-        // }
-
-        // if ks.len() == 4 {
-        //     json[ks[0]][ks[1]][ks[2]][ks[3]] = json!(v);
-        // }
-
-        // if ks.len() == 5 {
-        //     json[ks[0]][ks[1]][ks[2]][ks[3]][ks[4]] = json!(v);
-        // }
+        match ks.len() {
+            1 => json[ks[0]] = json!(v),
+            2 => json[ks[0]][ks[1]] = json!(v),
+            3 => json[ks[0]][ks[1]][ks[2]] = json!(v),
+            4 => json[ks[0]][ks[1]][ks[2]][ks[3]] = json!(v),
+            5 => json[ks[0]][ks[1]][ks[2]][ks[3]][ks[4]] = json!(v),
+            6 => json[ks[0]][ks[1]][ks[2]][ks[3]][ks[4]][ks[5]] = json!(v),
+            7 => json[ks[0]][ks[1]][ks[2]][ks[3]][ks[4]][ks[5]][ks[6]] = json!(v),
+            8 => json[ks[0]][ks[1]][ks[2]][ks[3]][ks[4]][ks[5]][ks[6]][ks[7]] = json!(v),
+            9 => json[ks[0]][ks[1]][ks[2]][ks[3]][ks[4]][ks[5]][ks[6]][ks[7]][ks[8]] = json!(v),
+            _ => (),
+        }
     }
 
     return json.to_string();
@@ -141,22 +130,22 @@ pub fn kv_to_json_value(kv: Vec<(&String, &String)>) -> String {
 //     }
 // }
 
-pub fn mapjson(ks: Vec<&str>, val: &str) -> Value {
-    let mut result: Value = Value::Null;
+// pub fn mapjson(ks: Vec<&str>, val: &str) -> Value {
+//     let mut result: Value = Value::Null;
 
-    for k in ks.iter().rev() {
-        println!("{}", k);
+//     for k in ks.iter().rev() {
+//         println!("{}", k);
 
-        if result == Value::Null {
-            result = json!(val);
-        }
+//         if result == Value::Null {
+//             result = json!(val);
+//         }
 
-        let mut temp = Value::Null;
-        temp[k] = result;
-        println!("{}\n", temp);
+//         let mut temp = Value::Null;
+//         temp[k] = result;
+//         println!("{}\n", temp);
 
-        result = temp;
-    }
+//         result = temp;
+//     }
 
-    result
-}
+//     result
+// }
