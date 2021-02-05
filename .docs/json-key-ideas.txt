@@ -13,7 +13,6 @@
 
     user = null
 
-
     <>
 
     user.profile.age 36

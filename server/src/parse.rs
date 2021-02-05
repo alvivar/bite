@@ -99,9 +99,8 @@ pub fn proc_from_string(content: &str) -> Proc {
 pub fn kv_to_json_value(kv: Vec<(&String, &String)>) -> String {
     let mut json: Value = json!(Value::Null);
 
-    for (k, v) in kv {
+    for (k, v) in kv.iter().rev() {
         let ks: Vec<&str> = k.split(".").collect();
-
         match ks.len() {
             1 => json[ks[0]] = json!(v),
             2 => json[ks[0]][ks[1]] = json!(v),
