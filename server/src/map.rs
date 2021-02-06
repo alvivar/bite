@@ -46,10 +46,12 @@ impl Map {
                     let map = self.data.lock().unwrap();
 
                     let range = map.range(key.to_owned()..);
+
                     let kv: Vec<(&String, &String)> =
                         range.take_while(|(k, _)| k.starts_with(&key)).collect();
 
-                    let json = parse::kv_to_json_value(kv);
+                    let json = parse::kv_to_json(kv);
+
                     handle.send(Result::Message(json)).unwrap();
                 }
                 Command::Get(handle, key) => {
