@@ -1,3 +1,5 @@
+use std::env::consts::FAMILY;
+
 use serde_json::{json, map::Entry, Value};
 
 pub struct Proc {
@@ -63,27 +65,63 @@ pub fn proc_from_string(content: &str) -> Proc {
     }
 }
 
-pub fn kv_to_json(kv: Vec<(&String, &String)>) -> String {
+pub fn kv_to_json(kv: Vec<(&String, &String)>) -> Value {
     let mut merged_json = json!({});
 
     for (k, v) in kv.iter().rev() {
         insert(&mut merged_json, k, json!(v));
     }
 
-    return merged_json.to_string();
+    return merged_json;
 }
 
 fn insert(mut json: &mut Value, key: &str, val: Value) {
     let mut entry: Entry;
 
-    for k in key.split('.') {
+    for mut k in key.split('.') {
+        let is_klist = is_klist(k);
+
+        if is_klist {
+            k = k.split("[").next().unwrap();
+            println!("KLIST {}", k);
+        }
+
+        // match json  {
+        //     Value::Null => {}
+        //     Value::Bool(_) => {}
+        //     Value::Number(_) => {}
+        //     Value::String(_) => {}
+        //     Value::Array(_) => {}
+        //     Value::Object(_) => {}
+        // }
         entry = json.as_object_mut().unwrap().entry(k);
-        json = entry.or_insert_with(|| json!({}));
+
+        match is_klist {
+            true => json = entry.or_insert_with(|| json!([])),
+            false => json = entry.or_insert_with(|| json!({})),
+        }
     }
 
-    // Don't overwrite non empty values.
     let inside = &json;
-    if **inside == json!({}) {
-        *json = val;
+
+    match **inside {
+        Value::Array(_) => (*json).as_array_mut().unwrap().push(val),
+        Value::Object(_) => {
+            if **inside == json!({}) {
+                *json = val;
+            }
+        }
+        _ => {}
     }
+}
+
+fn is_klist(str: &str) -> bool {
+    let left = str.contains("[");
+    let right = str.contains("]");
+
+    if !left || !right {
+        return false;
+    }
+
+    true
 }

@@ -52,7 +52,7 @@ impl Map {
 
                     let json = parse::kv_to_json(kv);
 
-                    handle.send(Result::Message(json)).unwrap();
+                    handle.send(Result::Message(json.to_string())).unwrap();
                 }
                 Command::Get(handle, key) => {
                     let map = self.data.lock().unwrap();
