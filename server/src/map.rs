@@ -65,8 +65,6 @@ impl Map {
                 Command::Set(handle, key, value) => {
                     let mut map = self.data.lock().unwrap();
 
-                    // let json = parse::to_json(&key, &value);
-
                     match map.insert(key, value) {
                         Some(_) => handle.send(Result::Message("OK".to_owned())).unwrap(),
                         None => handle.send(Result::Message("OK".to_owned())).unwrap(),
