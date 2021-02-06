@@ -1,26 +1,14 @@
 
-    Parsing JSON Parent key with data panics!
-    Macros to deal with infinite json value propagation?
 
-    SET user.name Name -> { "user": { name: "Name" } }
-    SET user.name.len 4 -> { "user": { "name": { "len": 4 } } }
-
-    GET user.name -> Name <- { "user": { name: "Name" } }
-    GET user.name.len -> 4 <- { "user": { "name": { "len": 4 } } }
-
-    SET user.likes.1 She -> { "user": { likes: ["She"] } }
-    GET user.likes.1 ->
-    GET user.likes.0 -> She
-
-    Get should read values using json instructions
-    Set should transform json instructions into a value
-    Parse message for nested jsons into instructions
-
-    Hand Value casting, it needs to be int, float eventually.
-    Probably, values needs to be sanitized, codified when converting to json?
-
+    A way to handle lists, maybe user.likes.1 or something
     Push # value should insert into a list, transform normal values
     Pop # should return and delete a value
+    SET without key, creates an empty key
+
+    Hand Value casting, it needs to be int, float eventually.
+
+    Trim '.' at the end to avoid weird formats
+    Append '.' to the key to make sure the json tree can be constructed
 
     Use time and IP on the server log
     Connection handles needs to be a module?
@@ -31,13 +19,24 @@
     Thread waiting for q! in the input to quit.
     Improve serialization so it can be written in blocks like a good BTreeMap on file?
 
-    Auth
-
+    Auth by environment
     DB file name by environment
     IP and port by environment
-    SET without key, creates an empty key
+
     Use Error as results instead of unwrap
 
+
+    2021.02.06
+    x Probably, values needs to be sanitized, codified when converting to json?
+    x Get should read values using json instructions
+    x Set should transform json instructions into a value
+    x Parse message for nested jsons into instructions
+    x Parsing JSON Parent key with data panics!
+    x SET user.name Name -> { "user": { name: "Name" } }
+    x SET user.name.len 4 -> { "user": { "name": { "len": 4 } } }
+    x GET user.name -> Name <- { "user": { name: "Name" } }
+    x GET user.name.len -> 4 <- { "user": { "name": { "len": 4 } } }
+    x Macros to deal with infinite json value propagation?
 
     2021.02.02
     x Handle dead threads
