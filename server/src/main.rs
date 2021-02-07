@@ -1,7 +1,9 @@
 mod db;
 mod map;
-mod parse;
 mod work;
+
+mod parse;
+use parse::{AsyncInstr, Instr};
 
 use std::{
     io::{BufRead, BufReader, Write},
@@ -72,26 +74,26 @@ fn handle_conn(
         let conn_sndr = conn_sndr.clone();
 
         let async_instr = match instr {
-            parse::Instr::Get => {
+            Instr::Get => {
                 map_sndr.send(map::Command::Get(conn_sndr, key)).unwrap();
-                parse::AsyncInstr::Yes
+                AsyncInstr::Yes
             }
-            parse::Instr::Set => {
+            Instr::Set => {
                 map_sndr.send(map::Command::Set(key, val)).unwrap();
-                parse::AsyncInstr::No(String::from("OK"))
+                AsyncInstr::No(String::from("OK"))
             }
-            parse::Instr::Json => {
+            Instr::Json => {
                 map_sndr.send(map::Command::Json(conn_sndr, key)).unwrap();
-                parse::AsyncInstr::Yes
+                AsyncInstr::Yes
             }
-            parse::Instr::Nop => parse::AsyncInstr::No(String::from("NO")),
+            Instr::Nop => AsyncInstr::No(String::from("NO")),
         };
 
         let message = match async_instr {
-            parse::AsyncInstr::Yes => match conn_recvr.recv().unwrap() {
+            AsyncInstr::Yes => match conn_recvr.recv().unwrap() {
                 map::Result::Message(msg) => msg,
             },
-            parse::AsyncInstr::No(msg) => msg,
+            AsyncInstr::No(msg) => msg,
         };
 
         stream.write(message.as_bytes()).unwrap();
