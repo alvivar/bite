@@ -1,4 +1,7 @@
 
+    Better naming
+    Heroku script
+
     A way to handle lists, maybe user.likes.1 or something
     Push # value should insert into a list, transform normal values
     Pop # should return and delete a value
