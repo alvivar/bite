@@ -1,5 +1,3 @@
-use serde_json::json;
-
 use crate::db;
 use crate::parse;
 
@@ -13,7 +11,7 @@ use std::{
 
 pub enum Command {
     Get(Sender<Result>, String),
-    Set(Sender<Result>, String, String),
+    Set(String, String),
     Json(Sender<Result>, String),
 }
 
@@ -44,41 +42,32 @@ impl Map {
             let message = self.receiver.recv().unwrap();
 
             match message {
-                Command::Json(handle, key) => {
+                Command::Json(conn_sender, key) => {
                     let map = self.data.lock().unwrap();
 
                     let range = map.range(key.to_owned()..);
 
-                    let kv: Vec<(&String, &String)> =
-                        range.take_while(|(k, _)| k.starts_with(&key)).collect();
+                    let kv: Vec<(&str, &str)> = range
+                        .take_while(|(k, _)| k.starts_with(&key))
+                        .map(|(k, v)| (k.as_str(), v.as_str()))
+                        .collect();
 
-                    let json = parse::kv_to_json(kv);
+                    let json = parse::kv_to_json(&*kv);
 
-                    // let mut output = vec![vec![]];
-                    // let current_path = vec![];
-                    // parse::deep_keys(&json, current_path, &mut output);
-                    // println!("{:?}", output);
-
-                    let mut altjson = json!({});
-                    parse::compact(&mut altjson, &json);
-
-                    handle.send(Result::Message(altjson.to_string())).unwrap();
+                    conn_sender.send(Result::Message(json.to_string())).unwrap();
                 }
-                Command::Get(handle, key) => {
+                Command::Get(conn_sender, key) => {
                     let map = self.data.lock().unwrap();
 
                     match map.get(&key) {
-                        Some(json) => handle.send(Result::Message(json.to_owned())).unwrap(),
-                        None => handle.send(Result::Message("".to_owned())).unwrap(),
+                        Some(json) => conn_sender.send(Result::Message(json.to_owned())).unwrap(),
+                        None => conn_sender.send(Result::Message("".to_owned())).unwrap(),
                     }
                 }
-                Command::Set(handle, key, value) => {
+                Command::Set(key, value) => {
                     let mut map = self.data.lock().unwrap();
 
-                    match map.insert(key, value) {
-                        Some(_) => handle.send(Result::Message("OK".to_owned())).unwrap(),
-                        None => handle.send(Result::Message("OK".to_owned())).unwrap(),
-                    }
+                    map.insert(key, value);
 
                     db.send(db::Command::Save).unwrap();
                 }
