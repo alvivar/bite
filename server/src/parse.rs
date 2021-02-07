@@ -111,14 +111,14 @@ pub fn compact(mut dst_json: &mut Value, src_json: &Value) {
                     _ => {}
                 }
 
+                let jlist = json!(list);
                 if approved {
-                    dst_json[k] = json!(list);
-                    println!("{}", dst_json);
+                    dst_json[k] = jlist.clone();
+                    compact(&mut dst_json[k], &jlist);
                 } else {
                     dst_json[k] = v.clone();
+                    compact(&mut dst_json[k], v);
                 }
-
-                compact(&mut dst_json[k], v);
             }
         }
         _ => {}
