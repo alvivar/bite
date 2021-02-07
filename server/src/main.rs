@@ -4,7 +4,7 @@ mod parse;
 mod work;
 
 use std::{
-    io::{BufRead, BufReader, BufWriter, Write},
+    io::{BufRead, BufReader, Write},
     net::{TcpListener, TcpStream},
     sync::mpsc::{self, Receiver, Sender},
 };
@@ -30,44 +30,37 @@ fn main() {
     // New job on incoming connections.
     for stream in listener.incoming() {
         let stream = stream.unwrap();
-        let map = map_sender.clone();
-        let (sender, receiver) = mpsc::channel::<map::Result>();
+        let map_sender = map_sender.clone();
+        let (conn_sender, conn_receiver) = mpsc::channel::<map::Result>();
 
-        pool.execute(move || {
-            handle_connection(stream, map, sender, receiver);
-        });
+        pool.execute(move || handle_conn(stream, map_sender, conn_sender, conn_receiver));
     }
 
-    // @todo Thread waiting for q! in the input to quit.
+    // @todo Thread waiting q! in the input to quit.
     println!("Shutting down.");
 }
 
-fn handle_connection(
-    stream: TcpStream,
-    map: Sender<map::Command>,
-    sender: Sender<map::Result>,
-    receiver: Receiver<map::Result>,
+fn handle_conn(
+    mut stream: TcpStream,
+    map_sndr: Sender<map::Command>,
+    conn_sndr: Sender<map::Result>,
+    conn_recvr: Receiver<map::Result>,
 ) {
-    let mut writer = BufWriter::new(stream.try_clone().unwrap());
-    let mut reader = BufReader::new(stream);
+    let mut reader = BufReader::new(stream.try_clone().unwrap());
 
     loop {
         let mut buffer = String::new();
 
-        match reader.read_line(&mut buffer) {
-            Ok(_) => {} // @todo Is doing nothing wrong?
-            Err(e) => {
-                println!("Client disconnected: {}.", e);
-                break;
-            }
+        if let Err(e) = reader.read_line(&mut buffer) {
+            println!("Client disconnected: {}.", e);
+            break;
         }
 
-        match buffer.len() > 0 {
-            true => println!("> {}", buffer.trim()),
-            false => {
-                println!("Client disconnected.");
-                break;
-            }
+        if buffer.len() > 0 {
+            println!("> {}", buffer.trim());
+        } else {
+            println!("Client disconnected.");
+            break;
         }
 
         // Parse the message.
@@ -76,29 +69,33 @@ fn handle_connection(
         let key = proc.key;
         let val = proc.value;
 
-        let sender = sender.clone();
+        let conn_sndr = conn_sndr.clone();
 
-        match instr {
-            parse::Instr::Get => map.send(map::Command::Get(sender, key)).unwrap(),
-            parse::Instr::Set => map.send(map::Command::Set(sender, key, val)).unwrap(),
-            parse::Instr::Json => map.send(map::Command::Json(sender, key)).unwrap(),
-            parse::Instr::Nop => {
-                writer.write("NOP".as_bytes()).unwrap();
-                writer.write(&[0xA]).unwrap(); // Write line.
-                writer.flush().unwrap();
-                continue;
+        let async_instr = match instr {
+            parse::Instr::Get => {
+                map_sndr.send(map::Command::Get(conn_sndr, key)).unwrap();
+                parse::AsyncInstr::Yes
             }
-        }
-
-        // Wait for the Map response.
-        let response = receiver.recv().unwrap();
-
-        match response {
-            map::Result::Message(m) => {
-                writer.write(m.as_bytes()).unwrap();
-                writer.write(&[0xA]).unwrap(); // Write line.
-                writer.flush().unwrap();
+            parse::Instr::Set => {
+                map_sndr.send(map::Command::Set(key, val)).unwrap();
+                parse::AsyncInstr::No(String::from("OK"))
             }
-        }
+            parse::Instr::Json => {
+                map_sndr.send(map::Command::Json(conn_sndr, key)).unwrap();
+                parse::AsyncInstr::Yes
+            }
+            parse::Instr::Nop => parse::AsyncInstr::No(String::from("NO")),
+        };
+
+        let message = match async_instr {
+            parse::AsyncInstr::Yes => match conn_recvr.recv().unwrap() {
+                map::Result::Message(msg) => msg,
+            },
+            parse::AsyncInstr::No(msg) => msg,
+        };
+
+        stream.write(message.as_bytes()).unwrap();
+        stream.write(&[0xA]).unwrap(); // Write line.
+        stream.flush().unwrap();
     }
 }
