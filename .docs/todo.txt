@@ -1,32 +1,35 @@
 
-    Better naming
-    Heroku script
-
-    A way to handle lists, maybe user.likes.1 or something
-    Push # value should insert into a list, transform normal values
-    Pop # should return and delete a value
+    Readme update
     SET without key, creates an empty key
-
-    Hand Value casting, it needs to be int, float eventually.
-
-    Trim '.' at the end to avoid weird formats
-    Append '.' to the key to make sure the json tree can be constructed
+    Handle Value casting, it needs to be int, float eventually.
+    Auth by environment
 
     Use time and IP on the server log
-    Connection handles needs to be a module?
-    Use a decent log system instead of println?
+    DB file name by environment
+    IP and port by environment
 
     I'm using the Cargo.toml dependencies correctly?
+    Use Error as results instead of unwrap
+
+    Heroku script
+    Use a decent log system instead of println?
 
     Thread waiting for q! in the input to quit.
     Improve serialization so it can be written in blocks like a good BTreeMap on file?
 
-    Auth by environment
-    DB file name by environment
-    IP and port by environment
+    A way to handle lists, maybe user.likes.1 or something
+    Push # value should insert into a list, transform normal values
+    Pop # should return and delete a value
 
-    Use Error as results instead of unwrap
+    Trim '.' at the end to avoid weird formats?
 
+    Connection handles needs to be a module?
+
+
+    2021.02.07
+    . Append '.' to the key to make sure the json tree can be constructed
+    x Accept that this may not be the time to implement lists
+    x Better naming
 
     2021.02.06
     x Probably, values needs to be sanitized, codified when converting to json?
