@@ -1,3 +1,5 @@
+use serde_json::json;
+
 use crate::db;
 use crate::parse;
 
@@ -52,7 +54,15 @@ impl Map {
 
                     let json = parse::kv_to_json(kv);
 
-                    handle.send(Result::Message(json.to_string())).unwrap();
+                    // let mut output = vec![vec![]];
+                    // let current_path = vec![];
+                    // parse::deep_keys(&json, current_path, &mut output);
+                    // println!("{:?}", output);
+
+                    let mut altjson = json!({});
+                    parse::compact(&mut altjson, &json);
+
+                    handle.send(Result::Message(altjson.to_string())).unwrap();
                 }
                 Command::Get(handle, key) => {
                     let map = self.data.lock().unwrap();
