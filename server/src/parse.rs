@@ -1,6 +1,4 @@
-use std::{env::consts::FAMILY, mem, usize};
-
-use serde_json::{json, map::Entry, Value};
+use serde_json::{json, Value};
 
 pub struct Proc {
     pub instr: Instr,
@@ -76,53 +74,12 @@ pub fn kv_to_json(kv: Vec<(&String, &String)>) -> Value {
 }
 
 fn insert(mut json: &mut Value, key: &str, val: Value) {
-    let mut entry: Entry;
-
-    for mut k in key.split('.') {
-        let is_list = is_klist(k);
-
-        let mut kli = String::new();
-        if is_list {
-            let mut split = k.split("[");
-            k = split.next().unwrap();
-            kli = split.next().unwrap().split("]").next().unwrap().to_string();
-            println!("{}", kli);
-        }
-
-        match json {
-            Value::Array(_) => {
-                // let map = json
-                //     .as_array()
-                //     .unwrap()
-                //     .iter()
-                //     .find(|x| x.as_object().unwrap().contains_key(key))
-                //     .unwrap();
-
-                // println!("Map {}", &map);
-
-                println!("{} {} {} ", kli, key, val);
-
-                // let arr = json.as_array_mut().unwrap();
-                // arr.push(json!({ k: val }));
-
-                // let arr = json.as_array_mut().unwrap();
-                // if arr.len() < 1 {
-                //     arr.push(json!({ k: val }));
-                // } else {
-                //     println!("kli {}", kli);
-                //     mem::replace(&mut arr[kli], json!({ k: val }));
-                // }
-            }
-            Value::Object(_) => {
-                entry = json.as_object_mut().unwrap().entry(k);
-
-                match is_list {
-                    true => json = entry.or_insert_with(|| json!([])),
-                    false => json = entry.or_insert_with(|| json!({})),
-                }
-            }
-            _ => {}
-        }
+    for k in key.split('.') {
+        json = json
+            .as_object_mut()
+            .unwrap()
+            .entry(k)
+            .or_insert_with(|| json!({}));
     }
 
     let inside = &json;
@@ -136,15 +93,4 @@ fn insert(mut json: &mut Value, key: &str, val: Value) {
         }
         _ => {}
     }
-}
-
-fn is_klist(str: &str) -> bool {
-    let left = str.contains("[");
-    let right = str.contains("]");
-
-    if !left || !right {
-        return false;
-    }
-
-    true
 }
