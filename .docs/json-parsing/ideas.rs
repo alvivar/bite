@@ -1,3 +1,6 @@
+// Unfinished experiments.
+
+// Should create lists from the current json result.
 pub fn compact(mut dst_json: &mut Value, src_json: &Value) {
     match src_json {
         Value::Object(map) => {
