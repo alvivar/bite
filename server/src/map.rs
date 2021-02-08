@@ -60,13 +60,15 @@ impl Map {
                     // [!] Returns the pointer.
                     // Always returns everything when the key is empty.
                     let pointr = format!("/{}", key.replace(".", "/"));
-                    match json.pointer(pointr.as_str()) {
-                        Some(val) => conn_sender.send(Result::Message(val.to_string())).unwrap(),
+                    let msg = match json.pointer(pointr.as_str()) {
+                        Some(val) => val.to_string(),
                         None => {
                             let msg = if pointr.len() <= 1 { json } else { json!({}) };
-                            conn_sender.send(Result::Message(msg.to_string())).unwrap();
+                            msg.to_string()
                         }
                     };
+
+                    conn_sender.send(Result::Message(msg)).unwrap()
                 }
                 Command::Json(conn_sender, key) => {
                     let map = self.data.lock().unwrap();
@@ -83,13 +85,15 @@ impl Map {
                     // [!] Returns the json, but only if the pointer is real.
                     // Always returns everything when the key is empty.
                     let pointr = format!("/{}", key.replace(".", "/"));
-                    match json.pointer(pointr.as_str()) {
-                        Some(_) => conn_sender.send(Result::Message(json.to_string())).unwrap(),
+                    let msg = match json.pointer(pointr.as_str()) {
+                        Some(_) => json.to_string(),
                         None => {
-                            let msg = if pointr.len() == 1 { json } else { json!({}) };
-                            conn_sender.send(Result::Message(msg.to_string())).unwrap();
+                            let msg = if pointr.len() <= 1 { json } else { json!({}) };
+                            msg.to_string()
                         }
                     };
+
+                    conn_sender.send(Result::Message(msg)).unwrap()
                 }
                 Command::Get(conn_sender, key) => {
                     let map = self.data.lock().unwrap();
