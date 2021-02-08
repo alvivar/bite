@@ -1,7 +1,6 @@
 {
     "app": {
-        "description": "A prototype that needs a quick & simple JSON Key-Value store.",
-        "name": "Something Awesome",
+        "description": "Some prototype needing a quick & simple JSON Key-Value store.",
         "user": {
             "1984": {
                 "description": "Programmer & Game Designer",
@@ -13,7 +12,7 @@
                 }
             },
             "2020": {
-                "description": "Probably you, in the future!",
+                "description": "Probably you!",
                 "name": "<Your Name>"
             }
         }
