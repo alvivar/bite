@@ -1,3 +1,5 @@
+use serde_json::{self, json};
+
 use crate::parse;
 
 use std::{
@@ -55,14 +57,15 @@ impl Map {
 
                     let json = parse::kv_to_json(&*kv);
 
+                    // [!] Returns the pointer.
+
                     let jpointer = format!("/{}", key.replace(".", "/"));
-
-                    let json = match json.pointer(jpointer.as_str()) {
-                        Some(val) => val,
-                        None => &json,
+                    match json.pointer(jpointer.as_str()) {
+                        Some(val) => conn_sender.send(Result::Message(val.to_string())).unwrap(),
+                        None => conn_sender
+                            .send(Result::Message(json!({}).to_string()))
+                            .unwrap(),
                     };
-
-                    conn_sender.send(Result::Message(json.to_string())).unwrap();
                 }
                 Command::Json(conn_sender, key) => {
                     let map = self.data.lock().unwrap();
@@ -76,7 +79,15 @@ impl Map {
 
                     let json = parse::kv_to_json(&*kv);
 
-                    conn_sender.send(Result::Message(json.to_string())).unwrap();
+                    // [!] Returns the json, but online if the pointer is real.
+
+                    let jpointer = format!("/{}", key.replace(".", "/"));
+                    match json.pointer(jpointer.as_str()) {
+                        Some(_) => conn_sender.send(Result::Message(json.to_string())).unwrap(),
+                        None => conn_sender
+                            .send(Result::Message(json!({}).to_string()))
+                            .unwrap(),
+                    };
                 }
                 Command::Get(conn_sender, key) => {
                     let map = self.data.lock().unwrap();
