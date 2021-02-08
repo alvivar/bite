@@ -1,32 +1,66 @@
 # Bite
 
-Minimal Key-Value Store. A socket waiting for messages to GET and SET values.
+Minimalistic JSON Key-Value Store.
 
-## How to use
+## How
 
-To set the value:
+To set the value,
 
-    SET somekeyname Some string as a value I guess
+    S somekeyname Some string as a value I guess
     > OK
 
-To get the value:
+To get the value,
 
-    GET somekeyname
+    G somekeyname
     > Some string as a value I guess
 
-    GET keywithoutvalue
+    G keywithoutvalue
     >
+
+For JSON use the dot notation on keys,
+
+    S library.name Bite
+    S library.why Simplest database ever
+    S library.author.name Andrés
+    S library.author.twitter matnesis
+
+This way you can construct JSON using the keys, with the full path,
+
+    JS library
+    >
+    {
+        "library" : {
+            "name" : "Bite",
+            "why" : "Simplest database ever"
+            "author" : {
+                "name" : "Andrés",
+                "twitter" : "matnesis
+            }
+        }
+    }
+
+Or just the value,
+
+    J library
+    >
+    {
+        "name" : "Bite",
+        "why" : "Simplest database ever"
+    }
+
+    J library.why
+    > "Simplest database ever."
 
 A **./data/DB.json** file will be created with the information sorted.
 
 ## How to run
 
-The server runs on **127.0.0.1:1984**, just like me:
+The server runs on **0.0.0.0:1984**, just like me:
 
     cargo run --release --p server
 
-The client is just a simple test that connects to **127.0.0.1:1984** and
-send/receive messages.
+The client is just a simple test that connects to **127.0.0.1:1984** to send and
+receive messages.
 
     cargo run --release --p client
 
@@ -49,12 +83,11 @@ Then you can connect at **127.0.0.1:1984**.
 
 ## Tech
 
-Rust multi-thread **TcpListener** storing data on a **BTreeMap** serialized into
-a json file with **Serde**. Ready to run on **Docker**.
+Rust multi-thread **TcpListener** storing on a **BTreeMap** serialized into a
+json file with **Serde**. Ready to run on **Docker**.
 
 ## Things to do
 
-- A smart way to handle json doc-like data?
-- GET & SET that creates embedded JSON
-- Lists (Push, Pop)
-- Auth
+- Auth.
+- Support ints, floats and bools.
+- Maybe Lists.
