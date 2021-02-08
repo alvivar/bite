@@ -1,15 +1,17 @@
 
 
-    Handle Value casting, it needs to be int, float eventually.
+    Command to get all the keys, gk, jk
     Auth by environment
 
+    Handle casting, int, float, bool
+
     Extract kv range into his own function
+    I'm using the Cargo.toml dependencies correctly?
 
     Use time and IP on the server log
     DB file name by environment
     IP and port by environment
 
-    I'm using the Cargo.toml dependencies correctly?
     Use Error as results instead of unwrap
 
     Heroku script
@@ -21,6 +23,7 @@
     Trim '.' at the end to avoid weird formats?
 
     Connection handles needs to be a module?
+
     A way to handle lists, maybe user.likes.1 or something
     Push # value should insert into a list, transform normal values
     Pop # should return and delete a value
