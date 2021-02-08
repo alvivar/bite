@@ -21,10 +21,10 @@ For JSON use the dot notation on keys,
 
     S library.name Bite
     S library.why Simplest database ever
-    S library.author.name Andrés
+    S library.author.name Andrés Villalobos
     S library.author.twitter matnesis
 
-This way you can construct JSON using the keys, with the full path,
+This way you can construct JSON using the keys, with the full path.
 
     JS library
     >
@@ -33,25 +33,29 @@ This way you can construct JSON using the keys, with the full path,
             "name" : "Bite",
             "why" : "Simplest database ever"
             "author" : {
-                "name" : "Andrés",
+                "name" : "Andrés Villalobos",
                 "twitter" : "matnesis
             }
         }
     }
 
-Or just the value,
+Or just the value.
 
     J library
     >
     {
         "name" : "Bite",
-        "why" : "Simplest database ever"
+        "why" : "Simplest database ever",
+        "author" : {
+            "name" : "Andrés Villalobos",
+            "twitter" : "matnesis
+        }
     }
 
     J library.why
     > "Simplest database ever."
 
-A **./data/DB.json** file will be created with the information sorted.
+Storing everything on **./data/DB.json** with the information sorted.
 
 ## How to run
 
