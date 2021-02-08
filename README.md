@@ -1,6 +1,6 @@
 # Bite
 
-Minimalistic JSON Key-Value Store.
+Minimalistic JSON Key-Value Database.
 
 ## How
 
@@ -67,23 +67,20 @@ Everything will be stored sorted on **data/DB.json**.
 
 ## How to run
 
-The server runs on **0.0.0.0:1984**, just like me:
+The server runs on **0.0.0.0:1984**, you can send and receive messages with any
+TCP connection, just send complete lines (0xA) before flush.
 
     cargo run --release --p server
 
-The client is just a simple test that connects to **127.0.0.1:1984** to send and
-receive messages.
+The client is just a simple test that connects to **127.0.0.1:1984**.
 
     cargo run --release --p client
 
-Or for a custom test server, use the first argument:
+Or use first argument to specity a different address.
 
     cargo run --release -p client -- 123.45.678.90:1234
 
-You should be able to write from any TCP connection, just send complete lines
-before flush.
-
-## Docker installation
+## Docker
 
 It includes the **docker-compose** and **Dockerfile** to build and run the
 server.
@@ -92,6 +89,9 @@ server.
     docker-compose up -d
 
 Then you can connect at **127.0.0.1:1984**.
+
+It uses Google containers tools to run the binary,
+[gcr.io/distroless/cc](https://github.com/GoogleContainerTools/distroless/blob/master/examples/rust/Dockerfile).
 
 ## Tech
 
