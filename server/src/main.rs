@@ -1,6 +1,8 @@
-mod db;
 mod map;
 mod work;
+
+mod db;
+use db::DB;
 
 mod parse;
 use parse::{AsyncInstr, Instr};
@@ -21,7 +23,7 @@ fn main() {
     let map = map::Map::new();
     let map_sender = map.sender.clone();
 
-    let mut db = db::DB::new(map.data.clone());
+    let mut db = DB::new(map.data.clone());
     db.load_from_file();
 
     let db_modified = db.modified.clone();
