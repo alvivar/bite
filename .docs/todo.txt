@@ -1,4 +1,6 @@
 
+    DB should saved based on a dirty flag, every certain second.
+
     Readme update
     SET without key, creates an empty key
     Handle Value casting, it needs to be int, float eventually.
