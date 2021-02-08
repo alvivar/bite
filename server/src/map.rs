@@ -13,6 +13,7 @@ pub enum Command {
     Get(Sender<Result>, String),
     Set(String, String),
     Json(Sender<Result>, String),
+    Jtrim(Sender<Result>, String),
 }
 
 pub enum Result {
@@ -42,6 +43,25 @@ impl Map {
             let message = self.receiver.recv().unwrap();
 
             match message {
+                Command::Jtrim(conn_sender, key) => {
+                    let map = self.data.lock().unwrap();
+
+                    let range = map.range(key.to_owned()..);
+
+                    let kv: Vec<(&str, &str)> = range
+                        .take_while(|(k, _)| k.starts_with(&key))
+                        .map(|(k, v)| (k.as_str(), v.as_str()))
+                        .collect();
+
+                    let mut jpointer = key.replace(".", "/");
+                    jpointer.insert_str(0, "/");
+                    println!("{}", jpointer);
+
+                    let json = parse::kv_to_json(&*kv);
+                    let json = json.pointer(jpointer.as_str()).unwrap();
+
+                    conn_sender.send(Result::Message(json.to_string())).unwrap();
+                }
                 Command::Json(conn_sender, key) => {
                     let map = self.data.lock().unwrap();
 

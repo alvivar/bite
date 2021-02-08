@@ -27,7 +27,7 @@ fn main() {
     let db_modified = db.modified.clone();
 
     pool.execute(move || map.handle(db_modified));
-    pool.execute(move || db.handle(3));
+    pool.execute(move || db.handle(1));
 
     // New job on incoming connections.
     for stream in listener.incoming() {
@@ -84,6 +84,10 @@ fn handle_conn(
             }
             Instr::Json => {
                 map_sndr.send(map::Command::Json(conn_sndr, key)).unwrap();
+                AsyncInstr::Yes
+            }
+            Instr::Jtrim => {
+                map_sndr.send(map::Command::Jtrim(conn_sndr, key)).unwrap();
                 AsyncInstr::Yes
             }
             Instr::Nop => AsyncInstr::No(String::from("NO")),

@@ -10,6 +10,7 @@ pub enum Instr {
     Set,
     Get,
     Json,
+    Jtrim,
     Nop,
 }
 
@@ -52,9 +53,10 @@ pub fn proc_from_string(content: &str) -> Proc {
     // println!("i[{}] k[{}] v[{}]", inst, key, val); // Debug
 
     let instruction = match inst.trim().to_lowercase().as_str() {
-        "get" => Instr::Get,
-        "set" => Instr::Set,
-        "json" => Instr::Json,
+        "g" => Instr::Get,
+        "s" => Instr::Set,
+        "js" => Instr::Json,
+        "j" => Instr::Jtrim,
         _ => {
             key = format!("{} {}", inst, key);
             Instr::Nop
