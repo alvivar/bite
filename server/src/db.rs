@@ -1,4 +1,4 @@
-use serde_json;
+use serde_json::{self};
 
 use std::{
     collections::BTreeMap,

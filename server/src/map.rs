@@ -53,12 +53,14 @@ impl Map {
                         .map(|(k, v)| (k.as_str(), v.as_str()))
                         .collect();
 
-                    let mut jpointer = key.replace(".", "/");
-                    jpointer.insert_str(0, "/");
-                    println!("{}", jpointer);
-
                     let json = parse::kv_to_json(&*kv);
-                    let json = json.pointer(jpointer.as_str()).unwrap();
+
+                    let jpointer = format!("/{}", key.replace(".", "/"));
+
+                    let json = match json.pointer(jpointer.as_str()) {
+                        Some(val) => val,
+                        None => &json,
+                    };
 
                     conn_sender.send(Result::Message(json.to_string())).unwrap();
                 }
