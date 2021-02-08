@@ -1,7 +1,5 @@
 
 
-    Readme update
-
     Handle Value casting, it needs to be int, float eventually.
     Auth by environment
 
@@ -29,6 +27,7 @@
 
 
     2021.02.07
+    x Readme update
     x SET without key, creates an empty key
     x DB should saved based on a dirty flag, every certain second.
     . Append '.' to the key to make sure the json tree can be constructed
