@@ -1,2 +1,2 @@
 
-Code donated by Kimundi when I asked json parsing questions on the Rust Discord.
+Code donated by Kimundi when I asked about json parsing on the Rust Discord.
