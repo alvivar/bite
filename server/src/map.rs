@@ -58,13 +58,14 @@ impl Map {
                     let json = parse::kv_to_json(&*kv);
 
                     // [!] Returns the pointer.
-
-                    let jpointer = format!("/{}", key.replace(".", "/"));
-                    match json.pointer(jpointer.as_str()) {
+                    // Always returns everything when the key is empty.
+                    let pointr = format!("/{}", key.replace(".", "/"));
+                    match json.pointer(pointr.as_str()) {
                         Some(val) => conn_sender.send(Result::Message(val.to_string())).unwrap(),
-                        None => conn_sender
-                            .send(Result::Message(json!({}).to_string()))
-                            .unwrap(),
+                        None => {
+                            let msg = if pointr.len() <= 1 { json } else { json!({}) };
+                            conn_sender.send(Result::Message(msg.to_string())).unwrap();
+                        }
                     };
                 }
                 Command::Json(conn_sender, key) => {
@@ -79,22 +80,23 @@ impl Map {
 
                     let json = parse::kv_to_json(&*kv);
 
-                    // [!] Returns the json, but online if the pointer is real.
-
-                    let jpointer = format!("/{}", key.replace(".", "/"));
-                    match json.pointer(jpointer.as_str()) {
+                    // [!] Returns the json, but only if the pointer is real.
+                    // Always returns everything when the key is empty.
+                    let pointr = format!("/{}", key.replace(".", "/"));
+                    match json.pointer(pointr.as_str()) {
                         Some(_) => conn_sender.send(Result::Message(json.to_string())).unwrap(),
-                        None => conn_sender
-                            .send(Result::Message(json!({}).to_string()))
-                            .unwrap(),
+                        None => {
+                            let msg = if pointr.len() == 1 { json } else { json!({}) };
+                            conn_sender.send(Result::Message(msg.to_string())).unwrap();
+                        }
                     };
                 }
                 Command::Get(conn_sender, key) => {
                     let map = self.data.lock().unwrap();
 
                     match map.get(&key) {
-                        Some(json) => conn_sender.send(Result::Message(json.to_owned())).unwrap(),
-                        None => conn_sender.send(Result::Message("".to_owned())).unwrap(),
+                        Some(val) => conn_sender.send(Result::Message(val.to_owned())).unwrap(),
+                        None => conn_sender.send(Result::Message("".to_string())).unwrap(),
                     }
                 }
                 Command::Set(key, value) => {
@@ -105,7 +107,6 @@ impl Map {
                     }
 
                     map.insert(key, value);
-
                     db_modified.swap(true, Ordering::Relaxed);
                 }
             }
