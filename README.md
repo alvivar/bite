@@ -96,9 +96,9 @@ Ready to run on **127.0.0.1:1984**.
 Rust multi-thread **TcpListener** storing on a **BTreeMap** serialized into a
 json file with **Serde**.
 
-Ready to run on **Docker** using [Google Container
+Uses [Google Container
 Tools](https://github.com/GoogleContainerTools/distroless/blob/master/examples/rust/Dockerfile)
-to run the binary.
+to run the binary on **Docker**.
 
 ## Things to do
 
