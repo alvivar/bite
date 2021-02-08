@@ -14,7 +14,7 @@ use std::{
 };
 
 fn main() {
-    println!("\nBITE\n");
+    println!("\nBIT:E");
 
     let listener = TcpListener::bind("0.0.0.0:1984").unwrap(); // Asumming Docker.
     let mut pool = work::ThreadPool::new(4);
