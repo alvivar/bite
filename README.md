@@ -106,4 +106,4 @@ to run the binary on **Docker**.
 - Support ints, floats and bools.
 - Maybe Lists.
 - The BTree on disk.
-- Only memory should be optional.
+- Only on memory should be an option.
