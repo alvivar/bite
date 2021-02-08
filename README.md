@@ -67,7 +67,7 @@ Everything will be stored sorted on **data/DB.json**.
 
 ## How to run
 
-The server runs on **0.0.0.0:1984**, you can send and receive messages with any
+The server runs on **0.0.0.0:1984**, you can send/receive messages with any
 TCP connection, just send complete lines (0xA) before flush.
 
     cargo run --release --p server
