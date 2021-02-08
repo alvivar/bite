@@ -1,25 +1,29 @@
-[
-    {
-        "id": 20210202170229,
-        "profile": {
-            "name": "Andrés Villalobos",
-            "twitter": "twitter.com/matnesis"
-        },
-        "workingOn": [
-            {
-                "name": "The Eye of Minds",
-                "description": "A game about hell."
+{
+    "app": {
+        "user": {
+            "1984": {
+                "info": {
+                    "description": "Programmer & Game Designer",
+                    "name": "Andrés Villalobos",
+                    "social": {
+                        "github": "github.com/alvivar",
+                        "itchio": "itch.io/matnesis",
+                        "twitter": "twitter.com/matnesis"
+                    }
+                },
+                "lang": {
+                    "0": "Rust",
+                    "1": "C#",
+                    "2": "Python",
+                    "3": "JavaScript"
+                }
             },
-            {
-                "name": "Bite",
-                "description": "Minimalist Key-Value Database for quick prototypes."
+            "2020": {
+                "info": {
+                    "description": "Probably you in the future!",
+                    "name": "Someone Else"
+                }
             }
-        ]
-    },
-    {
-        "id": 20210202172717,
-        "profile": {
-            "name": "This can be you!"
         }
     }
-]
+}
