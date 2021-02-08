@@ -7,6 +7,7 @@
 
     Extract kv range into his own function
     I'm using the Cargo.toml dependencies correctly?
+    Gracefully shutdown on Docker, Ctrl + C
 
     Use time and IP on the server log
     DB file name by environment
