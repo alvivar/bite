@@ -32,11 +32,11 @@ impl DB {
             sleep(Duration::new(throttle, 0));
 
             if self.modified.load(Ordering::Relaxed) {
-                self.save_to_file();
-
                 self.modified.swap(false, Ordering::Relaxed);
 
-                println!("DB saved.");
+                self.save_to_file();
+
+                println!("Saved.");
             }
         }
     }
