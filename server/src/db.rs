@@ -36,7 +36,7 @@ impl DB {
 
                 self.save_to_file();
 
-                println!("Saved.");
+                println!("DB.json Saved.");
             }
         }
     }
