@@ -5,70 +5,43 @@ use std::{
     fs::{self, OpenOptions},
     io::{Read, Write},
     sync::{
-        mpsc::{self, Receiver, Sender},
+        atomic::{AtomicBool, Ordering},
         Arc, Mutex,
     },
     thread::sleep,
-    time::{Duration, Instant},
-    u64,
+    time::Duration,
 };
 
 const DB_PATH: &str = "./data";
 const DB_FILE: &str = "./data/DB.json";
 
-pub enum Command {
-    Load,
-    Save,
-}
-
 pub struct DB {
     data: Arc<Mutex<BTreeMap<String, String>>>,
-    pub sender: Sender<Command>,
-    receiver: Receiver<Command>,
-    save_throttle: u64,
-    saving: bool,
-    timer: Instant,
+    pub modified: Arc<AtomicBool>,
 }
 
 impl DB {
-    pub fn new(data: Arc<Mutex<BTreeMap<String, String>>>, save_throttle: u64) -> DB {
-        let (sender, receiver) = mpsc::channel();
+    pub fn new(data: Arc<Mutex<BTreeMap<String, String>>>) -> DB {
+        let modified = Arc::new(AtomicBool::new(false));
 
-        DB {
-            data,
-            sender,
-            receiver,
-            save_throttle,
-            timer: Instant::now(),
-            saving: false,
-        }
+        DB { data, modified }
     }
 
-    pub fn handle(&mut self) {
+    pub fn handle(&mut self, throttle: u64) {
         loop {
-            let message = self.receiver.try_recv();
+            sleep(Duration::new(throttle, 0));
 
-            match message {
-                Ok(m) => match m {
-                    Command::Load => self.load_from_file(),
-                    Command::Save => {
-                        self.saving = true;
-                        self.timer = Instant::now();
-                    }
-                },
-                Err(_) => {
-                    if self.saving && self.timer.elapsed().as_secs() >= self.save_throttle {
-                        self.saving = false;
-                        self.save_to_file();
-                    } else {
-                        sleep(Duration::new(0, 100000000)); // 0.1s
-                    }
-                }
+            if self.modified.load(Ordering::Relaxed) {
+                self.save_to_file();
+
+                self.modified.swap(false, Ordering::Relaxed);
+
+                println!("DB saved.");
             }
         }
     }
 
-    fn load_from_file(&self) {
+    pub fn load_from_file(&self) {
         fs::create_dir_all(DB_PATH).unwrap();
 
         let mut file = OpenOptions::new()
@@ -88,8 +61,9 @@ impl DB {
         }
     }
 
-    fn save_to_file(&self) {
+    pub fn save_to_file(&self) {
         let map = self.data.lock().unwrap();
+
         let file = OpenOptions::new()
             .read(true)
             .write(true)

@@ -1,9 +1,9 @@
-use crate::db;
 use crate::parse;
 
 use std::{
     collections::BTreeMap,
     sync::{
+        atomic::{AtomicBool, Ordering},
         mpsc::{self, Receiver, Sender},
         Arc, Mutex,
     },
@@ -37,7 +37,7 @@ impl Map {
         }
     }
 
-    pub fn handle(&self, db: Sender<db::Command>) {
+    pub fn handle(&self, db_modified: Arc<AtomicBool>) {
         loop {
             let message = self.receiver.recv().unwrap();
 
@@ -69,7 +69,7 @@ impl Map {
 
                     map.insert(key, value);
 
-                    db.send(db::Command::Save).unwrap();
+                    db_modified.swap(true, Ordering::Relaxed);
                 }
             }
         }

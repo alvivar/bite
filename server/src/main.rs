@@ -21,13 +21,13 @@ fn main() {
     let map = map::Map::new();
     let map_sender = map.sender.clone();
 
-    let mut db = db::DB::new(map.data.clone(), 2);
-    let db_sender = db.sender.clone();
+    let mut db = db::DB::new(map.data.clone());
+    db.load_from_file();
 
-    db_sender.send(db::Command::Load).unwrap(); // Load on start.
+    let db_modified = db.modified.clone();
 
-    pool.execute(move || map.handle(db_sender.clone()));
-    pool.execute(move || db.handle());
+    pool.execute(move || map.handle(db_modified));
+    pool.execute(move || db.handle(3));
 
     // New job on incoming connections.
     for stream in listener.incoming() {

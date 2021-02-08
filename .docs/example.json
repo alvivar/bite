@@ -10,18 +10,12 @@
                         "itchio": "itch.io/matnesis",
                         "twitter": "twitter.com/matnesis"
                     }
-                },
-                "lang": {
-                    "0": "Rust",
-                    "1": "C#",
-                    "2": "Python",
-                    "3": "JavaScript"
                 }
             },
             "2020": {
                 "info": {
                     "description": "Probably you in the future!",
-                    "name": "Someone Else"
+                    "name": "<Someone Else>"
                 }
             }
         }
