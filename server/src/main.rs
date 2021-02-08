@@ -77,8 +77,12 @@ fn handle_conn(
 
         let async_instr = match instr {
             Instr::Get => {
-                map_sndr.send(map::Command::Get(conn_sndr, key)).unwrap();
-                AsyncInstr::Yes
+                if key.len() <= 0 {
+                    AsyncInstr::No("OK".to_owned())
+                } else {
+                    map_sndr.send(map::Command::Get(conn_sndr, key)).unwrap();
+                    AsyncInstr::Yes
+                }
             }
             Instr::Set => {
                 map_sndr.send(map::Command::Set(key, val)).unwrap();
@@ -92,7 +96,7 @@ fn handle_conn(
                 map_sndr.send(map::Command::Jtrim(conn_sndr, key)).unwrap();
                 AsyncInstr::Yes
             }
-            Instr::Nop => AsyncInstr::No(String::from("NO")),
+            Instr::Nop => AsyncInstr::No("NOP".to_owned()),
         };
 
         let message = match async_instr {
