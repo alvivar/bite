@@ -67,6 +67,10 @@ impl Map {
                 Command::Set(key, value) => {
                     let mut map = self.data.lock().unwrap();
 
+                    if key.len() < 1 {
+                        continue;
+                    }
+
                     map.insert(key, value);
 
                     db_modified.swap(true, Ordering::Relaxed);

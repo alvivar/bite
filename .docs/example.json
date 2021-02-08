@@ -1,22 +1,20 @@
 {
     "app": {
+        "description": "A prototype that needs a quick & simple JSON Key-Value store.",
+        "name": "Something Awesome",
         "user": {
             "1984": {
-                "info": {
-                    "description": "Programmer & Game Designer",
-                    "name": "Andrés Villalobos",
-                    "social": {
-                        "github": "github.com/alvivar",
-                        "itchio": "itch.io/matnesis",
-                        "twitter": "twitter.com/matnesis"
-                    }
+                "description": "Programmer & Game Designer",
+                "name": "Andrés Villalobos",
+                "social": {
+                    "github": "github.com/alvivar",
+                    "itchio": "itch.io/matnesis",
+                    "twitter": "twitter.com/matnesis"
                 }
             },
             "2020": {
-                "info": {
-                    "description": "Probably you in the future!",
-                    "name": "<Someone Else>"
-                }
+                "description": "Probably you, in the future!",
+                "name": "<Your Name>"
             }
         }
     }

@@ -1,8 +1,6 @@
 
-    DB should saved based on a dirty flag, every certain second.
 
     Readme update
-    SET without key, creates an empty key
     Handle Value casting, it needs to be int, float eventually.
     Auth by environment
 
@@ -29,6 +27,8 @@
 
 
     2021.02.07
+    x SET without key, creates an empty key
+    x DB should saved based on a dirty flag, every certain second.
     . Append '.' to the key to make sure the json tree can be constructed
     x Accept that this may not be the time to implement lists
     x Better naming
