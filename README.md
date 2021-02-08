@@ -72,11 +72,12 @@ TCP connection, just send complete lines (0xA) before flush.
 
     cargo run --release --p server
 
-The client is just a simple test that connects to **127.0.0.1:1984**.
+The client is a simple test that connects to **127.0.0.1:1984**, write and hit
+enter to send/receive.
 
     cargo run --release --p client
 
-Or use first argument to specity a different address.
+You could use the first argument to specify a different address.
 
     cargo run --release -p client -- 123.45.678.90:1234
 
@@ -88,18 +89,21 @@ server.
     docker-compose build
     docker-compose up -d
 
-Then you can connect at **127.0.0.1:1984**.
-
-It uses Google containers tools to run the binary,
-[gcr.io/distroless/cc](https://github.com/GoogleContainerTools/distroless/blob/master/examples/rust/Dockerfile).
+Ready to run on **127.0.0.1:1984**.
 
 ## Tech
 
 Rust multi-thread **TcpListener** storing on a **BTreeMap** serialized into a
-json file with **Serde**. Ready to run on **Docker**.
+json file with **Serde**.
+
+Ready to run on **Docker** using [Google Container
+Tools](https://github.com/GoogleContainerTools/distroless/blob/master/examples/rust/Dockerfile)
+to run the binary.
 
 ## Things to do
 
 - Auth.
 - Support ints, floats and bools.
 - Maybe Lists.
+- Maybe the BTree on disk.
+- Only memory should be optional.
