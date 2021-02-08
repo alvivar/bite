@@ -4,58 +4,66 @@ Minimalistic JSON Key-Value Store.
 
 ## How
 
-To set the value,
+To set the value, use **s**.
 
-    S somekeyname Some string as a value I guess
+    s somekeyname Some string as a value I guess
     > OK
 
-To get the value,
+To get the value. use **g**.
 
-    G somekeyname
+    g somekeyname
     > Some string as a value I guess
 
-    G keywithoutvalue
+    g keywithoutvalue
     >
 
-For JSON use the dot notation on keys,
+For JSON use the dot notation on keys.
 
-    S library.name Bite
-    S library.why Simplest database ever
-    S library.author.name Andrés Villalobos
-    S library.author.twitter matnesis
+    s data.name Bite
+    s data.why Simplest database ever
+    s data.author.name Andrés Villalobos
+    s data.author.twitter matnesis
 
-This way you can construct JSON using the keys, with the full path.
+So you can construct JSON with **js**.
 
-    JS library
+    js data
     >
     {
-        "library" : {
-            "name" : "Bite",
-            "why" : "Simplest database ever"
-            "author" : {
-                "name" : "Andrés Villalobos",
-                "twitter" : "matnesis
-            }
+        "data": {
+            "author": {
+                "name": "Andrés Villalobos",
+                "twitter": "matnesis"
+            },
+            "name": "Bite",
+            "why": "Simplest database ever"
         }
     }
 
-Or just the value.
-
-    J library
+    js data.why
     >
     {
-        "name" : "Bite",
-        "why" : "Simplest database ever",
-        "author" : {
-            "name" : "Andrés Villalobos",
-            "twitter" : "matnesis
+        "data": {
+            "why": "Simplest database ever"
         }
     }
 
-    J library.why
-    > "Simplest database ever."
+Use **j** to get the value without the full path.
 
-Storing everything on **./data/DB.json** with the information sorted.
+    J data
+    >
+    {
+        "author": {
+            "name": "Andrés Villalobos",
+            "twitter": "matnesis"
+        },
+        "name": "Bite",
+        "why": "Simplest database ever"
+    }
+
+    J data.why
+    > "Simplest database ever"
+
+Everything will be stored sorted on **data/DB.json**.
 
 ## How to run
 

@@ -1,20 +1,8 @@
 {
-    "app": {
-        "description": "Some prototype needing a quick & simple JSON Key-Value store.",
-        "user": {
-            "1984": {
-                "description": "Programmer & Game Designer",
-                "name": "Andrés Villalobos",
-                "social": {
-                    "github": "github.com/alvivar",
-                    "itchio": "itch.io/matnesis",
-                    "twitter": "twitter.com/matnesis"
-                }
-            },
-            "2020": {
-                "description": "Probably you!",
-                "name": "<Your Name>"
-            }
-        }
-    }
+    "author": {
+        "name": "Andrés Villalobos",
+        "twitter": "matnesis"
+    },
+    "name": "Bite",
+    "why": "Simplest database ever"
 }
