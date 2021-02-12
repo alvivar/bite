@@ -65,7 +65,7 @@ Use **j** to get the value without the full path.
 
 Everything will be stored sorted on **data/DB.json**.
 
-## C# library
+## C# Library
 
 Check out
 [**.csharp/Bite.cs**](https://github.com/alvivar/bite/tree/master/.csharp) for a
