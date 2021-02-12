@@ -9,7 +9,7 @@ To set a value, use **s**.
     s somekeyname Some string as a value I guess
     > OK
 
-To get a value. use **g**.
+To get a value, use **g**.
 
     g somekeyname
     > Some string as a value I guess
