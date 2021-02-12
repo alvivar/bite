@@ -106,6 +106,7 @@ public class Bite
         {
             if (OnError != null)
                 OnError($"Disconnected while sending: {message}");
+
             return;
         }
 
