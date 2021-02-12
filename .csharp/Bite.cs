@@ -20,7 +20,8 @@ using System.Threading;
 
 public class Bite
 {
-    public List<string> messages = new List<string>();
+    public List<string> queries = new List<string>();
+    public List<Action<string>> callbacks = new List<Action<string>>();
 
     public Action<string> OnResponse;
     public Action<string> OnError;
@@ -64,19 +65,30 @@ public class Bite
 
             while (true)
             {
-                if (messages.Count <= 0)
+                if (queries.Count <= 0)
                     continue;
 
                 var reader = new StreamReader(stream);
                 var writer = new StreamWriter(stream);
 
-                var query = messages[0];
-                messages.RemoveAt(0);
+                // Send
+
+                var query = queries[0];
+                queries.RemoveAt(0);
+
+                var call = callbacks[0];
+                callbacks.RemoveAt(0);
 
                 writer.WriteLine(query);
                 writer.Flush();
 
+                // Receive
+
                 var response = reader.ReadLine();
+
+                if (call != null)
+                    call(response);
+
                 if (OnResponse != null)
                     OnResponse(response);
             }
@@ -88,15 +100,16 @@ public class Bite
         }
     }
 
-    public void Send(string message)
+    public void Send(string message, Action<string> callback = null)
     {
         if (socketConnection == null || !socketConnection.Connected)
         {
             if (OnError != null)
-                OnError("Disconnected.");
+                OnError($"Disconnected while sending: {message}");
             return;
         }
 
-        messages.Add(message);
+        queries.Add(message);
+        callbacks.Add(callback);
     }
 }
