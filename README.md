@@ -65,6 +65,11 @@ Use **j** to get the value without the full path.
 
 Everything will be stored sorted on **data/DB.json**.
 
+## C# library
+
+Check out **.csharp/Bite.cs** for a simple **C#** library (That also works on
+Unity).
+
 ## How to run
 
 The server runs on **0.0.0.0:1984**, you can send/receive messages with any
