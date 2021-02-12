@@ -71,6 +71,16 @@ Check out
 [**.csharp/Bite.cs**](https://github.com/alvivar/bite/tree/master/.csharp) for a
 simple **C#** client library (that also works on Unity).
 
+## Docker
+
+It includes the **docker-compose** and **Dockerfile** to build and run the
+server.
+
+    docker-compose build
+    docker-compose up -d
+
+Ready to run on **127.0.0.1:1984**.
+
 ## Rust
 
 The server runs on **0.0.0.0:1984**, you can send/receive messages with any
@@ -86,16 +96,6 @@ enter to send/receive.
 You could use the first argument to specify a different address.
 
     cargo run --release -p client -- 123.45.678.90:1234
-
-## Docker
-
-It includes the **docker-compose** and **Dockerfile** to build and run the
-server.
-
-    docker-compose build
-    docker-compose up -d
-
-Ready to run on **127.0.0.1:1984**.
 
 ## Tech
 
