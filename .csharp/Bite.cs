@@ -6,17 +6,25 @@ using System.Threading;
 
 // To connect.
 
-//     var bite = new Bite("127.0.0.1", 1984);
+// Bite bite = new Bite("127.0.0.1", 1984);
 
 // To send.
 
-//     bite.Send("s author Andrés Villalobos");
-//     bite.Send("j author");
+// bite.Send("s author Andrés Villalobos");
+// bite.Send("j author");
 
-// To receive use the System.Actions that receive <string>.
+// You can use a System.Action callback on send to deal directly with the response.
 
-//     bite.OnError = YourOnError;
-//     bite.OnResponse = YourOnResponse;
+// bite.Send("g author", response => {
+//     // Handle your response.
+// });
+
+// You also have a couple System.Action to subscribe.
+
+// bite.OnResponse += YourOnResponse;
+// bite.OnError += YourOnError;
+
+// That's it!
 
 public class Bite
 {
