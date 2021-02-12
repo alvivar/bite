@@ -2,6 +2,7 @@
 
     Send multiple commands, batch-like (Multiple sets, to receive multiple results)
     Auth by environment
+    Subscriptions
 
     Command to get all the keys, gk, jk
 
