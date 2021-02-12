@@ -110,6 +110,7 @@ to run the binary on **Docker**.
 
 - Auth.
 - Suscriptions (receive a message when the value of a key changes).
+- You should be able to send several instructions at the same time, and receive responses accordinly.
 - Support ints, floats and bools, everything is a string at the moment.
 - The BTree on disk, serialized correctly instead of json.
 - "Only on memory" should be an option.
