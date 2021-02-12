@@ -13,4 +13,3 @@ To receive use **System.Action<string>**.
 
     bite.OnResponse = YourOnResponse;
     bite.OnError = YourOnError;
-    
