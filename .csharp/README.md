@@ -16,7 +16,7 @@ with the **response**.
         // Handle your response.
     });
 
-You also have a couple **System.Action<string>** to suscribe.
+You also have a couple **System.Action<string>** to subscribe.
 
     bite.OnResponse += YourOnResponse;
     bite.OnError += YourOnError;
