@@ -99,7 +99,7 @@ Ready to run on **127.0.0.1:1984**.
 
 ## Tech
 
-Rust multi-thread **TcpListeners** storing on a **BTreeMap** serialized into a
+**Rust** multi-thread **TcpListeners** storing on a **BTreeMap** serialized into a
 json file with **Serde**.
 
 Uses [Google Container
@@ -109,7 +109,8 @@ to run the binary on **Docker**.
 ## Priorities
 
 - Auth.
-- Support ints, floats and bools.
-- The BTree on disk.
-- Only on memory should be an option.
-- Maybe Lists.
+- Suscriptions (receive a message when a key changes).
+- Support ints, floats and bools, everything is a string at the moment.
+- The BTree on disk, serialized correctly instead of json.
+- "Only on memory" should be an option.
+- Maybe Lists. (?)
