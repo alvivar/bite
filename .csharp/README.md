@@ -11,5 +11,6 @@ To **send**.
 
 To receive use **System.Action<string>**.
 
-    bite.OnError = YourOnError;
     bite.OnResponse = YourOnResponse;
+    bite.OnError = YourOnError;
+    
