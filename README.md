@@ -1,6 +1,6 @@
 # Bite
 
-Minimalistic JSON Key-Value Database.
+Minimalistic Key-Value JSON Database.
 
 ## How
 
