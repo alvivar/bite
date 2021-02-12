@@ -1,7 +1,9 @@
 
 
-    Command to get all the keys, gk, jk
+    Send multiple commands, batch-like (Multiple sets, to receive multiple results)
     Auth by environment
+
+    Command to get all the keys, gk, jk
 
     Handle casting, int, float, bool
 
