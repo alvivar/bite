@@ -109,7 +109,7 @@ to run the binary on **Docker**.
 ## Priorities
 
 - Auth.
-- Suscriptions (receive a message when a key changes).
+- Suscriptions (receive a message when the value of a key changes).
 - Support ints, floats and bools, everything is a string at the moment.
 - The BTree on disk, serialized correctly instead of json.
 - "Only on memory" should be an option.
