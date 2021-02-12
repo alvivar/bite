@@ -4,14 +4,19 @@ using System.IO;
 using System.Net.Sockets;
 using System.Threading;
 
-// Tutorial
+// To connect.
 
-// var bite = new Bite("142.93.180.20", 1984);
-// bite.OnError = YourOnError;
-// bite.OnResponse = YourOnResponse;
+//     var bite = new Bite("127.0.0.1", 1984);
 
-// bite.Send("s author Andrés Villalobos");
-// bite.Send("j author");
+// To send.
+
+//     bite.Send("s author Andrés Villalobos");
+//     bite.Send("j author");
+
+// To receive use the System.Actions that receive <string>.
+
+//     bite.OnError = YourOnError;
+//     bite.OnResponse = YourOnResponse;
 
 public class Bite
 {

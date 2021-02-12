@@ -4,12 +4,12 @@ Minimalistic JSON Key-Value Database.
 
 ## How
 
-To set the value, use **s**.
+To set a value, use **s**.
 
     s somekeyname Some string as a value I guess
     > OK
 
-To get the value. use **g**.
+To get a value. use **g**.
 
     g somekeyname
     > Some string as a value I guess
@@ -67,10 +67,11 @@ Everything will be stored sorted on **data/DB.json**.
 
 ## C# library
 
-Check out **.csharp/Bite.cs** for a simple **C#** library (That also works on
-Unity).
+Check out
+[**.csharp/Bite.cs**](https://github.com/alvivar/bite/tree/master/.csharp) for a
+simple **C#** client library (that also works on Unity).
 
-## How to run
+## Rust
 
 The server runs on **0.0.0.0:1984**, you can send/receive messages with any
 TCP connection, just send complete lines (0xA) before flush.
@@ -98,17 +99,17 @@ Ready to run on **127.0.0.1:1984**.
 
 ## Tech
 
-Rust multi-thread **TcpListener** storing on a **BTreeMap** serialized into a
+Rust multi-thread **TcpListeners** storing on a **BTreeMap** serialized into a
 json file with **Serde**.
 
 Uses [Google Container
 Tools](https://github.com/GoogleContainerTools/distroless/blob/master/examples/rust/Dockerfile)
 to run the binary on **Docker**.
 
-## Things to do
+## Priorities
 
 - Auth.
 - Support ints, floats and bools.
-- Maybe Lists.
 - The BTree on disk.
 - Only on memory should be an option.
+- Maybe Lists.
