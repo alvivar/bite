@@ -121,4 +121,22 @@ public class Bite
         queries.Add(message);
         callbacks.Add(callback);
     }
+
+    public static int IntOr(string str, int or)
+    {
+        int n;
+        return int.TryParse(str, out n) ? n : or;
+    }
+
+    public static float FloatOr(string str, float or)
+    {
+        float n;
+        return float.TryParse(str, out n) ? n : or;
+    }
+
+    public static float LongOr(string str, long or)
+    {
+        long n;
+        return long.TryParse(str, out n) ? n : or;
+    }
 }
