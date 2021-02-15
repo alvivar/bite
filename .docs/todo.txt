@@ -1,17 +1,19 @@
 
-
-    Send multiple commands, batch-like (Multiple sets, to receive multiple results)
     Auth by environment
     Subscriptions
-
-    Command to get all the keys, gk, jk
-
     Handle casting, int, float, bool
 
-    Extract kv range into his own function
-    I'm using the Cargo.toml dependencies correctly?
-    Gracefully shutdown on Docker, Ctrl + C
+    Delete
 
+    Send multiple commands, batch-like (Multiple sets, to receive multiple results)
+    Command to get all the keys, gk, jk
+    Trim '.' at the end to avoid weird formats?
+
+    Extract kv range into his own function
+    Gracefully shutdown on Docker, Ctrl + C
+    I'm using the Cargo.toml dependencies correctly?
+
+    Use a decent log system instead of println?
     Use time and IP on the server log
     DB file name by environment
     IP and port by environment
@@ -19,12 +21,9 @@
     Use Error as results instead of unwrap
 
     Heroku script
-    Use a decent log system instead of println?
 
     Thread waiting for q! in the input to quit.
     Improve serialization so it can be written in blocks like a good BTreeMap on file?
-
-    Trim '.' at the end to avoid weird formats?
 
     Connection handles needs to be a module?
 
