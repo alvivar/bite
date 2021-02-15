@@ -29,7 +29,7 @@ fn main() {
     let db_modified = db.modified.clone();
 
     pool.execute(move || map.handle(db_modified));
-    pool.execute(move || db.handle(1));
+    pool.execute(move || db.handle(3));
 
     // New job on incoming connections.
     for stream in listener.incoming() {
