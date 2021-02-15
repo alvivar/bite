@@ -21,4 +21,4 @@ You also have a couple **System.Action<string>** to subscribe.
     bite.OnResponse += YourOnResponse;
     bite.OnError += YourOnError;
 
-That's it!
+Check out the Unity Analytics [example]().
