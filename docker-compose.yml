@@ -7,5 +7,4 @@ services:
       - '1984:1984'
     volumes:
       - ./data:/data
-    restart:
-      - on-failure
+    restart: on-failure
