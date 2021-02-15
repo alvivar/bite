@@ -20,7 +20,7 @@ public class AnalyticsData
 
 public class Analytics : MonoBehaviour
 {
-    public string app = "default";
+    public string app = "company.game.user";
 
     [Header("Info")]
     public string id; // SystemInfo.deviceUniqueIdentifier
