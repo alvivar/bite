@@ -112,7 +112,7 @@ public class Bite
         }
         catch (Exception e)
         {
-            // socketConnection.
+            Stop();
 
             if (OnError != null)
                 OnError($"{e}");
@@ -124,7 +124,7 @@ public class Bite
         if (socketConnection == null || !socketConnection.Connected)
         {
             if (OnError != null)
-                OnError($"Disconnected while sending: {message}");
+                OnError($"Disconnected trying {message}");
 
             return;
         }
