@@ -67,9 +67,8 @@ Everything will be stored sorted on **data/DB.json**.
 
 ## C# Library
 
-Check out
-[**.csharp/Bite.cs**](https://github.com/alvivar/bite/tree/master/.csharp) for a
-simple **C#** client library (that also works on Unity).
+Check out [**.csharp**](https://github.com/alvivar/bite/tree/master/.csharp) for
+a simple **C#** client library (that also works on Unity).
 
 ## Docker
 
