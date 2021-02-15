@@ -1,11 +1,13 @@
 
-    Auth by environment
     Subscriptions
+    Auth by environment
+
     Handle casting, int, float, bool
-
-    Delete
-
     Send multiple commands, batch-like (Multiple sets, to receive multiple results)
+
+    Delete op
+    Update key op
+
     Command to get all the keys, gk, jk
     Trim '.' at the end to avoid weird formats?
 
