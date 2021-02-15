@@ -1,7 +1,12 @@
 using System;
 using UnityEngine;
 
-internal class Pos { public float x; public float y; public float z; }
+internal class Pos
+{
+    public float x;
+    public float y;
+    public float z;
+}
 
 [System.Serializable]
 public class AnalyticsData
@@ -61,14 +66,21 @@ public class Analytics : MonoBehaviour
 
         // Statistics.
         SaveTimePlayed(tick);
+
         SaveLastEpoch();
 
         SaveLastPosition();
     }
 
-    void OnDestroy() { bite.Stop(); }
+    void OnDestroy()
+    {
+        bite.Stop();
+    }
 
-    void OnError(string error) { Debug.Log($"{error}"); }
+    void OnError(string error)
+    {
+        Debug.Log($"{error}");
+    }
 
     void OnResponse(string response)
     {
@@ -76,18 +88,18 @@ public class Analytics : MonoBehaviour
         {
             connected = true;
 
-            UpdateDataFromServer();
-
-            LoadOrSetStartedEpoch();
-
             Debug.Log($"Analytics Started.");
             Debug.Log($"> {response}");
+
+            LoadDataFromServer();
+
+            LoadOrSetStartedEpoch();
         }
     }
 
-    void UpdateDataFromServer()
+    void LoadDataFromServer()
     {
-        bite.Send($"g {app}.{id}.name", response =>
+        bite.Send($"g {key}.name", response =>
         {
             if (response.Trim().Length < 1)
                 response = "?";
@@ -95,20 +107,19 @@ public class Analytics : MonoBehaviour
             data.name = response;
         });
 
-        bite.Send($"g {app}.{id}.timePlayed", response =>
+        bite.Send($"g {key}.timePlayed", response =>
         {
-            data.timePlayed = Bite.IntOr(response, 0);
+            data.timePlayed = Bite.Int(response, 0);
         });
 
-        bite.Send($"j {app}.{id}.lastPosition", response =>
+        bite.Send($"j {key}.lastPosition", response =>
         {
             var json = JsonUtility.FromJson<Pos>(response);
 
             data.lastPosition = new Vector3(
-                Bite.FloatOr($"{json.x}", 0),
-                Bite.FloatOr($"{json.y}", 0),
-                Bite.FloatOr($"{json.z}", 0)
-            );
+                Bite.Float($"{json.x}", 0),
+                Bite.Float($"{json.y}", 0),
+                Bite.Float($"{json.z}", 0));
 
             lastPositionLoaded = true;
 
@@ -118,27 +129,25 @@ public class Analytics : MonoBehaviour
     void SaveTimePlayed(int time)
     {
         data.timePlayed += time;
-        bite.Send($"s {app}.{id}.timePlayed {data.timePlayed}");
+        bite.Send($"s {key}.timePlayed {data.timePlayed}");
     }
 
     void SaveLastEpoch()
     {
         data.lastEpoch = DateTimeOffset.Now.ToUnixTimeSeconds();
-        bite.Send($"s {app}.{id}.lastEpoch {data.lastEpoch}");
+        bite.Send($"s {key}.lastEpoch {data.lastEpoch}");
     }
 
     void LoadOrSetStartedEpoch()
     {
-        var key = $"{app}.{id}.startedEpoch";
-
-        bite.Send($"g {key}", response =>
+        bite.Send($"g {key}.startedEpoch", response =>
         {
-            data.startedEpoch = Bite.LongOr(response, 0);
+            data.startedEpoch = Bite.Long(response, 0);
 
             if (data.startedEpoch <= 0)
             {
                 data.startedEpoch = DateTimeOffset.Now.ToUnixTimeSeconds();
-                bite.Send($"s {key} {data.startedEpoch}");
+                bite.Send($"s {key}.startedEpoch {data.startedEpoch}");
             }
         });
     }
@@ -150,14 +159,15 @@ public class Analytics : MonoBehaviour
 
         data.lastPosition = position.transform.position;
 
-        bite.Send($"s {app}.{id}.lastPosition.x {data.lastPosition.x}");
-        bite.Send($"s {app}.{id}.lastPosition.y {data.lastPosition.y}");
-        bite.Send($"s {app}.{id}.lastPosition.z {data.lastPosition.z}");
+        bite.Send($"s {key}.lastPosition.x {data.lastPosition.x}");
+        bite.Send($"s {key}.lastPosition.y {data.lastPosition.y}");
+        bite.Send($"s {key}.lastPosition.z {data.lastPosition.z}");
     }
 
     public void SetName(string name)
+
     {
         data.name = name;
-        bite.Send($"s {app}.{id}.name {data.name}");
+        bite.Send($"s {key}.name {data.name}");
     }
 }
