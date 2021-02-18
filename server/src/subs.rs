@@ -6,8 +6,6 @@ use std::{
     },
 };
 
-use map::Result;
-
 use crate::map;
 
 pub enum Command {
