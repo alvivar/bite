@@ -1,14 +1,16 @@
-mod map;
 mod subs;
+
 mod work;
+use work::ThreadPool;
 
 mod db;
 use db::DB;
 
-mod parse;
 use map::Result;
+mod map;
+
+mod parse;
 use parse::{AsyncInstr, Instr};
-use work::ThreadPool;
 
 use std::{
     io::{BufRead, BufReader, Write},
@@ -17,6 +19,7 @@ use std::{
         mpsc::{self, Receiver, Sender},
         Arc, Mutex,
     },
+    thread,
 };
 
 fn main() {
@@ -144,8 +147,10 @@ fn handle_conn(
 
                 println!("subjtrim stream");
 
-                let mut pool = pool.lock().unwrap();
-                pool.execute(|| handle_sub(stream, sub_rcvr));
+                // let mut pool = pool.lock().unwrap();
+                println!("About to thread");
+                // pool.execute(|| handle_sub(stream, sub_rcvr));
+                thread::spawn(move || handle_sub(stream, sub_rcvr));
 
                 println!("subjtrim pool");
 

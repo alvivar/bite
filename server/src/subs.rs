@@ -58,12 +58,14 @@ impl Subs {
 
                     let senders = subs.entry(key.clone()).or_insert_with(Vec::new);
 
-                    // @todo This can be cached, by getting just one value and cloned it to others!
+                    // @todo This needs to check the range of keys, and value that exists.
+
+                    // @todo This can be cached, by getting just one value and clone it to others!
 
                     for sndr in senders {
                         let sndr_clone = sndr.clone();
                         map_sender
-                            .send(map::Command::Json(sndr_clone, key.clone()))
+                            .send(map::Command::Jtrim(sndr_clone, key.clone()))
                             .unwrap();
                     }
                 }
