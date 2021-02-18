@@ -10,7 +10,7 @@ edition = "2018"
 serde_json = "1.0.62"
 
 [workspace]
-members = ["server", "client"]
+members = ["server", "client", "subs"]
 
 [[bin]]
 name = "server"
@@ -19,3 +19,7 @@ path = "server/src/main.rs"
 [[bin]]
 name = "client"
 path = "client/src/main.rs"
+
+[[bin]]
+name = "subs"
+path = "subs/src/main.rs"
