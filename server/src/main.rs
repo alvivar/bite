@@ -101,7 +101,10 @@ fn handle_conn(
                 AsyncInstr::Yes
             }
             Instr::SubJtrim => {
-                // It needs to register this handle to
+                // It needs to register the key into the subscription
+
+                // It needs to add the client sender to the list of senders in
+                // the subscription map
 
                 AsyncInstr::Yes
             }

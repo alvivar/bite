@@ -7,11 +7,12 @@ use std::{
 };
 
 pub enum Command {
-    Some,
+    Sub,
+    Check,
 }
 
 pub enum Result {
-    Wat,
+    Message(String),
 }
 
 pub struct Subs {
@@ -38,7 +39,12 @@ impl Subs {
             let message = self.receiver.recv().unwrap();
 
             match message {
-                Command::Some => {}
+                Command::Sub => {
+                    // Subscribes the client thread
+                }
+                Command::Check => {
+                    // Checks the key and sends the each client
+                }
             }
         }
     }
