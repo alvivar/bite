@@ -31,6 +31,7 @@ pub struct Map {
 impl Map {
     pub fn new() -> Map {
         let data = Arc::new(Mutex::new(BTreeMap::<String, String>::new()));
+
         let (sender, receiver) = mpsc::channel();
 
         Map {
@@ -105,10 +106,6 @@ impl Map {
                 }
                 Command::Set(key, value) => {
                     let mut map = self.data.lock().unwrap();
-
-                    if key.len() < 1 {
-                        continue;
-                    }
 
                     map.insert(key, value);
                     db_modified.swap(true, Ordering::Relaxed);

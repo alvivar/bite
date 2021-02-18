@@ -1,4 +1,5 @@
 mod map;
+mod subs;
 mod work;
 
 mod db;
@@ -85,7 +86,10 @@ fn handle_conn(
                 }
             }
             Instr::Set => {
-                map_sndr.send(map::Command::Set(key, val)).unwrap();
+                if key.len() > 0 {
+                    map_sndr.send(map::Command::Set(key, val)).unwrap();
+                }
+
                 AsyncInstr::No(String::from("OK"))
             }
             Instr::Json => {
@@ -94,6 +98,11 @@ fn handle_conn(
             }
             Instr::Jtrim => {
                 map_sndr.send(map::Command::Jtrim(conn_sndr, key)).unwrap();
+                AsyncInstr::Yes
+            }
+            Instr::SubJtrim => {
+                // It needs to register this handle to
+
                 AsyncInstr::Yes
             }
             Instr::Nop => AsyncInstr::No("NOP".to_owned()),

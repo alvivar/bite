@@ -1,0 +1,14 @@
+
+    #j
+        Map with keys being watched with a list of senders
+
+        Set
+            Calls Subscriptions telling it about a key
+
+            Subscriptions check for the key, probably with .range, if found,
+            sends the value to all connections subscribed in his list of senders
+
+        #j
+            Adds the client sender into the list inside the Subscription dictionary with the key
+
+            Creates a thread waiting for subscription messages to send to the client

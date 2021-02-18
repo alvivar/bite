@@ -11,6 +11,7 @@ pub enum Instr {
     Get,
     Json,
     Jtrim,
+    SubJtrim,
     Nop,
 }
 
@@ -57,6 +58,7 @@ pub fn proc_from_string(content: &str) -> Proc {
         "s" => Instr::Set,
         "js" => Instr::Json,
         "j" => Instr::Jtrim,
+        "#j" => Instr::SubJtrim,
         _ => {
             key = format!("{} {}", inst, key);
             Instr::Nop
