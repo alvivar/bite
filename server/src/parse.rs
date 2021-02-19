@@ -7,12 +7,14 @@ pub struct Proc {
 }
 
 pub enum Instr {
+    Nop,
     Set,
     Get,
     Json,
     Jtrim,
     SubJtrim,
-    Nop,
+    SubJson,
+    SubGet,
 }
 
 pub enum AsyncInstr {
@@ -59,6 +61,8 @@ pub fn proc_from_string(content: &str) -> Proc {
         "js" => Instr::Json,
         "j" => Instr::Jtrim,
         "#j" => Instr::SubJtrim,
+        "#js" => Instr::SubJson,
+        "#g" => Instr::SubGet,
         _ => {
             key = format!("{} {}", inst, key);
             Instr::Nop

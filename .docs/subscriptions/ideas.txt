@@ -1,7 +1,12 @@
 
-    MAP
+    test.something.choripan
 
-    DB
+    test something choripan
+
+    test something
+
+    test
+
 
     #j
         Map with keys being watched with a list of senders

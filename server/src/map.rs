@@ -12,10 +12,10 @@ use std::{
 };
 
 pub enum Command {
-    Get(Sender<Result>, String),
+    Get(Vec<Sender<Result>>, String),
     Set(String, String),
-    Json(Sender<Result>, String),
-    Jtrim(Sender<Result>, String),
+    Json(Vec<Sender<Result>>, String),
+    Jtrim(Vec<Sender<Result>>, String),
 }
 
 pub enum Result {
@@ -46,7 +46,7 @@ impl Map {
             let message = self.receiver.recv().unwrap();
 
             match message {
-                Command::Jtrim(conn_sender, key) => {
+                Command::Jtrim(conn_senders, key) => {
                     let map = self.data.lock().unwrap();
 
                     let range = map.range(key.to_owned()..);
@@ -69,9 +69,11 @@ impl Map {
                         }
                     };
 
-                    conn_sender.send(Result::Message(msg)).unwrap()
+                    for sndr in conn_senders {
+                        sndr.send(Result::Message(msg.to_owned())).unwrap()
+                    }
                 }
-                Command::Json(conn_sender, key) => {
+                Command::Json(conn_senders, key) => {
                     let map = self.data.lock().unwrap();
 
                     let range = map.range(key.to_owned()..);
@@ -94,14 +96,20 @@ impl Map {
                         }
                     };
 
-                    conn_sender.send(Result::Message(msg)).unwrap()
+                    for sndr in conn_senders {
+                        sndr.send(Result::Message(msg.to_owned())).unwrap()
+                    }
                 }
-                Command::Get(conn_sender, key) => {
+                Command::Get(conn_senders, key) => {
                     let map = self.data.lock().unwrap();
 
-                    match map.get(&key) {
-                        Some(val) => conn_sender.send(Result::Message(val.to_owned())).unwrap(),
-                        None => conn_sender.send(Result::Message("".to_string())).unwrap(),
+                    let message = match map.get(&key) {
+                        Some(val) => val,
+                        None => "",
+                    };
+
+                    for sndr in conn_senders {
+                        sndr.send(Result::Message(message.to_owned())).unwrap()
                     }
                 }
                 Command::Set(key, value) => {

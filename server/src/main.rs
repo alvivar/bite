@@ -1,9 +1,9 @@
-mod db;
-use db::DB;
-
 mod map;
 mod subs;
 mod work;
+
+mod db;
+use db::DB;
 
 mod parse;
 use parse::{AsyncInstr, Instr};
@@ -12,6 +12,7 @@ use std::{
     io::{BufRead, BufReader, Write},
     net::{TcpListener, TcpStream},
     sync::mpsc::{self, Receiver, Sender},
+    vec,
 };
 
 fn main() {
@@ -54,7 +55,7 @@ fn main() {
 }
 
 fn handle_conn(
-    mut stream: TcpStream,
+    stream: TcpStream,
     map_sender: Sender<map::Command>,
     subs_sender: Sender<subs::Command>,
     conn_sndr: Sender<map::Result>,
@@ -90,7 +91,9 @@ fn handle_conn(
                 if key.len() <= 0 {
                     AsyncInstr::No("OK".to_owned())
                 } else {
-                    map_sender.send(map::Command::Get(conn_sndr, key)).unwrap();
+                    map_sender
+                        .send(map::Command::Get(vec![conn_sndr], key))
+                        .unwrap();
 
                     AsyncInstr::Yes
                 }
@@ -98,44 +101,44 @@ fn handle_conn(
             Instr::Set => {
                 if key.len() > 0 {
                     map_sender
-                        .send(map::Command::Set(key.clone(), val))
+                        .send(map::Command::Set(key.to_owned(), val))
                         .unwrap();
 
-                    subs_sender.send(subs::Command::CallSub(key)).unwrap();
+                    subs_sender.send(subs::Command::CallSubs(key)).unwrap();
                 }
 
                 AsyncInstr::No(String::from("OK"))
             }
             Instr::Json => {
-                map_sender.send(map::Command::Json(conn_sndr, key)).unwrap();
+                map_sender
+                    .send(map::Command::Json(vec![conn_sndr], key))
+                    .unwrap();
 
                 AsyncInstr::Yes
             }
             Instr::Jtrim => {
                 map_sender
-                    .send(map::Command::Jtrim(conn_sndr, key))
+                    .send(map::Command::Jtrim(vec![conn_sndr], key))
                     .unwrap();
 
                 AsyncInstr::Yes
             }
-            Instr::SubJtrim => {
-                // Infinite loop that waits for subscriptions.
-
-                let mut stream = stream.try_clone().unwrap();
+            Instr::SubJtrim | Instr::SubJson | Instr::SubGet => {
+                let stream = stream.try_clone().unwrap();
                 let (sub_sndr, sub_rcvr) = mpsc::channel::<map::Result>();
 
                 subs_sender
-                    .send(subs::Command::NewSub(sub_sndr, key))
+                    .send(subs::Command::NewSub(sub_sndr, key, instr))
                     .unwrap();
+
+                // Infinite loop that waits for subscriptions.
 
                 loop {
                     let msg = match sub_rcvr.recv().unwrap() {
                         map::Result::Message(msg) => msg,
                     };
 
-                    stream.write(msg.as_bytes()).unwrap();
-                    stream.write(&[0xA]).unwrap(); // Write line.
-                    stream.flush().unwrap();
+                    stream_write(&stream, msg);
                 }
             }
             Instr::Nop => AsyncInstr::No("NOP".to_owned()),
@@ -148,8 +151,12 @@ fn handle_conn(
             AsyncInstr::No(msg) => msg,
         };
 
-        stream.write(message.as_bytes()).unwrap();
-        stream.write(&[0xA]).unwrap(); // Write line.
-        stream.flush().unwrap();
+        stream_write(&stream, message);
     }
+}
+
+fn stream_write(mut stream: &TcpStream, message: String) {
+    stream.write(message.as_bytes()).unwrap();
+    stream.write(&[0xA]).unwrap(); // Write line.
+    stream.flush().unwrap();
 }

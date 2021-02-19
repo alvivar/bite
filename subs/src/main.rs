@@ -17,7 +17,7 @@ fn main() {
     let mut writer = BufWriter::new(stream);
     let mut reader = BufReader::new(stream_clone);
 
-    writer.write(b"#j test.something").unwrap();
+    writer.write(b"#g test.something").unwrap();
     writer.write(&[0xA]).unwrap();
     writer.flush().unwrap();
 

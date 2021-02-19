@@ -6,24 +6,27 @@ use std::{
     },
 };
 
-use crate::map;
+use crate::{map, parse::Instr};
 
 pub enum Command {
-    NewSub(Sender<map::Result>, String),
-    CallSub(String),
+    NewSub(Sender<map::Result>, String, Instr),
+    CallSubs(String),
+}
+
+pub struct Sub {
+    sender: Sender<map::Result>,
+    instr: Instr,
 }
 
 pub struct Subs {
-    pub subs: Arc<Mutex<BTreeMap<String, Vec<Sender<map::Result>>>>>,
+    pub subs: Arc<Mutex<BTreeMap<String, Vec<Sub>>>>,
     pub sender: Sender<Command>,
     receiver: Receiver<Command>,
 }
 
 impl Subs {
     pub fn new() -> Subs {
-        let subs = Arc::new(Mutex::new(
-            BTreeMap::<String, Vec<Sender<map::Result>>>::new(),
-        ));
+        let subs = Arc::new(Mutex::new(BTreeMap::<String, Vec<Sub>>::new()));
 
         let (sender, receiver) = mpsc::channel();
 
@@ -39,35 +42,64 @@ impl Subs {
             let message = self.receiver.recv().unwrap();
 
             match message {
-                Command::NewSub(sub_sender, key) => {
-                    println!("NewSub!");
-
+                Command::NewSub(sender, key, instr) => {
                     let mut subs = self.subs.lock().unwrap();
 
                     let senders = subs.entry(key).or_insert_with(Vec::new);
 
-                    senders.push(sub_sender);
+                    senders.push(Sub { sender, instr });
                 }
-                Command::CallSub(key) => {
-                    println!("Found! callsub");
-
+                Command::CallSubs(key) => {
                     let mut subs = self.subs.lock().unwrap();
-                    let key = key.clone();
 
-                    let senders = subs.entry(key.clone()).or_insert_with(Vec::new);
+                    for alt_key in get_key_combinations(key.to_owned()) {
+                        let sub_list = subs.entry(alt_key.to_owned()).or_insert_with(Vec::new);
 
-                    // @todo This needs to check the range of keys, and value that exists.
+                        for sub in sub_list {
+                            let instr = &sub.instr;
+                            let sender = vec![sub.sender.clone()];
 
-                    // @todo This can be cached, by getting just one value and clone it to others!
+                            // @todo Optimize sending sender batches grouped by Instr.
 
-                    for sndr in senders {
-                        let sndr_clone = sndr.clone();
-                        map_sender
-                            .send(map::Command::Jtrim(sndr_clone, key.clone()))
-                            .unwrap();
+                            let command = match instr {
+                                Instr::SubJtrim => {
+                                    map::Command::Jtrim(sender.clone(), alt_key.to_owned())
+                                }
+                                Instr::SubJson => {
+                                    map::Command::Json(sender.clone(), alt_key.to_owned())
+                                }
+                                Instr::SubGet => {
+                                    if alt_key != key {
+                                        continue;
+                                    }
+
+                                    map::Command::Get(sender.clone(), alt_key.to_owned())
+                                }
+                                _ => panic!("Unknown instruction calling subscribers."),
+                            };
+
+                            map_sender.send(command).unwrap();
+                        }
                     }
                 }
             }
         }
     }
+}
+
+// "data.inner.value" -> ["data", "data.inner", "data.inner.value"]
+fn get_key_combinations(key: String) -> Vec<String> {
+    let keys: Vec<&str> = key.split(".").collect();
+
+    let mut parent_keys: Vec<String> = Vec::new();
+
+    let len = keys.len();
+
+    for i in 0..len {
+        let end = len - i;
+        let str = keys[..end].join(".");
+        parent_keys.push(str);
+    }
+
+    parent_keys
 }
