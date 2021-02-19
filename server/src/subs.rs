@@ -4,6 +4,7 @@ use std::{
         mpsc::{self, Receiver, Sender},
         Arc, Mutex,
     },
+    usize,
 };
 
 use crate::{map, parse::Instr};
@@ -11,7 +12,7 @@ use crate::{map, parse::Instr};
 pub enum Command {
     NewSub(Sender<map::Result>, String, Instr),
     CallSubs(String),
-    CleanUp(String),
+    CleanUp(Sender<map::Result>, String),
 }
 
 pub struct Sub {
@@ -53,8 +54,8 @@ impl Subs {
                 Command::CallSubs(key) => {
                     let mut subs = self.subs.lock().unwrap();
 
-                    for alt_key in get_key_combinations(key.to_owned()) {
-                        let sub_list = subs.entry(alt_key.to_owned()).or_insert_with(Vec::new);
+                    for alt_keys in get_key_combinations(key.to_owned()) {
+                        let sub_list = subs.entry(alt_keys.to_owned()).or_insert_with(Vec::new);
 
                         for sub in sub_list {
                             let instr = &sub.instr;
@@ -64,17 +65,17 @@ impl Subs {
 
                             let command = match instr {
                                 Instr::SubJtrim => {
-                                    map::Command::Jtrim(sender.clone(), alt_key.to_owned())
+                                    map::Command::Jtrim(sender.clone(), alt_keys.to_owned())
                                 }
                                 Instr::SubJson => {
-                                    map::Command::Json(sender.clone(), alt_key.to_owned())
+                                    map::Command::Json(sender.clone(), alt_keys.to_owned())
                                 }
                                 Instr::SubGet => {
-                                    if alt_key != key {
+                                    if alt_keys != key {
                                         continue;
                                     }
 
-                                    map::Command::Get(sender.clone(), alt_key.to_owned())
+                                    map::Command::Get(sender.clone(), alt_keys.to_owned())
                                 }
                                 _ => panic!("Unknown instruction calling subscribers."),
                             };
@@ -83,10 +84,26 @@ impl Subs {
                         }
                     }
                 }
-                Command::CleanUp(key) => {
-                    println!("@todo Needs implementation: {}", key);
+                Command::CleanUp(_sender, key) => {
+                    let mut subs = self.subs.lock().unwrap();
 
-                    // @todo Clean up.
+                    let sub_list = subs.entry(key.to_owned()).or_insert_with(Vec::new);
+
+                    // @todo Is there a way to make this better? Like compare
+                    // the _sender up there somehow?
+
+                    let mut idx = Vec::<usize>::new();
+                    for (i, sub) in sub_list.iter().enumerate() {
+                        let sendr = &sub.sender;
+                        if let Err(_) = sendr.send(map::Result::Ping) {
+                            idx.push(i);
+                        }
+                    }
+
+                    for (i, &index) in idx.iter().enumerate() {
+                        let end = &index - i;
+                        sub_list.remove(end);
+                    }
                 }
             }
         }

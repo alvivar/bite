@@ -20,6 +20,7 @@ pub enum Command {
 
 pub enum Result {
     Message(String),
+    Ping,
 }
 
 pub struct Map {
@@ -43,9 +44,9 @@ impl Map {
 
     pub fn handle(&self, db_modified: Arc<AtomicBool>, subs_sender: Sender<subs::Command>) {
         loop {
-            let message = self.receiver.recv().unwrap();
+            let msg = self.receiver.recv().unwrap();
 
-            match message {
+            match msg {
                 Command::Jtrim(conn_senders, key) => {
                     let map = self.data.lock().unwrap();
 
@@ -70,7 +71,11 @@ impl Map {
                     };
 
                     for sndr in conn_senders {
-                        sndr.send(Result::Message(msg.to_owned())).unwrap()
+                        if let Err(_) = sndr.send(Result::Message(msg.to_owned())) {
+                            subs_sender
+                                .send(subs::Command::CleanUp(sndr, key.to_owned()))
+                                .unwrap();
+                        }
                     }
                 }
                 Command::Json(conn_senders, key) => {
@@ -97,21 +102,25 @@ impl Map {
                     };
 
                     for sndr in conn_senders {
-                        sndr.send(Result::Message(msg.to_owned())).unwrap()
+                        if let Err(_) = sndr.send(Result::Message(msg.to_owned())) {
+                            subs_sender
+                                .send(subs::Command::CleanUp(sndr, key.to_owned()))
+                                .unwrap();
+                        }
                     }
                 }
                 Command::Get(conn_senders, key) => {
                     let map = self.data.lock().unwrap();
 
-                    let message = match map.get(&key) {
+                    let msg = match map.get(&key) {
                         Some(val) => val,
                         None => "",
                     };
 
                     for sndr in conn_senders {
-                        if let Err(_) = sndr.send(Result::Message(message.to_owned())) {
+                        if let Err(_) = sndr.send(Result::Message(msg.to_owned())) {
                             subs_sender
-                                .send(subs::Command::CleanUp(key.to_owned()))
+                                .send(subs::Command::CleanUp(sndr, key.to_owned()))
                                 .unwrap();
                         }
                     }
@@ -120,6 +129,7 @@ impl Map {
                     let mut map = self.data.lock().unwrap();
 
                     map.insert(key, value);
+
                     db_modified.swap(true, Ordering::Relaxed);
                 }
             }

@@ -89,6 +89,7 @@ fn handle_conn(
         let conn_sndr = conn_sndr.clone();
 
         let async_instr = match instr {
+            Instr::Nop => AsyncInstr::No("NOP".to_owned()),
             Instr::Get => {
                 if key.len() <= 0 {
                     AsyncInstr::No("OK".to_owned())
@@ -136,6 +137,7 @@ fn handle_conn(
                 loop {
                     let message = match sub_rcvr.recv().unwrap() {
                         map::Result::Message(msg) => msg,
+                        map::Result::Ping => continue,
                     };
 
                     if let Err(e) = stream_write(&stream, message) {
@@ -146,12 +148,12 @@ fn handle_conn(
 
                 return;
             }
-            Instr::Nop => AsyncInstr::No("NOP".to_owned()),
         };
 
         let message = match async_instr {
             AsyncInstr::Yes => match conn_recvr.recv().unwrap() {
                 map::Result::Message(msg) => msg,
+                map::Result::Ping => continue,
             },
             AsyncInstr::No(msg) => msg,
         };
