@@ -1,8 +1,10 @@
 
 
+    The subs client test sucks. At least read the input line.
+    Is map::Result the correct name/concept?
+
     Optimize subscriptions calling by grouping connections by instructions when calling the map.
 
-    Subscriptions
     Auth by password
 
     Handle casting, int, float, bool
@@ -38,6 +40,7 @@
 
 
     2021.02.18
+    x Subscriptions
     x Handle subscriptions error when sending to already disconnected clients.
     x Stop the subscription thread on disconnection.
     x #js
