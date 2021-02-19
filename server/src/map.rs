@@ -1,6 +1,6 @@
 use serde_json::{self, json};
 
-use crate::parse;
+use crate::{parse, subs};
 
 use std::{
     collections::BTreeMap,
@@ -41,7 +41,7 @@ impl Map {
         }
     }
 
-    pub fn handle(&self, db_modified: Arc<AtomicBool>) {
+    pub fn handle(&self, db_modified: Arc<AtomicBool>, subs_sender: Sender<subs::Command>) {
         loop {
             let message = self.receiver.recv().unwrap();
 
@@ -109,7 +109,11 @@ impl Map {
                     };
 
                     for sndr in conn_senders {
-                        sndr.send(Result::Message(message.to_owned())).unwrap()
+                        if let Err(_) = sndr.send(Result::Message(message.to_owned())) {
+                            subs_sender
+                                .send(subs::Command::CleanUp(key.to_owned()))
+                                .unwrap();
+                        }
                     }
                 }
                 Command::Set(key, value) => {

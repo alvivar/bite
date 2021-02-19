@@ -1,8 +1,6 @@
 
 
-    Handle subscriptions error when sending to already disconnected clients.
     Optimize subscriptions calling by grouping connections by instructions when calling the map.
-    Stop the subscription thread on disconnection.
 
     Subscriptions
     Auth by password
@@ -40,6 +38,8 @@
 
 
     2021.02.18
+    x Handle subscriptions error when sending to already disconnected clients.
+    x Stop the subscription thread on disconnection.
     x #js
     x #g
     x #j needs to add the client sender into a list, in a dictionary with his key

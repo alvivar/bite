@@ -11,6 +11,7 @@ use crate::{map, parse::Instr};
 pub enum Command {
     NewSub(Sender<map::Result>, String, Instr),
     CallSubs(String),
+    CleanUp(String),
 }
 
 pub struct Sub {
@@ -81,6 +82,11 @@ impl Subs {
                             map_sender.send(command).unwrap();
                         }
                     }
+                }
+                Command::CleanUp(key) => {
+                    println!("@todo Needs implementation: {}", key);
+
+                    // @todo Clean up.
                 }
             }
         }

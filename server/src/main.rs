@@ -21,24 +21,26 @@ fn main() {
     let listener = TcpListener::bind("0.0.0.0:1984").unwrap(); // Asumming Docker.
     let mut pool = work::ThreadPool::new(4);
 
-    // Map & DB Thread.
+    // Map
     let map = map::Map::new();
     let map_sender = map.sender.clone();
 
+    // DB
     let mut db = DB::new(map.data.clone());
     db.load_from_file();
-
-    let db_modified = db.modified.clone();
-
-    pool.execute(move || map.handle(db_modified));
-    pool.execute(move || db.handle(3));
 
     // Subscritions
     let subs = subs::Subs::new();
     let subs_sender = subs.sender.clone();
 
-    let map_subs_sender = map_sender.clone();
-    pool.execute(move || subs.handle(map_subs_sender));
+    // Channels
+    let db_modified = db.modified.clone();
+    let map_subs_sender = subs_sender.clone();
+    let subs_map_sender = map_sender.clone();
+
+    pool.execute(move || map.handle(db_modified, map_subs_sender));
+    pool.execute(move || db.handle(3));
+    pool.execute(move || subs.handle(subs_map_sender));
 
     // New job on incoming connections.
     for stream in listener.incoming() {
@@ -131,15 +133,18 @@ fn handle_conn(
                     .send(subs::Command::NewSub(sub_sndr, key, instr))
                     .unwrap();
 
-                // Infinite loop that waits for subscriptions.
-
                 loop {
-                    let msg = match sub_rcvr.recv().unwrap() {
+                    let message = match sub_rcvr.recv().unwrap() {
                         map::Result::Message(msg) => msg,
                     };
 
-                    stream_write(&stream, msg);
+                    if let Err(e) = stream_write(&stream, message) {
+                        println!("Client disconnected: {}", e);
+                        break;
+                    }
                 }
+
+                return;
             }
             Instr::Nop => AsyncInstr::No("NOP".to_owned()),
         };
@@ -151,12 +156,17 @@ fn handle_conn(
             AsyncInstr::No(msg) => msg,
         };
 
-        stream_write(&stream, message);
+        stream_write(&stream, message).unwrap();
     }
 }
 
-fn stream_write(mut stream: &TcpStream, message: String) {
-    stream.write(message.as_bytes()).unwrap();
-    stream.write(&[0xA]).unwrap(); // Write line.
-    stream.flush().unwrap();
+fn stream_write(mut stream: &TcpStream, message: String) -> std::io::Result<()> {
+    if let Err(e) = stream.write(message.as_bytes()) {
+        return Err(e);
+    } else {
+        stream.write(&[0xA]).unwrap(); // Write line.
+        stream.flush().unwrap();
+    }
+
+    Ok(())
 }
