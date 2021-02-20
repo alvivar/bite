@@ -3,7 +3,7 @@
     Document questions for the mentor
     Update the documentation
     The subs client test sucks. At least read the input line.
-    Is map::Result the correct name/concept?
+    Is map::Result the correct name/concept? It's a message to clients connections basically.
 
     Optimize subscriptions calling by grouping connections by instructions when calling the map.
 
