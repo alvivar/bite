@@ -1,3 +1,5 @@
+use crate::{map, parse::Instr};
+use serde_json::json;
 use std::{
     collections::BTreeMap,
     sync::{
@@ -7,11 +9,9 @@ use std::{
     usize,
 };
 
-use crate::{map, parse::Instr};
-
 pub enum Command {
     NewSub(Sender<map::Result>, String, Instr),
-    CallSubs(String),
+    CallSubs(String, String),
     CleanUp(Sender<map::Result>, String),
 }
 
@@ -51,7 +51,7 @@ impl Subs {
 
                     senders.push(Sub { sender, instr });
                 }
-                Command::CallSubs(key) => {
+                Command::CallSubs(key, val) => {
                     let mut subs = self.subs.lock().unwrap();
 
                     for alt_keys in get_key_combinations(key.to_owned()) {
@@ -63,9 +63,25 @@ impl Subs {
 
                             // @todo Optimize sending sender batches grouped by Instr.
 
+                            // @todo Sender should propagate the key & value, instead of getting.
+
                             let command = match instr {
                                 Instr::SubJtrim => {
-                                    map::Command::Jtrim(sender.clone(), alt_keys.to_owned())
+                                    let msg = json!({ key.to_owned() : val.to_owned() });
+
+                                    for sndr in sender {
+                                        if let Err(_) =
+                                            sndr.send(map::Result::Message(msg.to_string()))
+                                        {
+                                            self.sender
+                                                .send(Command::CleanUp(sndr, key.to_owned()))
+                                                .unwrap();
+                                        }
+                                    }
+
+                                    continue;
+
+                                    // map::Command::Jtrim(sender.clone(), alt_keys.to_owned())
                                 }
                                 Instr::SubJson => {
                                     map::Command::Json(sender.clone(), alt_keys.to_owned())

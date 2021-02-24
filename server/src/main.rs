@@ -104,10 +104,10 @@ fn handle_conn(
             Instr::Set => {
                 if key.len() > 0 {
                     map_sender
-                        .send(map::Command::Set(key.to_owned(), val))
+                        .send(map::Command::Set(key.to_owned(), val.to_owned()))
                         .unwrap();
 
-                    subs_sender.send(subs::Command::CallSubs(key)).unwrap();
+                    subs_sender.send(subs::Command::CallSubs(key, val)).unwrap();
                 }
 
                 AsyncInstr::No(String::from("OK"))
