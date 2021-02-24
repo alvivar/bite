@@ -67,7 +67,8 @@ impl Subs {
 
                             let command = match instr {
                                 Instr::SubJtrim => {
-                                    let msg = json!({ key.to_owned() : val.to_owned() });
+                                    let last = key.split(".").last().unwrap();
+                                    let msg = json!({ last.to_owned() : val.to_owned() });
 
                                     for sndr in sender {
                                         if let Err(_) =
