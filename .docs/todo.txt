@@ -1,6 +1,6 @@
 
-
-    #jx Needs to be able to receive only the last modification, not the complete json
+    s? sets key if empty
+    Rethink the #j #js api because it makes sense to only receive the last message setted
 
     Document questions for the mentor
     Update the documentation
@@ -42,6 +42,9 @@
     Push # value should insert into a list, transform normal values
     Pop # should return and delete a value
 
+
+    2021.02.24
+    x #jx Needs to be able to receive only the last modification, not the complete json
 
     2021.02.18
     x Subscriptions
