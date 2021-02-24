@@ -1,5 +1,7 @@
 
 
+    #jx Needs to be able to receive only the last modification, not the complete json
+
     Document questions for the mentor
     Update the documentation
     The subs client test sucks. At least read the input line.
