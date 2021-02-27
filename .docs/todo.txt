@@ -1,6 +1,6 @@
 
     s? sets key if empty
-    Rethink the #j #js api because it makes sense to only receive the last message setted
+    Rethink the #j #js #g api because it makes sense to only receive the last message setted
 
     Document questions for the mentor
     Update the documentation
