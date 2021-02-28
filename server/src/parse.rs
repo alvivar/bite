@@ -14,6 +14,7 @@ pub enum Instr {
     Jtrim,
     SubJ,
     SubGet,
+    SetIfNone,
 }
 
 pub enum AsyncInstr {
@@ -61,8 +62,10 @@ pub fn proc_from_string(content: &str) -> Proc {
         "j" => Instr::Jtrim,
         "#j" => Instr::SubJ,
         "#g" => Instr::SubGet,
+        "s?" => Instr::SetIfNone,
         _ => {
             key = format!("{} {}", inst, key);
+
             Instr::Nop
         }
     };

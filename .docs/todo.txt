@@ -1,12 +1,6 @@
 
 
-    x Subscription should be able to ignore non related subscription, instead of entry api
-    x Rethink the #j #js #g api because it makes sense to only receive the last message setted
-
-
-    s? sets key if empty
-
-    Thread that watch for old lost connections to free the worker
+    Thread that watch for workers with orphan connections
 
     Document questions for the mentor
     Update the documentation
@@ -48,6 +42,11 @@
     Push # value should insert into a list, transform normal values
     Pop # should return and delete a value
 
+
+    2021.02.28
+    x s? sets key if empty
+    x Subscription should be able to ignore non related subscription, instead of entry api
+    x Rethink the #j #js #g api because it makes sense to only receive the last message setted
 
     2021.02.24
     x #jx Needs to be able to receive only the last modification, not the complete json

@@ -109,7 +109,23 @@ fn handle_conn(
                         .send(map::Command::Set(key.to_owned(), val.to_owned()))
                         .unwrap();
 
-                    subs_sender.send(subs::Command::CallSub(key, val)).unwrap();
+                    subs_sender.send(subs::Command::Call(key, val)).unwrap();
+                }
+
+                AsyncInstr::No(String::from("OK"))
+            }
+
+            Instr::SetIfNone => {
+                if key.len() > 0 {
+                    map_sender
+                        .send(map::Command::SetIfNone(
+                            key.to_owned(),
+                            val.to_owned(),
+                            subs_sender.clone(),
+                        ))
+                        .unwrap();
+
+                    // ^ Subscription resolves after the map operation.
                 }
 
                 AsyncInstr::No(String::from("OK"))
@@ -136,7 +152,7 @@ fn handle_conn(
                 let (sub_sender, sub_receiver) = mpsc::channel::<map::Result>();
 
                 subs_sender
-                    .send(subs::Command::NewSub(sub_sender, key, instr))
+                    .send(subs::Command::New(sub_sender, key, instr))
                     .unwrap();
 
                 loop {

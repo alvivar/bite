@@ -14,6 +14,7 @@ use std::{
 pub enum Command {
     Get(Sender<Result>, String),
     Set(String, String),
+    SetIfNone(String, String, Sender<subs::Command>),
     Json(Sender<Result>, String),
     Jtrim(Sender<Result>, String),
 }
@@ -72,10 +73,11 @@ impl Map {
 
                     if let Err(_) = conn_sender.send(Result::Message(msg.to_owned())) {
                         subs_sender
-                            .send(subs::Command::CleanUp(conn_sender, key.to_owned()))
+                            .send(subs::Command::Clean(conn_sender, key.to_owned()))
                             .unwrap();
                     }
                 }
+
                 Command::Json(conn_sender, key) => {
                     let map = self.data.lock().unwrap();
 
@@ -101,10 +103,11 @@ impl Map {
 
                     if let Err(_) = conn_sender.send(Result::Message(msg.to_owned())) {
                         subs_sender
-                            .send(subs::Command::CleanUp(conn_sender, key.to_owned()))
+                            .send(subs::Command::Clean(conn_sender, key.to_owned()))
                             .unwrap();
                     }
                 }
+
                 Command::Get(conn_sender, key) => {
                     let map = self.data.lock().unwrap();
 
@@ -115,16 +118,39 @@ impl Map {
 
                     if let Err(_) = conn_sender.send(Result::Message(msg.to_owned())) {
                         subs_sender
-                            .send(subs::Command::CleanUp(conn_sender, key.to_owned()))
+                            .send(subs::Command::Clean(conn_sender, key.to_owned()))
                             .unwrap();
                     }
                 }
-                Command::Set(key, value) => {
+
+                Command::Set(key, val) => {
                     let mut map = self.data.lock().unwrap();
 
-                    map.insert(key, value);
+                    map.insert(key, val);
 
                     db_modified.swap(true, Ordering::Relaxed);
+                }
+
+                Command::SetIfNone(key, val, subs_sender) => {
+                    let mut map = self.data.lock().unwrap();
+
+                    match map.get(&key) {
+                        Some(val) => {
+                            let val = val.to_owned();
+                            subs_sender.send(subs::Command::Call(key, val)).unwrap();
+
+                            continue;
+                        }
+                        None => {
+                            let k = key.to_owned();
+                            let v = val.to_owned();
+                            subs_sender.send(subs::Command::Call(k, v)).unwrap();
+
+                            map.insert(key, val);
+
+                            db_modified.swap(true, Ordering::Relaxed);
+                        }
+                    };
                 }
             }
         }

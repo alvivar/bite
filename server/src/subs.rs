@@ -10,9 +10,9 @@ use std::{
 };
 
 pub enum Command {
-    NewSub(Sender<map::Result>, String, Instr),
-    CallSub(String, String),
-    CleanUp(Sender<map::Result>, String),
+    New(Sender<map::Result>, String, Instr),
+    Call(String, String),
+    Clean(Sender<map::Result>, String),
 }
 
 pub struct Sub {
@@ -44,14 +44,14 @@ impl Subs {
             let message = self.receiver.recv().unwrap();
 
             match message {
-                Command::NewSub(sender, key, instr) => {
+                Command::New(sender, key, instr) => {
                     let mut subs = self.subs.lock().unwrap();
 
                     let senders = subs.entry(key).or_insert_with(Vec::new);
 
                     senders.push(Sub { sender, instr });
                 }
-                Command::CallSub(key, val) => {
+                Command::Call(key, val) => {
                     let subs = self.subs.lock().unwrap();
 
                     for alt_key in get_key_combinations(key.to_owned()) {
@@ -90,13 +90,13 @@ impl Subs {
 
                             if let Err(_) = sender.send(map::Result::Message(msg.to_owned())) {
                                 self.sender
-                                    .send(Command::CleanUp(sender, key.to_owned()))
+                                    .send(Command::Clean(sender, key.to_owned()))
                                     .unwrap();
                             }
                         }
                     }
                 }
-                Command::CleanUp(_sender, key) => {
+                Command::Clean(_sender, key) => {
                     let mut subs = self.subs.lock().unwrap();
 
                     let sub_senders = match subs.get_mut(&key) {
