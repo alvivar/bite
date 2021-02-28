@@ -1,7 +1,8 @@
-use std::sync::Arc;
-use std::sync::Mutex;
 use std::thread;
-use std::{sync::mpsc, u32};
+use std::{
+    sync::{mpsc, Arc, Mutex},
+    usize,
+};
 
 trait FnBox {
     fn call_box(self: Box<Self>);
@@ -16,7 +17,7 @@ impl<F: FnOnce()> FnBox for F {
 type Job = Box<dyn FnBox + Send + 'static>;
 
 enum Message {
-    NewJob(Job, Arc<Mutex<u32>>),
+    NewJob(Job, Arc<Mutex<usize>>),
     Terminate,
 }
 
@@ -24,7 +25,7 @@ pub struct ThreadPool {
     workers: Vec<Worker>,
     sender: mpsc::Sender<Message>,
     receiver: Arc<Mutex<mpsc::Receiver<Message>>>,
-    active_jobs: Arc<Mutex<u32>>,
+    active_jobs: Arc<Mutex<usize>>,
 }
 
 impl ThreadPool {
@@ -54,18 +55,19 @@ impl ThreadPool {
     where
         F: FnOnce() + Send + 'static,
     {
-        let job = Box::new(f);
-
         // New worker if the queue is busy.
-        let id = self.workers.len();
-        let workers_len = id as u32;
+        let worker_id = self.workers.len();
 
-        if *self.active_jobs.lock().unwrap() >= workers_len {
-            self.workers.push(Worker::new(id, self.receiver.clone()));
-            println!("Worker {} has been created.", id);
+        if *self.active_jobs.lock().unwrap() >= worker_id {
+            let receiver = self.receiver.clone();
+            self.workers.push(Worker::new(worker_id, receiver));
+
+            println!("Worker {} has been created.", worker_id);
         }
 
         // Job queue.
+        let job = Box::new(f);
+
         self.sender
             .send(Message::NewJob(job, self.active_jobs.clone()))
             .unwrap();
@@ -105,8 +107,8 @@ impl Worker {
             match message {
                 Message::NewJob(job, active_jobs) => {
                     *active_jobs.lock().unwrap() += 1;
-                    println!("Worker {} executing a job.", id);
 
+                    println!("Worker {} executing a job.", id);
                     job.call_box();
 
                     *active_jobs.lock().unwrap() -= 1;
