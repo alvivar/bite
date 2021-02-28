@@ -1,6 +1,6 @@
 use std::{
     env,
-    io::{self, BufRead, BufReader, BufWriter, Write},
+    io::{self, BufRead, BufReader, BufWriter, Read, Write},
     net::TcpStream,
 };
 
@@ -17,11 +17,21 @@ fn main() {
     let mut writer = BufWriter::new(stream);
     let mut reader = BufReader::new(stream_clone);
 
-    for line in io::stdin().lock().lines() {
-        let content = line.unwrap();
-        writer.write(content.as_bytes()).unwrap();
-        writer.write(&[0xA]).unwrap();
-        writer.flush().unwrap();
+    let mut sub_mode = false;
+    let mut input = String::new();
+
+    loop {
+        if !sub_mode {
+            input = String::new();
+            io::stdin().read_line(&mut input).unwrap();
+
+            writer.write(input.as_bytes()).unwrap();
+            writer.flush().unwrap();
+        }
+
+        if input.trim().starts_with("#") {
+            sub_mode = true;
+        }
 
         let mut message = String::new();
         reader.read_line(&mut message).unwrap();
