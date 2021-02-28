@@ -2,6 +2,8 @@
     s? sets key if empty
     Rethink the #j #js #g api because it makes sense to only receive the last message setted
 
+    Thread that watch for old lost connections to free the worker
+
     Document questions for the mentor
     Update the documentation
     The subs client test sucks. At least read the input line.
