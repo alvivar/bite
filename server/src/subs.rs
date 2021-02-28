@@ -62,7 +62,7 @@ impl Subs {
 
                         for sub in sub_list {
                             let instr = &sub.instr;
-                            let sender = vec![sub.sender.clone()];
+                            let sender = sub.sender.clone();
 
                             // @todo Optimize sending sender batches grouped by Instr.
 
@@ -85,12 +85,10 @@ impl Subs {
                                 }
                             };
 
-                            for sndr in sender {
-                                if let Err(_) = sndr.send(map::Result::Message(msg.to_owned())) {
-                                    self.sender
-                                        .send(Command::CleanUp(sndr, key.to_owned()))
-                                        .unwrap();
-                                }
+                            if let Err(_) = sender.send(map::Result::Message(msg.to_owned())) {
+                                self.sender
+                                    .send(Command::CleanUp(sender, key.to_owned()))
+                                    .unwrap();
                             }
                         }
                     }

@@ -12,7 +12,6 @@ use std::{
     io::{BufRead, BufReader, Write},
     net::{TcpListener, TcpStream},
     sync::mpsc::{self, Receiver, Sender},
-    vec,
 };
 
 fn main() {
@@ -87,7 +86,7 @@ fn handle_conn(
         let key = proc.key;
         let val = proc.value;
 
-        let conn_sndr = conn_sndr.clone();
+        let conn_sender = conn_sndr.clone();
 
         let async_instr = match instr {
             Instr::Nop => AsyncInstr::No("NOP".to_owned()),
@@ -97,7 +96,7 @@ fn handle_conn(
                     AsyncInstr::No("OK".to_owned())
                 } else {
                     map_sender
-                        .send(map::Command::Get(vec![conn_sndr], key))
+                        .send(map::Command::Get(conn_sender, key))
                         .unwrap();
 
                     AsyncInstr::Yes
@@ -115,9 +114,10 @@ fn handle_conn(
 
                 AsyncInstr::No(String::from("OK"))
             }
+
             Instr::Json => {
                 map_sender
-                    .send(map::Command::Json(vec![conn_sndr], key))
+                    .send(map::Command::Json(conn_sender, key))
                     .unwrap();
 
                 AsyncInstr::Yes
@@ -125,7 +125,7 @@ fn handle_conn(
 
             Instr::Jtrim => {
                 map_sender
-                    .send(map::Command::Jtrim(vec![conn_sndr], key))
+                    .send(map::Command::Jtrim(conn_sender, key))
                     .unwrap();
 
                 AsyncInstr::Yes

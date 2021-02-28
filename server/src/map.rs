@@ -12,10 +12,10 @@ use std::{
 };
 
 pub enum Command {
-    Get(Vec<Sender<Result>>, String),
+    Get(Sender<Result>, String),
     Set(String, String),
-    Json(Vec<Sender<Result>>, String),
-    Jtrim(Vec<Sender<Result>>, String),
+    Json(Sender<Result>, String),
+    Jtrim(Sender<Result>, String),
 }
 
 pub enum Result {
@@ -47,7 +47,7 @@ impl Map {
             let msg = self.receiver.recv().unwrap();
 
             match msg {
-                Command::Jtrim(conn_senders, key) => {
+                Command::Jtrim(conn_sender, key) => {
                     let map = self.data.lock().unwrap();
 
                     let range = map.range(key.to_owned()..);
@@ -70,15 +70,13 @@ impl Map {
                         }
                     };
 
-                    for sndr in conn_senders {
-                        if let Err(_) = sndr.send(Result::Message(msg.to_owned())) {
-                            subs_sender
-                                .send(subs::Command::CleanUp(sndr, key.to_owned()))
-                                .unwrap();
-                        }
+                    if let Err(_) = conn_sender.send(Result::Message(msg.to_owned())) {
+                        subs_sender
+                            .send(subs::Command::CleanUp(conn_sender, key.to_owned()))
+                            .unwrap();
                     }
                 }
-                Command::Json(conn_senders, key) => {
+                Command::Json(conn_sender, key) => {
                     let map = self.data.lock().unwrap();
 
                     let range = map.range(key.to_owned()..);
@@ -101,15 +99,13 @@ impl Map {
                         }
                     };
 
-                    for sndr in conn_senders {
-                        if let Err(_) = sndr.send(Result::Message(msg.to_owned())) {
-                            subs_sender
-                                .send(subs::Command::CleanUp(sndr, key.to_owned()))
-                                .unwrap();
-                        }
+                    if let Err(_) = conn_sender.send(Result::Message(msg.to_owned())) {
+                        subs_sender
+                            .send(subs::Command::CleanUp(conn_sender, key.to_owned()))
+                            .unwrap();
                     }
                 }
-                Command::Get(conn_senders, key) => {
+                Command::Get(conn_sender, key) => {
                     let map = self.data.lock().unwrap();
 
                     let msg = match map.get(&key) {
@@ -117,12 +113,10 @@ impl Map {
                         None => "",
                     };
 
-                    for sndr in conn_senders {
-                        if let Err(_) = sndr.send(Result::Message(msg.to_owned())) {
-                            subs_sender
-                                .send(subs::Command::CleanUp(sndr, key.to_owned()))
-                                .unwrap();
-                        }
+                    if let Err(_) = conn_sender.send(Result::Message(msg.to_owned())) {
+                        subs_sender
+                            .send(subs::Command::CleanUp(conn_sender, key.to_owned()))
+                            .unwrap();
                     }
                 }
                 Command::Set(key, value) => {
