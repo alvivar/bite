@@ -11,7 +11,7 @@ use std::{
 
 pub enum Command {
     NewSub(Sender<map::Result>, String, Instr),
-    CallSubs(String, String),
+    CallSub(String, String),
     CleanUp(Sender<map::Result>, String),
 }
 
@@ -39,7 +39,7 @@ impl Subs {
         }
     }
 
-    pub fn handle(&self, map_sender: Sender<map::Command>) {
+    pub fn handle(&self) {
         loop {
             let message = self.receiver.recv().unwrap();
 
@@ -51,11 +51,11 @@ impl Subs {
 
                     senders.push(Sub { sender, instr });
                 }
-                Command::CallSubs(key, val) => {
+                Command::CallSub(key, val) => {
                     let mut subs = self.subs.lock().unwrap();
 
-                    for alt_keys in get_key_combinations(key.to_owned()) {
-                        let sub_list = subs.entry(alt_keys.to_owned()).or_insert_with(Vec::new);
+                    for alt_key in get_key_combinations(key.to_owned()) {
+                        let sub_list = subs.entry(alt_key.to_owned()).or_insert_with(Vec::new);
 
                         for sub in sub_list {
                             let instr = &sub.instr;
@@ -63,54 +63,45 @@ impl Subs {
 
                             // @todo Optimize sending sender batches grouped by Instr.
 
-                            // @todo Sender should propagate the key & value, instead of getting.
-
-                            let command = match instr {
-                                Instr::SubJtrim => {
+                            let msg = match instr {
+                                Instr::SubJ => {
                                     let last = key.split(".").last().unwrap();
                                     let msg = json!({ last.to_owned() : val.to_owned() });
 
-                                    for sndr in sender {
-                                        if let Err(_) =
-                                            sndr.send(map::Result::Message(msg.to_string()))
-                                        {
-                                            self.sender
-                                                .send(Command::CleanUp(sndr, key.to_owned()))
-                                                .unwrap();
-                                        }
-                                    }
-
-                                    continue;
-
-                                    // map::Command::Jtrim(sender.clone(), alt_keys.to_owned())
-                                }
-                                Instr::SubJson => {
-                                    map::Command::Json(sender.clone(), alt_keys.to_owned())
+                                    msg.to_string()
                                 }
                                 Instr::SubGet => {
-                                    if alt_keys != key {
+                                    if alt_key != key {
                                         continue;
                                     }
 
-                                    map::Command::Get(sender.clone(), alt_keys.to_owned())
+                                    val.to_string()
                                 }
-                                _ => panic!("Unknown instruction calling subscribers."),
+                                _ => {
+                                    panic!("Unknown instruction calling subscribers.");
+                                }
                             };
 
-                            map_sender.send(command).unwrap();
+                            for sndr in sender {
+                                if let Err(_) = sndr.send(map::Result::Message(msg.to_owned())) {
+                                    self.sender
+                                        .send(Command::CleanUp(sndr, key.to_owned()))
+                                        .unwrap();
+                                }
+                            }
                         }
                     }
                 }
                 Command::CleanUp(_sender, key) => {
                     let mut subs = self.subs.lock().unwrap();
 
-                    let sub_list = subs.entry(key.to_owned()).or_insert_with(Vec::new);
+                    let sub_senders = subs.entry(key.to_owned()).or_insert_with(Vec::new);
 
                     // @todo Is there a way to make this better? Like compare
                     // the _sender up there somehow?
 
                     let mut idx = Vec::<usize>::new();
-                    for (i, sub) in sub_list.iter().enumerate() {
+                    for (i, sub) in sub_senders.iter().enumerate() {
                         let sendr = &sub.sender;
                         if let Err(_) = sendr.send(map::Result::Ping) {
                             idx.push(i);
@@ -119,7 +110,7 @@ impl Subs {
 
                     for (i, &index) in idx.iter().enumerate() {
                         let end = &index - i;
-                        sub_list.remove(end);
+                        sub_senders.remove(end);
                     }
                 }
             }

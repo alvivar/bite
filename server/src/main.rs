@@ -31,25 +31,26 @@ fn main() {
 
     // Subscritions
     let subs = subs::Subs::new();
-    let subs_sender = subs.sender.clone();
+    let sub_sender = subs.sender.clone();
 
     // Channels
     let db_modified = db.modified.clone();
-    let map_subs_sender = subs_sender.clone();
-    let subs_map_sender = map_sender.clone();
+    let map_subsender = sub_sender.clone();
 
-    pool.execute(move || map.handle(db_modified, map_subs_sender));
+    pool.execute(move || map.handle(db_modified, map_subsender));
     pool.execute(move || db.handle(3));
-    pool.execute(move || subs.handle(subs_map_sender));
+    pool.execute(move || subs.handle());
 
     // New job on incoming connections.
     for stream in listener.incoming() {
         let stream = stream.unwrap();
         let map_sender = map_sender.clone();
-        let subs_sender = subs_sender.clone();
-        let (conn_sndr, conn_recvr) = mpsc::channel::<map::Result>();
+        let sub_sender = sub_sender.clone();
+        let (conn_sender, conn_receiver) = mpsc::channel::<map::Result>();
 
-        pool.execute(move || handle_conn(stream, map_sender, subs_sender, conn_sndr, conn_recvr));
+        pool.execute(move || {
+            handle_conn(stream, map_sender, sub_sender, conn_sender, conn_receiver)
+        });
     }
 
     // @todo Thread waiting q! in the input to quit.
@@ -90,6 +91,7 @@ fn handle_conn(
 
         let async_instr = match instr {
             Instr::Nop => AsyncInstr::No("NOP".to_owned()),
+
             Instr::Get => {
                 if key.len() <= 0 {
                     AsyncInstr::No("OK".to_owned())
@@ -101,13 +103,14 @@ fn handle_conn(
                     AsyncInstr::Yes
                 }
             }
+
             Instr::Set => {
                 if key.len() > 0 {
                     map_sender
                         .send(map::Command::Set(key.to_owned(), val.to_owned()))
                         .unwrap();
 
-                    subs_sender.send(subs::Command::CallSubs(key, val)).unwrap();
+                    subs_sender.send(subs::Command::CallSub(key, val)).unwrap();
                 }
 
                 AsyncInstr::No(String::from("OK"))
@@ -119,6 +122,7 @@ fn handle_conn(
 
                 AsyncInstr::Yes
             }
+
             Instr::Jtrim => {
                 map_sender
                     .send(map::Command::Jtrim(vec![conn_sndr], key))
@@ -126,16 +130,17 @@ fn handle_conn(
 
                 AsyncInstr::Yes
             }
-            Instr::SubJtrim | Instr::SubJson | Instr::SubGet => {
+
+            Instr::SubJ | Instr::SubGet => {
                 let stream = stream.try_clone().unwrap();
-                let (sub_sndr, sub_rcvr) = mpsc::channel::<map::Result>();
+                let (sub_sender, sub_receiver) = mpsc::channel::<map::Result>();
 
                 subs_sender
-                    .send(subs::Command::NewSub(sub_sndr, key, instr))
+                    .send(subs::Command::NewSub(sub_sender, key, instr))
                     .unwrap();
 
                 loop {
-                    let message = match sub_rcvr.recv().unwrap() {
+                    let message = match sub_receiver.recv().unwrap() {
                         map::Result::Message(msg) => msg,
                         map::Result::Ping => continue,
                     };
