@@ -57,6 +57,9 @@ impl Subs {
                     for alt_key in get_key_combinations(key.to_owned()) {
                         let sub_list = subs.entry(alt_key.to_owned()).or_insert_with(Vec::new);
 
+                        // @todo ^ This should be a simple check, instead of
+                        // creating an entry for each alt key.
+
                         for sub in sub_list {
                             let instr = &sub.instr;
                             let sender = vec![sub.sender.clone()];
