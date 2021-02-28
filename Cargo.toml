@@ -7,10 +7,10 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-serde_json = "1.0.62"
+serde_json = "1.0.64"
 
 [workspace]
-members = ["server", "client", "subs"]
+members = ["server", "client"]
 
 [[bin]]
 name = "server"
@@ -19,7 +19,3 @@ path = "server/src/main.rs"
 [[bin]]
 name = "client"
 path = "client/src/main.rs"
-
-[[bin]]
-name = "subs"
-path = "subs/src/main.rs"
