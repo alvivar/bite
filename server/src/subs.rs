@@ -52,19 +52,17 @@ impl Subs {
                     senders.push(Sub { sender, instr });
                 }
                 Command::CallSub(key, val) => {
-                    let mut subs = self.subs.lock().unwrap();
+                    let subs = self.subs.lock().unwrap();
 
                     for alt_key in get_key_combinations(key.to_owned()) {
-                        let sub_list = subs.entry(alt_key.to_owned()).or_insert_with(Vec::new);
-
-                        // @todo ^ This should be a simple check, instead of
-                        // creating an entry for each alt key.
+                        let sub_list = match subs.get(&alt_key) {
+                            Some(val) => val,
+                            None => continue,
+                        };
 
                         for sub in sub_list {
                             let instr = &sub.instr;
                             let sender = sub.sender.clone();
-
-                            // @todo Optimize sending sender batches grouped by Instr.
 
                             let msg = match instr {
                                 Instr::SubJ => {
@@ -74,9 +72,14 @@ impl Subs {
                                     msg.to_string()
                                 }
                                 Instr::SubGet => {
-                                    if alt_key != key {
-                                        continue;
-                                    }
+                                    // This commented code makes the
+                                    // subscription precise, on the exact
+                                    // subscribed key, instead of any children
+                                    // forkey modified.
+
+                                    // if alt_key != key {
+                                    //     continue;
+                                    // }
 
                                     val.to_string()
                                 }
@@ -96,20 +99,24 @@ impl Subs {
                 Command::CleanUp(_sender, key) => {
                     let mut subs = self.subs.lock().unwrap();
 
-                    let sub_senders = subs.entry(key.to_owned()).or_insert_with(Vec::new);
+                    let sub_senders = match subs.get_mut(&key) {
+                        Some(val) => val,
+                        None => continue,
+                    };
 
                     // @todo Is there a way to make this better? Like compare
                     // the _sender up there somehow?
 
-                    let mut idx = Vec::<usize>::new();
+                    let mut orphans = Vec::<usize>::new();
                     for (i, sub) in sub_senders.iter().enumerate() {
                         let sendr = &sub.sender;
                         if let Err(_) = sendr.send(map::Result::Ping) {
-                            idx.push(i);
+                            orphans.push(i);
                         }
                     }
 
-                    for (i, &index) in idx.iter().enumerate() {
+                    println!("Cleaning {} orphan subscriptions.", orphans.len());
+                    for (i, &index) in orphans.iter().enumerate() {
                         let end = &index - i;
                         sub_senders.remove(end);
                     }

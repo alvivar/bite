@@ -1,6 +1,10 @@
 
+
+    x Subscription should be able to ignore non related subscription, instead of entry api
+    x Rethink the #j #js #g api because it makes sense to only receive the last message setted
+
+
     s? sets key if empty
-    Rethink the #j #js #g api because it makes sense to only receive the last message setted
 
     Thread that watch for old lost connections to free the worker
 
