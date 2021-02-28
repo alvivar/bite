@@ -2,7 +2,7 @@
 
 Minimalistic Key-Value JSON Database.
 
-## How
+## Tutorial
 
 To set a value, use **s**.
 
@@ -70,9 +70,9 @@ Use **j** to get the value without the full path.
 
 Everything will be stored sorted on **data/DB.json**.
 
-## Subscriptions
+### Subscriptions
 
-You can subscribe to a key to receive values changing in realtime.
+You can subscribe to a key to receive values in realtime.
 
 **#g** Sends you the value.
 
@@ -82,9 +82,9 @@ You can subscribe to a key to receive values changing in realtime.
 **#j** Sends you the key and the value in json format.
 
     #j parentKey.childKey
-    > { "childKey" : "Some value changed because of some client set parentKey.childKey to this" }
+    > { "other" : "Some value changed because of some client set parentKey.childKey.other to this" }
 
-If you subscribe to **somekey** you will also receive updates from children in dot key notations, like **somekey.subkey** or **somekey.subkey.other**.
+^ If you subscribe to **somekey** you will also receive updates from children in dot key notations, like **somekey.subkey** or **somekey.subkey.other**.
 
 ## C# Library
 
@@ -128,8 +128,8 @@ to run the binary on **Docker**.
 ## Priorities
 
 - Auth.
-- You should be able to send several instructions at the same time, and receive responses accordinly.
 - Support ints, floats and bools, everything is a string at the moment.
 - The BTree on disk, serialized correctly instead of json.
 - "Only on memory" should be an option.
+- You should be able to send several instructions at the same time, and receive responses accordinly. (?)
 - Maybe Lists. (?)
