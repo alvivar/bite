@@ -2,11 +2,16 @@
 
 Minimalistic Key-Value JSON Database.
 
-## How
+## Tutorial
 
 To set a value, use **s**.
 
     s somekeyname Some string as a value I guess
+    > OK
+
+To set a value, but only if the key doesn't exist, use **s?**.
+
+    s? somekeyname Update if the key doesn't exists
     > OK
 
 To get a value, use **g**.
@@ -65,10 +70,25 @@ Use **j** to get the value without the full path.
 
 Everything will be stored sorted on **data/DB.json**.
 
+### Subscriptions
+
+You can subscribe to a key to receive values in realtime.
+
+**#g** Sends you the value.
+
+    #g parentKey.childKey
+    > Some value changed because of some client set parentKey.childKey to this
+
+**#j** Sends you the key and the value in json format.
+
+    #j parentKey.childKey
+    > { "other" : "Some value changed because of some client set parentKey.childKey.other to this" }
+
+^ If you subscribe to **somekey** you will also receive updates from children in dot key notations, like **somekey.subkey** or **somekey.subkey.other**.
+
 ## C# Library
 
-Check out [**.csharp**](https://github.com/alvivar/bite/tree/master/.csharp) for
-a simple **C#** client library (that also works on Unity).
+Check out [**.csharp**](https://github.com/alvivar/bite/tree/master/.csharp) for a simple **C#** client library (that also works on Unity).
 
 ## Docker
 
@@ -108,9 +128,8 @@ to run the binary on **Docker**.
 ## Priorities
 
 - Auth.
-- Suscriptions (receive a message when the value of a key changes).
-- You should be able to send several instructions at the same time, and receive responses accordinly.
 - Support ints, floats and bools, everything is a string at the moment.
 - The BTree on disk, serialized correctly instead of json.
 - "Only on memory" should be an option.
+- You should be able to send several instructions at the same time, and receive responses accordinly. (?)
 - Maybe Lists. (?)
