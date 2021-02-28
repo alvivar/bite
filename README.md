@@ -74,21 +74,24 @@ Everything will be stored sorted on **data/DB.json**.
 
 You can subscribe to a key to receive values in realtime.
 
-**#g** Sends you the value.
+**#g** sends you the value.
 
     #g parentKey.childKey
-    > Some value changed because of some client set parentKey.childKey to this
+    > Value changed because some client set parentKey.childKey to something
 
-**#j** Sends you the key and the value in json format.
+**#j** sends you the key and the value as JSON.
 
     #j parentKey.childKey
-    > { "other" : "Some value changed because of some client set parentKey.childKey.other to this" }
+    > { "childKey" : "Value changed because some client set parentKey.childKey to something" }
 
-^ If you subscribe to **somekey** you will also receive updates from children in dot key notations, like **somekey.subkey** or **somekey.subkey.other**.
+^ If you subscribe to **parentKey.childKey** you will also receive updates from
+children in dot key notations, like **somekey.subkey.other**, but no from
+parents like **parentKey**.
 
 ## C# Library
 
-Check out [**.csharp**](https://github.com/alvivar/bite/tree/master/.csharp) for a simple **C#** client library (that also works on Unity).
+Check out [**.csharp**](https://github.com/alvivar/bite/tree/master/.csharp) for
+a simple **C#** client library and a **Unity** example.
 
 ## Docker
 
