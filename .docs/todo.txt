@@ -2,6 +2,8 @@
     x The test client handles subscriptions also.
     x The subs client test sucks. At least read the input line.
 
+    Could smol make the application faster?
+
     Thread that watch for workers with orphan connections
 
     Is map::Result the correct name/concept? It's a message to clients connections basically.
