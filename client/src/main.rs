@@ -29,7 +29,7 @@ fn main() {
             writer.flush().unwrap();
         }
 
-        if input.trim().starts_with("#") {
+        if !sub_mode && input.trim().starts_with("#") {
             sub_mode = true;
         }
 
