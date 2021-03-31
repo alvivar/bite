@@ -1,14 +1,11 @@
 
-    x The test client handles subscriptions also.
-    x The subs client test sucks. At least read the input line.
-
     Could smol make the application faster?
 
-    Thread that watch for workers with orphan connections
+    Thread that watch for workers with orphan connections?
 
     Is map::Result the correct name/concept? It's a message to clients connections basically.
-    Update the documentation
 
+    Update the documentation
     Document questions for the mentor
 
     Optimize subscriptions calling by grouping connections by instructions when calling the map.
@@ -48,6 +45,8 @@
 
 
     2021.02.28
+    x The test client handles subscriptions also.
+    x The subs client test sucks. At least read the input line.
     x s? sets key if empty
     x Subscription should be able to ignore non related subscription, instead of entry api
     x Rethink the #j #js #g api because it makes sense to only receive the last message setted
