@@ -50,8 +50,8 @@ impl Map {
             match msg {
                 Command::Jtrim(conn_sender, key) => {
                     let map = self.data.lock().unwrap();
-
                     let range = map.range(key.to_owned()..);
+                    drop(&map);
 
                     let kv: Vec<(&str, &str)> = range
                         .take_while(|(k, _)| k.starts_with(&key))
@@ -80,8 +80,8 @@ impl Map {
 
                 Command::Json(conn_sender, key) => {
                     let map = self.data.lock().unwrap();
-
                     let range = map.range(key.to_owned()..);
+                    drop(&map);
 
                     let kv: Vec<(&str, &str)> = range
                         .take_while(|(k, _)| k.starts_with(&key))
@@ -110,11 +110,11 @@ impl Map {
 
                 Command::Get(conn_sender, key) => {
                     let map = self.data.lock().unwrap();
-
                     let msg = match map.get(&key) {
                         Some(val) => val,
                         None => "",
                     };
+                    drop(&map);
 
                     if let Err(_) = conn_sender.send(Result::Message(msg.to_owned())) {
                         subs_sender
@@ -125,8 +125,8 @@ impl Map {
 
                 Command::Set(key, val) => {
                     let mut map = self.data.lock().unwrap();
-
                     map.insert(key, val);
+                    drop(&map);
 
                     db_modified.swap(true, Ordering::Relaxed);
                 }
