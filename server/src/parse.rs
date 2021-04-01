@@ -10,6 +10,7 @@ pub enum Instr {
     Nop,
     Set,
     Get,
+    SubBite,
     Json,
     Jtrim,
     SubJ,
@@ -39,6 +40,7 @@ pub fn proc_from_string(content: &str) -> Proc {
                     found = 1;
                 }
             }
+
             _ => match found {
                 0 => {
                     inst.push(c);
@@ -63,6 +65,7 @@ pub fn proc_from_string(content: &str) -> Proc {
         "#j" => Instr::SubJ,
         "#g" => Instr::SubGet,
         "s?" => Instr::SetIfNone,
+        "#b" => Instr::SubBite,
         _ => {
             key = format!("{} {}", inst, key);
 
