@@ -55,7 +55,7 @@ impl Subs {
                 Command::Call(key, val) => {
                     let subs = self.subs.lock().unwrap();
 
-                    for alt_key in get_key_combinations(key.to_owned()) {
+                    for alt_key in get_key_combinations(key.as_str()) {
                         let sub_vec = match subs.get(&alt_key) {
                             Some(val) => val,
                             None => continue,
@@ -131,8 +131,9 @@ impl Subs {
 }
 
 /// "data.inner.value" -> ["data.inner.value", "data.inner", "data"]
-fn get_key_combinations(key: String) -> Vec<String> {
+fn get_key_combinations(key: &str) -> Vec<String> {
     let mut parent_keys = Vec::<String>::new();
+
     let keys: Vec<&str> = key.split(".").collect();
     let len = keys.len();
 
