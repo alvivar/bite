@@ -48,7 +48,6 @@ impl Subs {
                     let mut subs = self.subs.lock().unwrap();
 
                     let senders = subs.entry(key).or_insert_with(Vec::new);
-
                     senders.push(Sub { sender, instr });
                 }
 
