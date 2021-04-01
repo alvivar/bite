@@ -68,9 +68,8 @@ impl Subs {
                             let msg = match instr {
                                 Instr::SubJ => {
                                     let last = key.split(".").last().unwrap();
-                                    let msg = json!({ last.to_owned() : val.to_owned() });
 
-                                    msg.to_string()
+                                    json!({ last: val }).to_string()
                                 }
 
                                 Instr::SubGet => {
@@ -83,7 +82,13 @@ impl Subs {
                                     //     continue;
                                     // }
 
-                                    val.to_string()
+                                    val.to_owned()
+                                }
+
+                                Instr::SubBite => {
+                                    let last = key.split(".").last().unwrap();
+
+                                    format!("{} {}", last, val)
                                 }
 
                                 _ => {
@@ -91,7 +96,7 @@ impl Subs {
                                 }
                             };
 
-                            if let Err(_) = sender.send(map::Result::Message(msg.to_owned())) {
+                            if let Err(_) = sender.send(map::Result::Message(msg)) {
                                 self.sender
                                     .send(Command::Clean(sender, key.to_owned()))
                                     .unwrap();
