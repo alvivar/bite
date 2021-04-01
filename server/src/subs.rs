@@ -109,20 +109,24 @@ impl Subs {
 
                     println!("Trying to clean!");
 
-                    for alt_key in get_key_combinations(key.as_str()) {
-                        let sub_senders = match subs.get_mut(&alt_key) {
-                            Some(val) => val,
-                            None => continue,
-                        };
+                    let sub_senders = match subs.get_mut(&key) {
+                        Some(val) => val,
 
-                        let index = sub_senders
-                            .iter()
-                            .position(|x| sender.same_channel(&x.sender))
-                            .unwrap();
+                        None => continue,
+                    };
 
-                        sub_senders.remove(index);
+                    let index = sub_senders
+                        .iter()
+                        .position(|x| sender.same_channel(&x.sender));
 
-                        println!("Cleaning orphan subscriptions #{}.", index);
+                    match index {
+                        Some(index) => {
+                            println!("Cleaning orphan subscriptions.");
+
+                            sub_senders.remove(index);
+                        }
+
+                        None => continue,
                     }
 
                     // Retain is cool but it checks all subscriptions, we
