@@ -1,18 +1,16 @@
 
+    Update the documentation
+
     Is map::Result the correct name/concept? It's a message to clients connections basically.
     Thread that watch for workers with orphan connections?
     Optimize subscriptions calling by grouping connections by instructions when calling the map.
+    Handle casting, int, float, bool
+    Auth by password
 
-    Update the documentation
+    Send multiple commands, batch-like (Multiple sets, to receive multiple results)
 
     Could smol make the application faster?
     Document questions for the mentor
-
-
-    Auth by password
-
-    Handle casting, int, float, bool
-    Send multiple commands, batch-like (Multiple sets, to receive multiple results)
 
     Delete op
     Update key op
