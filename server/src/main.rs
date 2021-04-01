@@ -147,7 +147,7 @@ fn handle_conn(
                 AsyncInstr::Yes
             }
 
-            Instr::SubJ | Instr::SubGet => {
+            Instr::SubJ | Instr::SubGet | Instr::SubBite => {
                 let stream = stream.try_clone().unwrap();
                 let (sub_sender, sub_receiver) = mpsc::channel::<map::Result>();
 
@@ -176,6 +176,7 @@ fn handle_conn(
                 map::Result::Message(msg) => msg,
                 map::Result::Ping => continue,
             },
+
             AsyncInstr::No(msg) => msg,
         };
 
