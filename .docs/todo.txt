@@ -1,6 +1,7 @@
 
     Update the documentation
 
+    Do we need to call Subs::Clean on reads (JTrim, Json, Get)?
     stream_write bug when the first write works and the second fails unwrapping, usually when there are subscriptions a la user, then user.name, then user.name.meaning
 
     Revision 2021.04.01
