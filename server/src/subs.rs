@@ -1,13 +1,13 @@
-use crate::{map, parse::Instr};
+use crossbeam_channel::{unbounded, Receiver, Sender};
 use serde_json::json;
+
 use std::{
     collections::BTreeMap,
-    sync::{
-        mpsc::{self, Receiver, Sender},
-        Arc, Mutex,
-    },
+    sync::{Arc, Mutex},
     usize,
 };
+
+use crate::{map, parse::Instr};
 
 pub enum Command {
     New(Sender<map::Result>, String, Instr),
@@ -30,7 +30,7 @@ impl Subs {
     pub fn new() -> Subs {
         let subs = Arc::new(Mutex::new(BTreeMap::<String, Vec<Sub>>::new()));
 
-        let (sender, receiver) = mpsc::channel();
+        let (sender, receiver) = unbounded();
 
         Subs {
             subs,
@@ -104,30 +104,48 @@ impl Subs {
                     }
                 }
 
-                Command::Clean(_sender, key) => {
+                Command::Clean(sender, key) => {
                     let mut subs = self.subs.lock().unwrap();
 
-                    let sub_senders = match subs.get_mut(&key) {
-                        Some(val) => val,
-                        None => continue,
-                    };
+                    println!("Trying to clean!");
 
-                    // @todo Is there a way to make this better? Like compare
-                    // the _sender up there somehow?
+                    for alt_key in get_key_combinations(key.as_str()) {
+                        let sub_senders = match subs.get_mut(&alt_key) {
+                            Some(val) => val,
+                            None => continue,
+                        };
 
-                    let mut orphans = Vec::<usize>::new();
-                    for (i, sub) in sub_senders.iter().enumerate() {
-                        let sendr = &sub.sender;
-                        if let Err(_) = sendr.send(map::Result::Ping) {
-                            orphans.push(i);
-                        }
+                        let index = sub_senders
+                            .iter()
+                            .position(|x| sender.same_channel(&x.sender))
+                            .unwrap();
+
+                        sub_senders.remove(index);
+
+                        println!("Cleaning orphan subscriptions #{}.", index);
                     }
 
-                    println!("Cleaning {} orphan subscriptions.", orphans.len());
-                    for (i, &index) in orphans.iter().enumerate() {
-                        let end = &index - i;
-                        sub_senders.remove(end);
-                    }
+                    // Retain is cool but it checks all subscriptions, we
+                    // probably just need to clean the current sender.
+                    // sub_senders.retain(|x| !sender.same_channel(&x.sender));
+
+                    // @todo Below are functions that cleans completely the
+                    // senders. Maybe they are useful on a thread focused on
+                    // cleaning?
+
+                    // let mut orphans = Vec::<usize>::new();
+                    // for (i, sub) in sub_senders.iter().enumerate() {
+                    //     let sendr = &sub.sender;
+                    //     if let Err(_) = sendr.send(map::Result::Ping) {
+                    //         orphans.push(i);
+                    //     }
+                    // }
+
+                    // println!("Cleaning {} orphan subscriptions.", orphans.len());
+                    // for (i, &index) in orphans.iter().enumerate() {
+                    //     let end = &index - i;
+                    //     sub_senders.remove(end);
+                    // }
                 }
             }
         }
