@@ -73,7 +73,7 @@ impl Map {
 
                     if let Err(_) = conn_sender.send(Result::Message(msg)) {
                         subs_sender
-                            .send(subs::Command::Clean(conn_sender, key.to_owned()))
+                            .send(subs::Command::Clean(conn_sender, key))
                             .unwrap();
                     }
                 }
@@ -103,7 +103,7 @@ impl Map {
 
                     if let Err(_) = conn_sender.send(Result::Message(msg)) {
                         subs_sender
-                            .send(subs::Command::Clean(conn_sender, key.to_owned()))
+                            .send(subs::Command::Clean(conn_sender, key))
                             .unwrap();
                     }
                 }
@@ -118,7 +118,7 @@ impl Map {
 
                     if let Err(_) = conn_sender.send(Result::Message(msg.to_owned())) {
                         subs_sender
-                            .send(subs::Command::Clean(conn_sender, key.to_owned()))
+                            .send(subs::Command::Clean(conn_sender, key))
                             .unwrap();
                     }
                 }
