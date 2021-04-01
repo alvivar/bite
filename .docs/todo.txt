@@ -1,6 +1,9 @@
 
     Update the documentation
 
+    stream_write bug when the first write works and the second fails unwrapping, usually when there are subscriptions a la user, then user.name, then user.name.meaning
+
+    Revision 2021.04.01
     Migrate to Crossbeam?
 
     Is map::Result the correct name/concept? It's a message to clients connections basically.
