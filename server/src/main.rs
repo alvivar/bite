@@ -1,18 +1,18 @@
-mod map;
-mod subs;
-mod work;
-
-mod db;
-use db::DB;
-
-mod parse;
-use parse::{AsyncInstr, Instr};
+use crossbeam_channel::{unbounded, Receiver, Sender};
 
 use std::{
     io::{BufRead, BufReader, Write},
     net::{TcpListener, TcpStream},
-    sync::mpsc::{self, Receiver, Sender},
 };
+
+mod db;
+mod map;
+mod parse;
+mod subs;
+mod work;
+
+use db::DB;
+use parse::{AsyncInstr, Instr};
 
 fn main() {
     println!("\nBIT:E");
@@ -45,7 +45,7 @@ fn main() {
         let stream = stream.unwrap();
         let map_sender = map_sender.clone();
         let sub_sender = sub_sender.clone();
-        let (conn_sender, conn_receiver) = mpsc::channel::<map::Result>();
+        let (conn_sender, conn_receiver) = unbounded::<map::Result>();
 
         pool.execute(move || {
             handle_conn(stream, map_sender, sub_sender, conn_sender, conn_receiver)
@@ -112,7 +112,7 @@ fn handle_conn(
                     subs_sender.send(subs::Command::Call(key, val)).unwrap();
                 }
 
-                AsyncInstr::No(String::from("OK"))
+                AsyncInstr::No("OK".to_owned())
             }
 
             Instr::SetIfNone => {
@@ -128,7 +128,7 @@ fn handle_conn(
                     // ^ Subscription resolves after the map operation.
                 }
 
-                AsyncInstr::No(String::from("OK"))
+                AsyncInstr::No("OK".to_owned())
             }
 
             Instr::Json => {
@@ -149,7 +149,7 @@ fn handle_conn(
 
             Instr::SubJ | Instr::SubGet | Instr::SubBite => {
                 let stream = stream.try_clone().unwrap();
-                let (sub_sender, sub_receiver) = mpsc::channel::<map::Result>();
+                let (sub_sender, sub_receiver) = unbounded::<map::Result>();
 
                 subs_sender
                     .send(subs::Command::New(sub_sender, key, instr))

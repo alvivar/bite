@@ -1,15 +1,16 @@
-use serde_json::{self, json};
+use crossbeam_channel::{unbounded, Receiver, Sender};
 
-use crate::{parse, subs};
+use serde_json::{self, json};
 
 use std::{
     collections::BTreeMap,
     sync::{
         atomic::{AtomicBool, Ordering},
-        mpsc::{self, Receiver, Sender},
         Arc, Mutex,
     },
 };
+
+use crate::{parse, subs};
 
 pub enum Command {
     Get(Sender<Result>, String),
@@ -34,7 +35,7 @@ impl Map {
     pub fn new() -> Map {
         let data = Arc::new(Mutex::new(BTreeMap::<String, String>::new()));
 
-        let (sender, receiver) = mpsc::channel();
+        let (sender, receiver) = unbounded();
 
         Map {
             data,
