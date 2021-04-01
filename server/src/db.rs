@@ -71,7 +71,7 @@ impl DB {
             .truncate(true)
             .open(DB_FILE);
 
-        let json = serde_json::to_string(&*map).unwrap();
+        let json = serde_json::to_string_pretty(&*map).unwrap();
         file.unwrap().write_all(json.as_bytes()).unwrap();
     }
 }
