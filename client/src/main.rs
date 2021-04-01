@@ -1,6 +1,6 @@
 use std::{
     env,
-    io::{self, BufRead, BufReader, BufWriter, Read, Write},
+    io::{self, BufRead, BufReader, BufWriter, Write},
     net::TcpStream,
 };
 

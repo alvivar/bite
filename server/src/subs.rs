@@ -51,16 +51,17 @@ impl Subs {
 
                     senders.push(Sub { sender, instr });
                 }
+
                 Command::Call(key, val) => {
                     let subs = self.subs.lock().unwrap();
 
                     for alt_key in get_key_combinations(key.to_owned()) {
-                        let sub_list = match subs.get(&alt_key) {
+                        let sub_vec = match subs.get(&alt_key) {
                             Some(val) => val,
                             None => continue,
                         };
 
-                        for sub in sub_list {
+                        for sub in sub_vec {
                             let instr = &sub.instr;
                             let sender = sub.sender.clone();
 
@@ -71,6 +72,7 @@ impl Subs {
 
                                     msg.to_string()
                                 }
+
                                 Instr::SubGet => {
                                     // This commented code makes the
                                     // subscription precise, on the exact
@@ -83,6 +85,7 @@ impl Subs {
 
                                     val.to_string()
                                 }
+
                                 _ => {
                                     panic!("Unknown instruction calling subscribers.");
                                 }
@@ -96,6 +99,7 @@ impl Subs {
                         }
                     }
                 }
+
                 Command::Clean(_sender, key) => {
                     let mut subs = self.subs.lock().unwrap();
 
@@ -126,12 +130,10 @@ impl Subs {
     }
 }
 
-// "data.inner.value" -> ["data", "data.inner", "data.inner.value"]
+/// "data.inner.value" -> ["data.inner.value", "data.inner", "data"]
 fn get_key_combinations(key: String) -> Vec<String> {
+    let mut parent_keys = Vec::<String>::new();
     let keys: Vec<&str> = key.split(".").collect();
-
-    let mut parent_keys: Vec<String> = Vec::new();
-
     let len = keys.len();
 
     for i in 0..len {

@@ -71,7 +71,7 @@ impl Map {
                         }
                     };
 
-                    if let Err(_) = conn_sender.send(Result::Message(msg.to_owned())) {
+                    if let Err(_) = conn_sender.send(Result::Message(msg)) {
                         subs_sender
                             .send(subs::Command::Clean(conn_sender, key.to_owned()))
                             .unwrap();
@@ -101,7 +101,7 @@ impl Map {
                         }
                     };
 
-                    if let Err(_) = conn_sender.send(Result::Message(msg.to_owned())) {
+                    if let Err(_) = conn_sender.send(Result::Message(msg)) {
                         subs_sender
                             .send(subs::Command::Clean(conn_sender, key.to_owned()))
                             .unwrap();
@@ -141,6 +141,7 @@ impl Map {
 
                             continue;
                         }
+
                         None => {
                             let k = key.to_owned();
                             let v = val.to_owned();
