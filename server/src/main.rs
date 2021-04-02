@@ -189,12 +189,9 @@ fn stream_write(mut stream: &TcpStream, message: String) -> std::io::Result<()> 
     // fails unwrapping, usually when there are subscriptions a la user, then
     // user.name, then user.name.meaning.
 
-    if let Err(e) = stream.write(message.as_bytes()) {
-        return Err(e);
-    } else {
-        stream.write(&[0xA]).unwrap(); // Write line.
-        stream.flush().unwrap();
-    }
+    stream.write(message.as_bytes())?;
+    stream.write(&[0xA])?; // Write line.
+    stream.flush()?;
 
     Ok(())
 }
