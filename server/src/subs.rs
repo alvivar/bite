@@ -12,7 +12,7 @@ use crate::{map, parse::Instr};
 pub enum Command {
     New(Sender<map::Result>, String, Instr),
     Call(String, String),
-    Clean(Sender<map::Result>, String),
+    Drop(Sender<map::Result>, String),
 }
 
 pub struct Sub {
@@ -91,23 +91,22 @@ impl Subs {
                                 }
 
                                 _ => {
-                                    panic!("Unknown instruction calling subscribers.");
+                                    println!("Unknown instruction calling subscribers");
+                                    continue;
                                 }
                             };
 
                             if let Err(_) = sender.send(map::Result::Message(msg)) {
                                 self.sender
-                                    .send(Command::Clean(sender, key.to_owned()))
+                                    .send(Command::Drop(sender, alt_key.to_owned()))
                                     .unwrap();
                             }
                         }
                     }
                 }
 
-                Command::Clean(sender, key) => {
+                Command::Drop(sender, key) => {
                     let mut subs = self.subs.lock().unwrap();
-
-                    println!("Trying to clean!");
 
                     let sub_senders = match subs.get_mut(&key) {
                         Some(val) => val,
@@ -121,8 +120,6 @@ impl Subs {
 
                     match index {
                         Some(index) => {
-                            println!("Cleaning orphan subscriptions.");
-
                             sub_senders.remove(index);
                         }
 

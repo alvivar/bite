@@ -1,15 +1,18 @@
 
-    Update the documentation
+    x Dropping queues when send fails
+    x stream_write bug when the first write works and the second fails unwrapping, usually when there are subscriptions a la user, then user.name, then user.name.meaning
+    x Migrate to Crossbeam?
+    x Revision 2021.04.01
 
     Do we need to call Subs::Clean on reads (JTrim, Json, Get)?
-    stream_write bug when the first write works and the second fails unwrapping, usually when there are subscriptions a la user, then user.name, then user.name.meaning
+    Ping instruction to measure the response time
 
-    Revision 2021.04.01
-    Migrate to Crossbeam?
-
-    Is map::Result the correct name/concept? It's a message to clients connections basically.
     Thread that watch for workers with orphan connections?
     Optimize subscriptions calling by grouping connections by instructions when calling the map.
+    Is map::Result the correct name/concept? It's a message to clients connections basically.
+
+    Update the documentation
+
     Handle casting, int, float, bool
     Auth by password
 
