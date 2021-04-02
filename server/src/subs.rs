@@ -12,7 +12,7 @@ use crate::{map, parse::Instr};
 pub enum Command {
     New(Sender<map::Result>, String, Instr),
     Call(String, String),
-    Drop(Sender<map::Result>, String),
+    Clean,
 }
 
 pub struct Sub {
@@ -52,15 +52,18 @@ impl Subs {
                 }
 
                 Command::Call(key, val) => {
-                    let subs = self.subs.lock().unwrap();
+                    let mut subs = self.subs.lock().unwrap();
 
                     for alt_key in get_key_combinations(key.as_str()) {
-                        let sub_vec = match subs.get(&alt_key) {
+                        let sub_vec = match subs.get_mut(&alt_key) {
                             Some(val) => val,
+
                             None => continue,
                         };
 
-                        for sub in sub_vec {
+                        let mut bad_senders = Vec::<usize>::new();
+
+                        for (i, sub) in sub_vec.iter().enumerate() {
                             let instr = &sub.instr;
                             let sender = sub.sender.clone();
 
@@ -72,10 +75,9 @@ impl Subs {
                                 }
 
                                 Instr::SubGet => {
-                                    // This commented code makes the
-                                    // subscription precise, on the exact
-                                    // subscribed key, instead of any children
-                                    // forkey modified.
+                                    // This makes the subscription precise, on
+                                    // the exact subscribed key, instead of any
+                                    // children modified.
 
                                     // if alt_key != key {
                                     //     continue;
@@ -97,56 +99,37 @@ impl Subs {
                             };
 
                             if let Err(_) = sender.send(map::Result::Message(msg)) {
-                                self.sender
-                                    .send(Command::Drop(sender, alt_key.to_owned()))
-                                    .unwrap();
+                                bad_senders.push(i);
                             }
+                        }
+
+                        for &i in bad_senders.iter().rev() {
+                            println!("Dropping subscription on {}", key);
+                            sub_vec.swap_remove(i);
                         }
                     }
                 }
 
-                Command::Drop(sender, key) => {
+                Command::Clean => {
                     let mut subs = self.subs.lock().unwrap();
 
-                    let sub_senders = match subs.get_mut(&key) {
-                        Some(val) => val,
+                    let mut count: u32 = 0;
 
-                        None => continue,
-                    };
-
-                    let index = sub_senders
-                        .iter()
-                        .position(|x| sender.same_channel(&x.sender));
-
-                    match index {
-                        Some(index) => {
-                            sub_senders.remove(index);
+                    for (_, subs_vec) in subs.iter_mut() {
+                        let mut orphans = Vec::<usize>::new();
+                        for (i, sub) in subs_vec.iter().enumerate() {
+                            if let Err(_) = sub.sender.send(map::Result::Ping) {
+                                orphans.push(i);
+                            }
                         }
 
-                        None => continue,
+                        for &i in orphans.iter().rev() {
+                            count += 1;
+                            subs_vec.swap_remove(i);
+                        }
                     }
 
-                    // Retain is cool but it checks all subscriptions, we
-                    // probably just need to clean the current sender.
-                    // sub_senders.retain(|x| !sender.same_channel(&x.sender));
-
-                    // @todo Below are functions that cleans completely the
-                    // senders. Maybe they are useful on a thread focused on
-                    // cleaning?
-
-                    // let mut orphans = Vec::<usize>::new();
-                    // for (i, sub) in sub_senders.iter().enumerate() {
-                    //     let sendr = &sub.sender;
-                    //     if let Err(_) = sendr.send(map::Result::Ping) {
-                    //         orphans.push(i);
-                    //     }
-                    // }
-
-                    // println!("Cleaning {} orphan subscriptions.", orphans.len());
-                    // for (i, &index) in orphans.iter().enumerate() {
-                    //     let end = &index - i;
-                    //     sub_senders.remove(end);
-                    // }
+                    println!("{} orphan subscriptions removed", count);
                 }
             }
         }
