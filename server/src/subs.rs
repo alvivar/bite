@@ -4,20 +4,27 @@ use serde_json::json;
 use std::{
     collections::BTreeMap,
     sync::{Arc, Mutex},
-    usize,
+    time::Instant,
+    u32, u64, usize,
 };
 
-use crate::{map, parse::Instr};
+use crate::parse::Instr;
+
+pub enum Result {
+    Message(String),
+    Ping,
+}
 
 pub enum Command {
-    New(Sender<map::Result>, String, Instr),
+    New(Sender<Result>, String, Instr),
     Call(String, String),
-    Clean,
+    Clean(u64),
 }
 
 pub struct Sub {
-    sender: Sender<map::Result>,
+    sender: Sender<Result>,
     instr: Instr,
+    last_time: Instant,
 }
 
 pub struct Subs {
@@ -45,10 +52,16 @@ impl Subs {
 
             match message {
                 Command::New(sender, key, instr) => {
-                    let mut subs = self.subs.lock().unwrap();
+                    let called = Instant::now();
 
+                    let mut subs = self.subs.lock().unwrap();
                     let senders = subs.entry(key).or_insert_with(Vec::new);
-                    senders.push(Sub { sender, instr });
+
+                    senders.push(Sub {
+                        sender,
+                        instr,
+                        last_time: called,
+                    });
                 }
 
                 Command::Call(key, val) => {
@@ -63,7 +76,7 @@ impl Subs {
 
                         let mut bad_senders = Vec::<usize>::new();
 
-                        for (i, sub) in sub_vec.iter().enumerate() {
+                        for (i, sub) in sub_vec.iter_mut().enumerate() {
                             let instr = &sub.instr;
                             let sender = sub.sender.clone();
 
@@ -98,19 +111,21 @@ impl Subs {
                                 }
                             };
 
-                            if let Err(_) = sender.send(map::Result::Message(msg)) {
+                            if let Err(_) = sender.send(Result::Message(msg)) {
                                 bad_senders.push(i);
+                            } else {
+                                sub.last_time = Instant::now();
                             }
                         }
 
                         for &i in bad_senders.iter().rev() {
-                            println!("Dropping subscription on {}", key);
+                            println!("Removing subscription on {}", key);
                             sub_vec.swap_remove(i);
                         }
                     }
                 }
 
-                Command::Clean => {
+                Command::Clean(secs) => {
                     let mut subs = self.subs.lock().unwrap();
 
                     let mut count: u32 = 0;
@@ -118,18 +133,22 @@ impl Subs {
                     for (_, subs_vec) in subs.iter_mut() {
                         let mut orphans = Vec::<usize>::new();
                         for (i, sub) in subs_vec.iter().enumerate() {
-                            if let Err(_) = sub.sender.send(map::Result::Ping) {
-                                orphans.push(i);
+                            if sub.last_time.elapsed().as_secs() > secs {
+                                if let Err(_) = sub.sender.send(Result::Ping) {
+                                    orphans.push(i);
+                                }
                             }
                         }
 
                         for &i in orphans.iter().rev() {
-                            count += 1;
                             subs_vec.swap_remove(i);
+                            count += 1;
                         }
                     }
 
-                    println!("{} orphan subscriptions removed", count);
+                    if count > 0 {
+                        println!("{} orphan subscriptions removed", count);
+                    }
                 }
             }
         }

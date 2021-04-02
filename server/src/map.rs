@@ -12,17 +12,16 @@ use std::{
 
 use crate::{parse, subs};
 
+pub enum Result {
+    Message(String),
+}
+
 pub enum Command {
     Get(Sender<Result>, String),
     Set(String, String),
     SetIfNone(String, String, Sender<subs::Command>),
     Json(Sender<Result>, String),
     Jtrim(Sender<Result>, String),
-}
-
-pub enum Result {
-    Message(String),
-    Ping,
 }
 
 pub struct Map {

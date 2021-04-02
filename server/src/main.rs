@@ -3,6 +3,8 @@ use crossbeam_channel::{unbounded, Receiver, Sender};
 use std::{
     io::{BufRead, BufReader, Write},
     net::{TcpListener, TcpStream},
+    thread::sleep,
+    time::Duration,
 };
 
 mod db;
@@ -39,6 +41,14 @@ fn main() {
     pool.execute(move || db.handle(3));
     pool.execute(move || subs.handle());
 
+    // Maintenance
+
+    let sub_sender_cleaning = sub_sender.clone();
+    pool.execute(move || loop {
+        sleep(Duration::new(60, 0));
+        sub_sender_cleaning.send(subs::Command::Clean(60)).unwrap();
+    });
+
     // New job on incoming connections.
     for stream in listener.incoming() {
         let stream = stream.unwrap();
@@ -52,7 +62,7 @@ fn main() {
     }
 
     // @todo Thread waiting q! in the input to quit.
-    println!("Shutting down.");
+    println!("Shutting down");
 }
 
 fn handle_conn(
@@ -68,14 +78,14 @@ fn handle_conn(
         let mut buffer = String::new();
 
         if let Err(e) = reader.read_line(&mut buffer) {
-            println!("Client disconnected: {}.", e);
+            println!("Client disconnected: {}", e);
             break;
         }
 
         if buffer.len() > 0 {
             println!("> {}", buffer.trim());
         } else {
-            println!("Client disconnected.");
+            println!("Client disconnected: 0 bytes read");
             break;
         }
 
@@ -147,8 +157,8 @@ fn handle_conn(
             }
 
             Instr::SubJ | Instr::SubGet | Instr::SubBite => {
-                let stream = stream.try_clone().unwrap();
-                let (sub_sender, sub_receiver) = unbounded::<map::Result>();
+                let mut stream = stream.try_clone().unwrap();
+                let (sub_sender, sub_receiver) = unbounded::<subs::Result>();
 
                 subs_sender
                     .send(subs::Command::New(sub_sender, key, instr))
@@ -156,8 +166,15 @@ fn handle_conn(
 
                 loop {
                     let message = match sub_receiver.recv().unwrap() {
-                        map::Result::Message(msg) => msg,
-                        map::Result::Ping => continue,
+                        subs::Result::Message(msg) => msg,
+                        subs::Result::Ping => {
+                            if let Err(e) = stream.write(&mut [0]) {
+                                println!("Client disconnected on subscription ping: {}", e);
+                                break;
+                            }
+
+                            continue;
+                        }
                     };
 
                     if let Err(e) = stream_write(&stream, message) {
@@ -173,7 +190,6 @@ fn handle_conn(
         let message = match async_instr {
             AsyncInstr::Yes => match conn_recvr.recv().unwrap() {
                 map::Result::Message(msg) => msg,
-                map::Result::Ping => continue,
             },
 
             AsyncInstr::No(msg) => msg,

@@ -1,8 +1,6 @@
 
     Optimize subscriptions calling by grouping connections by instructions when calling the map
-    Thread that watch for workers with orphan connections?
     Ping instruction to measure the response time
-    Is map::Result the correct name/concept? It's a message to clients connections basically
 
     Update the documentation
 
@@ -44,6 +42,8 @@
 
 
     2021.04.01
+    x Is map::Result the correct name/concept? It's a message to clients connections basically
+    x Thread that watch for subscription workers with orphan connections
     x Do we need to call Subs::Clean on reads (JTrim, Json, Get)?
     x Dropping subscriptions when send fails can be grouped into a list
     x Dropping queues when send fails
