@@ -114,8 +114,9 @@ impl Worker {
                     job.call_box();
 
                     *active_jobs.lock().unwrap() -= 1;
-                    println!("Worker {} just finish his job", id);
+                    println!("Worker {} just finished his job", id);
                 }
+
                 Message::Terminate => {
                     println!("Worker {} was told to terminate", id);
 

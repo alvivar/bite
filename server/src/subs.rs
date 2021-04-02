@@ -132,6 +132,7 @@ impl Subs {
 
                     for (_, subs_vec) in subs.iter_mut() {
                         let mut orphans = Vec::<usize>::new();
+
                         for (i, sub) in subs_vec.iter().enumerate() {
                             if sub.last_time.elapsed().as_secs() > secs {
                                 if let Err(_) = sub.sender.send(Result::Ping) {
@@ -147,7 +148,7 @@ impl Subs {
                     }
 
                     if count > 0 {
-                        println!("{} orphan subscriptions removed", count);
+                        println!("{} subscriptions orphans removed", count);
                     }
                 }
             }
