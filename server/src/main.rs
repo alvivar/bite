@@ -48,7 +48,7 @@ fn main() {
         sub_sender_clean.send(subs::Command::Clean(60)).unwrap();
     });
 
-    // New job on incoming connections.
+    // New job on incoming connections
     for stream in listener.incoming() {
         let stream = stream.unwrap();
         let map_sender = map_sender.clone();
