@@ -1,6 +1,6 @@
 # Bite
 
-Minimalistic Key-Value Server.
+Key-Value Server.
 
 ## Tutorial
 
