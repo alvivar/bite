@@ -44,7 +44,7 @@ impl Map {
         }
     }
 
-    pub fn handle(&self, db_modified: Arc<AtomicBool>, subs_sender: Sender<subs::Command>) {
+    pub fn handle(&self, db_modified: Arc<AtomicBool>) {
         loop {
             let msg = self.receiver.recv().unwrap();
 
@@ -72,11 +72,7 @@ impl Map {
                         }
                     };
 
-                    if let Err(_) = conn_sender.send(Result::Message(msg)) {
-                        subs_sender
-                            .send(subs::Command::Clean(conn_sender, key))
-                            .unwrap();
-                    }
+                    conn_sender.send(Result::Message(msg)).unwrap();
                 }
 
                 Command::Json(conn_sender, key) => {
@@ -102,11 +98,7 @@ impl Map {
                         }
                     };
 
-                    if let Err(_) = conn_sender.send(Result::Message(msg)) {
-                        subs_sender
-                            .send(subs::Command::Clean(conn_sender, key))
-                            .unwrap();
-                    }
+                    conn_sender.send(Result::Message(msg)).unwrap();
                 }
 
                 Command::Get(conn_sender, key) => {
@@ -117,11 +109,7 @@ impl Map {
                     };
                     drop(&map);
 
-                    if let Err(_) = conn_sender.send(Result::Message(msg.to_owned())) {
-                        subs_sender
-                            .send(subs::Command::Clean(conn_sender, key))
-                            .unwrap();
-                    }
+                    conn_sender.send(Result::Message(msg.to_owned())).unwrap();
                 }
 
                 Command::Set(key, val) => {
