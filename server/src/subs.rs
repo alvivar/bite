@@ -148,7 +148,7 @@ impl Subs {
                     }
 
                     if count > 0 {
-                        println!("{} subscriptions orphans removed", count);
+                        println!("Removing {} orphan subscriptions", count);
                     }
                 }
             }

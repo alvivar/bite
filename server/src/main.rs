@@ -20,7 +20,7 @@ fn main() {
     println!("\nBIT:E");
 
     let listener = TcpListener::bind("0.0.0.0:1984").unwrap(); // Asumming Docker.
-    let mut pool = work::ThreadPool::new(8);
+    let mut pool = work::ThreadPool::new(4);
 
     // Map
     let map = map::Map::new();
@@ -30,7 +30,7 @@ fn main() {
     let mut db = DB::new(map.data.clone());
     db.load_from_file();
 
-    // Subscritions
+    // Subscriptions
     let subs = subs::Subs::new();
     let sub_sender = subs.sender.clone();
 
@@ -41,12 +41,11 @@ fn main() {
     pool.execute(move || db.handle(3));
     pool.execute(move || subs.handle());
 
-    // Maintenance
-
-    let sub_sender_cleaning = sub_sender.clone();
+    // Subscritions maintenance
+    let sub_sender_clean = sub_sender.clone();
     pool.execute(move || loop {
         sleep(Duration::new(60, 0));
-        sub_sender_cleaning.send(subs::Command::Clean(60)).unwrap();
+        sub_sender_clean.send(subs::Command::Clean(60)).unwrap();
     });
 
     // New job on incoming connections.
