@@ -34,9 +34,8 @@ fn main() {
 
     // Channels
     let db_modified = db.modified.clone();
-    let map_subsender = sub_sender.clone();
 
-    pool.execute(move || map.handle(db_modified, map_subsender));
+    pool.execute(move || map.handle(db_modified));
     pool.execute(move || db.handle(3));
     pool.execute(move || subs.handle());
 
