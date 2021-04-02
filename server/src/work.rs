@@ -43,7 +43,7 @@ impl ThreadPool {
             workers.push(Worker::new(id, receiver.clone()));
         }
 
-        println!("{} workers waiting for jobs.", size);
+        println!("{} workers waiting for jobs", size);
 
         ThreadPool {
             workers,
@@ -64,7 +64,7 @@ impl ThreadPool {
             let receiver = self.receiver.clone();
             self.workers.push(Worker::new(worker_id, receiver));
 
-            println!("Worker {} has been created.", worker_id);
+            println!("Worker {} has been created", worker_id);
         }
 
         // Job queue.
@@ -78,16 +78,16 @@ impl ThreadPool {
 
 impl Drop for ThreadPool {
     fn drop(&mut self) {
-        println!("Sending |Terminate| message to all workers.");
+        println!("Sending |Terminate| message to all workers");
 
         for _ in &mut self.workers {
             self.sender.send(Message::Terminate).unwrap();
         }
 
-        println!("Shutting down all workers.");
+        println!("Shutting down all workers");
 
         for worker in &mut self.workers {
-            println!("Shutting down worker {}.", worker.id);
+            println!("Shutting down worker {}", worker.id);
 
             if let Some(thread) = worker.thread.take() {
                 thread.join().unwrap();
@@ -110,14 +110,14 @@ impl Worker {
                 Message::NewJob(job, active_jobs) => {
                     *active_jobs.lock().unwrap() += 1;
 
-                    println!("Worker {} executing a job.", id);
+                    println!("Worker {} executing a job", id);
                     job.call_box();
 
                     *active_jobs.lock().unwrap() -= 1;
-                    println!("Worker {} just finish his job.", id);
+                    println!("Worker {} just finish his job", id);
                 }
                 Message::Terminate => {
-                    println!("Worker {} was told to terminate.", id);
+                    println!("Worker {} was told to terminate", id);
 
                     break;
                 }

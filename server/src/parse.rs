@@ -55,8 +55,6 @@ pub fn proc_from_string(content: &str) -> Proc {
         }
     }
 
-    // println!("i[{}] k[{}] v[{}]", inst, key, val); // Debug
-
     let instruction = match inst.trim().to_lowercase().as_str() {
         "g" => Instr::Get,
         "s" => Instr::Set,
