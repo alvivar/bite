@@ -1,6 +1,6 @@
 # Bite
 
-Minimalistic Key-Value JSON Database.
+Key-Value Server.
 
 ## Tutorial
 
