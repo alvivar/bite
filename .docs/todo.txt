@@ -11,6 +11,7 @@
 
     Could smol make the application faster?
     Document questions for the mentor
+    @mentor Does dropping the lock helps somehow?
 
     Delete op
     Update key op
