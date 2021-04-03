@@ -16,6 +16,7 @@ pub enum Instr {
     SubJ,
     SubGet,
     SetIfNone,
+    Inc,
 }
 
 pub enum AsyncInstr {
@@ -56,13 +57,14 @@ pub fn proc_from_string(content: &str) -> Proc {
     }
 
     let instruction = match inst.trim().to_lowercase().as_str() {
-        "g" => Instr::Get,
         "s" => Instr::Set,
-        "js" => Instr::Json,
+        "s?" => Instr::SetIfNone,
+        "+1" => Instr::Inc,
+        "g" => Instr::Get,
         "j" => Instr::Jtrim,
+        "js" => Instr::Json,
         "#j" => Instr::SubJ,
         "#g" => Instr::SubGet,
-        "s?" => Instr::SetIfNone,
         "#b" => Instr::SubBite,
         _ => {
             key = format!("{} {}", inst, key);

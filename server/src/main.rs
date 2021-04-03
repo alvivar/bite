@@ -166,6 +166,7 @@ fn handle_conn(
                 loop {
                     let message = match sub_receiver.recv().unwrap() {
                         subs::Result::Message(msg) => msg,
+
                         subs::Result::Ping => {
                             if let Err(e) = stream.write(&mut [0]) {
                                 println!("Client disconnected on subscription ping: {}", e);
@@ -183,6 +184,18 @@ fn handle_conn(
                 }
 
                 return;
+            }
+
+            Instr::Inc => {
+                if key.len() <= 0 {
+                    AsyncInstr::No("NOP".to_owned())
+                } else {
+                    map_sender
+                        .send(map::Command::Inc(conn_sender, key, subs_sender.clone()))
+                        .unwrap();
+
+                    AsyncInstr::Yes
+                }
             }
         };
 

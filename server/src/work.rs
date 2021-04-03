@@ -64,7 +64,7 @@ impl ThreadPool {
             let receiver = self.receiver.clone();
             self.workers.push(Worker::new(worker_id, receiver));
 
-            println!("Worker {} has been created", worker_id);
+            println!("Worker {} created", worker_id);
         }
 
         // Job queue.
@@ -109,12 +109,14 @@ impl Worker {
             match message {
                 Message::NewJob(job, active_jobs) => {
                     *active_jobs.lock().unwrap() += 1;
+                    drop(&active_jobs);
 
-                    println!("Worker {} executing a job", id);
+                    println!("Worker {} working", id);
                     job.call_box();
 
                     *active_jobs.lock().unwrap() -= 1;
-                    println!("Worker {} just finished his job", id);
+                    drop(active_jobs);
+                    println!("Worker {} just finished", id);
                 }
 
                 Message::Terminate => {

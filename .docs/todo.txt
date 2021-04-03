@@ -42,6 +42,7 @@
 
 
     2021.04.01
+    x Inc instruction
     x Is map::Result the correct name/concept? It's a message to clients connections basically
     x Thread that watch for subscription workers with orphan connections
     x Do we need to call Subs::Clean on reads (JTrim, Json, Get)?

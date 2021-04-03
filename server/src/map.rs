@@ -22,6 +22,7 @@ pub enum Command {
     SetIfNone(String, String, Sender<subs::Command>),
     Json(Sender<Result>, String),
     Jtrim(Sender<Result>, String),
+    Inc(Sender<Result>, String, Sender<subs::Command>),
 }
 
 pub struct Map {
@@ -124,6 +125,8 @@ impl Map {
 
                     match map.get(&key) {
                         Some(val) => {
+                            drop(&map);
+
                             let val = val.to_owned();
                             subs_sender.send(subs::Command::Call(key, val)).unwrap();
 
@@ -136,10 +139,34 @@ impl Map {
                             subs_sender.send(subs::Command::Call(k, v)).unwrap();
 
                             map.insert(key, val);
+                            drop(map);
 
                             db_modified.swap(true, Ordering::Relaxed);
                         }
                     };
+                }
+
+                Command::Inc(conn_sender, key, subs_sender) => {
+                    let mut map = self.data.lock().unwrap();
+
+                    let inc = match map.get(&key) {
+                        Some(val) => match val.parse::<u32>() {
+                            Ok(n) => n + 1,
+
+                            Err(_) => 0,
+                        },
+
+                        None => 0,
+                    };
+
+                    map.insert(key.to_owned(), inc.to_string());
+                    drop(map);
+
+                    subs_sender
+                        .send(subs::Command::Call(key, inc.to_string()))
+                        .unwrap();
+
+                    conn_sender.send(Result::Message(inc.to_string())).unwrap();
                 }
             }
         }
