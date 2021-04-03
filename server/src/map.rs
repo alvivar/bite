@@ -17,12 +17,12 @@ pub enum Result {
 }
 
 pub enum Command {
-    Get(Sender<Result>, String),
+    Get(String, Sender<Result>),
     Set(String, String),
     SetIfNone(String, String, Sender<subs::Command>),
-    Json(Sender<Result>, String),
-    Jtrim(Sender<Result>, String),
-    Inc(Sender<Result>, String, Sender<subs::Command>),
+    Json(String, Sender<Result>),
+    Jtrim(String, Sender<Result>),
+    Inc(String, Sender<Result>, Sender<subs::Command>),
 }
 
 pub struct Map {
@@ -49,7 +49,7 @@ impl Map {
             let msg = self.receiver.recv().unwrap();
 
             match msg {
-                Command::Jtrim(conn_sender, key) => {
+                Command::Jtrim(key, conn_sender) => {
                     let map = self.data.lock().unwrap();
                     let range = map.range(key.to_owned()..);
                     drop(&map);
@@ -75,7 +75,7 @@ impl Map {
                     conn_sender.send(Result::Message(msg)).unwrap();
                 }
 
-                Command::Json(conn_sender, key) => {
+                Command::Json(key, conn_sender) => {
                     let map = self.data.lock().unwrap();
                     let range = map.range(key.to_owned()..);
                     drop(&map);
@@ -101,7 +101,7 @@ impl Map {
                     conn_sender.send(Result::Message(msg)).unwrap();
                 }
 
-                Command::Get(conn_sender, key) => {
+                Command::Get(key, conn_sender) => {
                     let map = self.data.lock().unwrap();
                     let msg = match map.get(&key) {
                         Some(val) => val,
@@ -146,7 +146,7 @@ impl Map {
                     };
                 }
 
-                Command::Inc(conn_sender, key, subs_sender) => {
+                Command::Inc(key, conn_sender, subs_sender) => {
                     let mut map = self.data.lock().unwrap();
 
                     let inc = match map.get(&key) {

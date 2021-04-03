@@ -104,7 +104,7 @@ fn handle_conn(
                     AsyncInstr::No("OK".to_owned())
                 } else {
                     map_sender
-                        .send(map::Command::Get(conn_sender, key))
+                        .send(map::Command::Get(key, conn_sender))
                         .unwrap();
 
                     AsyncInstr::Yes
@@ -141,7 +141,7 @@ fn handle_conn(
 
             Instr::Json => {
                 map_sender
-                    .send(map::Command::Json(conn_sender, key))
+                    .send(map::Command::Json(key, conn_sender))
                     .unwrap();
 
                 AsyncInstr::Yes
@@ -149,7 +149,7 @@ fn handle_conn(
 
             Instr::Jtrim => {
                 map_sender
-                    .send(map::Command::Jtrim(conn_sender, key))
+                    .send(map::Command::Jtrim(key, conn_sender))
                     .unwrap();
 
                 AsyncInstr::Yes
@@ -191,7 +191,7 @@ fn handle_conn(
                     AsyncInstr::No("NOP".to_owned())
                 } else {
                     map_sender
-                        .send(map::Command::Inc(conn_sender, key, subs_sender.clone()))
+                        .send(map::Command::Inc(key, conn_sender, subs_sender.clone()))
                         .unwrap();
 
                     AsyncInstr::Yes
