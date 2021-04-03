@@ -1,4 +1,6 @@
 
+    tungstenite to support websockets?
+
     Optimize subscriptions calling by grouping connections by instructions when calling the map
     Ping instruction to measure the response time
 
