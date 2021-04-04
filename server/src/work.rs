@@ -108,14 +108,16 @@ impl Worker {
 
             match message {
                 Message::NewJob(job, active_jobs) => {
+                    // @todo What about those drops?
+
                     *active_jobs.lock().unwrap() += 1;
-                    drop(&active_jobs);
+                    // drop(&active_jobs);
 
                     println!("Worker {} working", id);
                     job.call_box();
 
                     *active_jobs.lock().unwrap() -= 1;
-                    drop(active_jobs);
+                    // drop(active_jobs);
                     println!("Worker {} just finished", id);
                 }
 
