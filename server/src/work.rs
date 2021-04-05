@@ -19,7 +19,7 @@ impl<F: FnOnce()> FnBox for F {
 type Job = Box<dyn FnBox + Send + 'static>;
 
 enum Message {
-    NewJob(Job, Arc<Mutex<usize>>),
+    New(Job, Arc<Mutex<usize>>),
     Terminate,
 }
 
@@ -27,7 +27,7 @@ pub struct ThreadPool {
     workers: Vec<Worker>,
     sender: Sender<Message>,
     receiver: Arc<Mutex<Receiver<Message>>>,
-    active_jobs: Arc<Mutex<usize>>,
+    count: Arc<Mutex<usize>>,
 }
 
 impl ThreadPool {
@@ -37,19 +37,19 @@ impl ThreadPool {
         let mut workers = Vec::with_capacity(size);
         let (sender, receiver) = unbounded();
         let receiver = Arc::new(Mutex::new(receiver));
-        let active_jobs = Arc::new(Mutex::new(0));
+        let count = Arc::new(Mutex::new(0));
 
         for id in 0..size {
             workers.push(Worker::new(id, receiver.clone()));
         }
 
-        println!("{} workers waiting for jobs", size);
+        println!("{} worker threads waiting for jobs", size);
 
         ThreadPool {
             workers,
             sender,
             receiver,
-            active_jobs,
+            count,
         }
     }
 
@@ -60,7 +60,7 @@ impl ThreadPool {
         // New worker if the queue is busy.
         let worker_id = self.workers.len();
 
-        if *self.active_jobs.lock().unwrap() >= worker_id {
+        if *self.count.lock().unwrap() >= worker_id {
             let receiver = self.receiver.clone();
             self.workers.push(Worker::new(worker_id, receiver));
 
@@ -71,7 +71,7 @@ impl ThreadPool {
         let job = Box::new(f);
 
         self.sender
-            .send(Message::NewJob(job, self.active_jobs.clone()))
+            .send(Message::New(job, self.count.clone()))
             .unwrap();
     }
 }
@@ -107,21 +107,21 @@ impl Worker {
             let message = receiver.lock().unwrap().recv().unwrap();
 
             match message {
-                Message::NewJob(job, active_jobs) => {
+                Message::New(job, count) => {
                     // @todo What about those drops?
 
-                    let mut c = active_jobs.lock().unwrap();
+                    let mut c = count.lock().unwrap();
                     *c += 1;
                     drop(c);
 
                     println!("Worker {} on a job!", id);
                     job.call_box();
 
-                    let mut c = active_jobs.lock().unwrap();
+                    let mut c = count.lock().unwrap();
                     *c -= 1;
                     drop(c);
 
-                    println!("Worker {} is done", id);
+                    println!("Worker {} released", id);
                 }
 
                 Message::Terminate => {
