@@ -210,10 +210,6 @@ fn handle_conn(
 }
 
 fn stream_write(mut stream: &TcpStream, message: String) -> std::io::Result<()> {
-    // @todo There is a bug here, when the first write works and the second
-    // fails unwrapping, usually when there are subscriptions a la user, then
-    // user.name, then user.name.meaning.
-
     stream.write(message.as_bytes())?;
     stream.write(&[0xA])?; // Write line.
     stream.flush()?;

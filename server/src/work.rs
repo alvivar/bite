@@ -27,7 +27,7 @@ pub struct ThreadPool {
     workers: Vec<Worker>,
     sender: Sender<Message>,
     receiver: Arc<Mutex<Receiver<Message>>>,
-    count: Arc<Mutex<usize>>,
+    active: Arc<Mutex<usize>>,
 }
 
 impl ThreadPool {
@@ -49,7 +49,7 @@ impl ThreadPool {
             workers,
             sender,
             receiver,
-            count,
+            active: count,
         }
     }
 
@@ -60,7 +60,7 @@ impl ThreadPool {
         // New worker if the queue is busy.
         let worker_id = self.workers.len();
 
-        if *self.count.lock().unwrap() >= worker_id {
+        if *self.active.lock().unwrap() >= worker_id {
             let receiver = self.receiver.clone();
             self.workers.push(Worker::new(worker_id, receiver));
 
@@ -71,7 +71,7 @@ impl ThreadPool {
         let job = Box::new(f);
 
         self.sender
-            .send(Message::New(job, self.count.clone()))
+            .send(Message::New(job, self.active.clone()))
             .unwrap();
     }
 }
