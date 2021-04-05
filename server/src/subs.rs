@@ -119,7 +119,7 @@ impl Subs {
                         }
 
                         for &i in bad_senders.iter().rev() {
-                            println!("Removing subscription related to {}", key);
+                            println!("Removing orphan subscription related to {}", key);
                             sub_vec.swap_remove(i);
                         }
                     }
