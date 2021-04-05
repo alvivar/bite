@@ -3,7 +3,7 @@ use crossbeam_channel::{unbounded, Receiver, Sender};
 use std::{
     io::{BufRead, BufReader, Write},
     net::{TcpListener, TcpStream},
-    thread::sleep,
+    thread::{self, sleep},
     time::Duration,
 };
 
@@ -20,7 +20,7 @@ fn main() {
     println!("\nBIT:E");
 
     let listener = TcpListener::bind("0.0.0.0:1984").unwrap(); // Asumming Docker.
-    let mut pool = work::ThreadPool::new(10);
+    let mut pool = work::ThreadPool::new(1);
 
     // Map
     let map = map::Map::new();
@@ -32,18 +32,18 @@ fn main() {
 
     // Subscriptions
     let subs = subs::Subs::new();
-    let sub_sender = subs.sender.clone();
+    let subs_sender = subs.sender.clone();
 
     // Channels
     let db_modified = db.modified.clone();
 
-    pool.execute(move || map.handle(db_modified));
-    pool.execute(move || db.handle(3));
-    pool.execute(move || subs.handle());
+    thread::spawn(move || map.handle(db_modified));
+    thread::spawn(move || db.handle(3));
+    thread::spawn(move || subs.handle());
 
     // Subscritions maintenance
-    let sub_sender_clean = sub_sender.clone();
-    pool.execute(move || loop {
+    let sub_sender_clean = subs_sender.clone();
+    thread::spawn(move || loop {
         sleep(Duration::new(60, 0));
         sub_sender_clean.send(subs::Command::Clean(60)).unwrap();
     });
@@ -52,12 +52,10 @@ fn main() {
     for stream in listener.incoming() {
         let stream = stream.unwrap();
         let map_sender = map_sender.clone();
-        let sub_sender = sub_sender.clone();
-        let (conn_sender, conn_receiver) = unbounded::<map::Result>();
+        let subs_sender = subs_sender.clone();
+        let (conn_sndr, conn_recv) = unbounded::<map::Result>();
 
-        pool.execute(move || {
-            handle_conn(stream, map_sender, sub_sender, conn_sender, conn_receiver)
-        });
+        pool.execute(move || handle_conn(stream, map_sender, subs_sender, conn_sndr, conn_recv));
     }
 
     // @todo Thread waiting q! in the input to quit.
@@ -69,7 +67,7 @@ fn handle_conn(
     map_sender: Sender<map::Command>,
     subs_sender: Sender<subs::Command>,
     conn_sndr: Sender<map::Result>,
-    conn_recvr: Receiver<map::Result>,
+    conn_recv: Receiver<map::Result>,
 ) {
     let mut reader = BufReader::new(stream.try_clone().unwrap());
 
@@ -200,7 +198,7 @@ fn handle_conn(
         };
 
         let message = match async_instr {
-            AsyncInstr::Yes => match conn_recvr.recv().unwrap() {
+            AsyncInstr::Yes => match conn_recv.recv().unwrap() {
                 map::Result::Message(msg) => msg,
             },
 

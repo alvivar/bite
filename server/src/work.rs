@@ -110,15 +110,18 @@ impl Worker {
                 Message::NewJob(job, active_jobs) => {
                     // @todo What about those drops?
 
-                    *active_jobs.lock().unwrap() += 1;
-                    // drop(&active_jobs);
+                    let mut c = active_jobs.lock().unwrap();
+                    *c += 1;
+                    drop(c);
 
-                    println!("Worker {} working", id);
+                    println!("Worker {} on a job!", id);
                     job.call_box();
 
-                    *active_jobs.lock().unwrap() -= 1;
-                    // drop(active_jobs);
-                    println!("Worker {} just finished", id);
+                    let mut c = active_jobs.lock().unwrap();
+                    *c -= 1;
+                    drop(c);
+
+                    println!("Worker {} is done", id);
                 }
 
                 Message::Terminate => {
