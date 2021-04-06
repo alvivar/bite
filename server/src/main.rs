@@ -62,9 +62,9 @@ fn main() {
         thread::spawn(move || {
             let id = thread_count_clone.fetch_add(1, Ordering::Relaxed);
 
-            println!("Thread {} spawned: Client connected", id);
+            println!("Client connected, thread #{} spawned", id);
             handle_conn(stream, map_sender, subs_sender, conn_sndr, conn_recv);
-            println!("Thread {} terminated", id);
+            println!("Thread #{} terminated", id);
 
             thread_count_clone.fetch_sub(1, Ordering::Relaxed);
         });
