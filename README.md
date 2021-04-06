@@ -14,6 +14,14 @@ To set a value, but only if the key doesn't exist, use **s?**.
     s? somekeyname Update if the key doesn't exists
     > OK
 
+To increase a value by 1, use **+1**. The value become 0 if it isn't a number, or doesn't exist.
+
+    s numberkey 9
+    > OK
+
+    +1 numberkey
+    > 10
+
 To get a value, use **g**.
 
     g somekeyname
@@ -76,17 +84,21 @@ You can subscribe to a key to receive values in realtime.
 
 **#g** sends you the value.
 
-    #g parentKey.childKey
-    > Value changed because some client set parentKey.childKey to something
+    #g parent.child
+    > Value changed because some client set parent.child to something
 
 **#j** sends you the key and the value as JSON.
 
-    #j parentKey.childKey
-    > { "childKey" : "Value changed because some client set parentKey.childKey to something" }
+    #j parent.child
+    > { "data" : "Value changed because some client set parent.child.data to something" }
 
-^ If you subscribe to **parentKey.childKey** you will also receive updates from
-children in dot key notations, like **somekey.subkey.other**, but no from
-parents like **parentKey**.
+**#b** sends you just the key and the value separated by space.
+
+    #b parent.child
+    > id Value changed because some client set parent.child.data.id to something
+
+^ If you subscribe to **parent.child** you will also receive updates from the
+children in dot key notation, like **parent.child.data.id**.
 
 ## C# Library
 
