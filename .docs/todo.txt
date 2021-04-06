@@ -1,11 +1,8 @@
 
-    tungstenite to support websockets?
-
     Optimize subscriptions calling by grouping connections by instructions when calling the map
     Ping instruction to measure the response time
 
-    Update the documentation
-
+    tungstenite to support websockets?
     Handle casting, int, float, bool
     Auth by password
 
@@ -43,6 +40,10 @@
     Push # value should insert into a list, transform normal values
     Pop # should return and delete a value
 
+
+    2021.04.05
+    x Update the documentation
+    x Replaced the worker threadpool, it doesn't make sense, eventually I'll migrate to async, probably smol
 
     2021.04.01
     x Inc instruction
