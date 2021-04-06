@@ -3,15 +3,17 @@ use crossbeam_channel::{unbounded, Receiver, Sender};
 use std::{
     io::{BufRead, BufReader, Write},
     net::{TcpListener, TcpStream},
+    sync::Arc,
     thread::{self, sleep},
     time::Duration,
 };
+
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 mod db;
 mod map;
 mod parse;
 mod subs;
-mod work;
 
 use db::DB;
 use parse::{AsyncInstr, Instr};
@@ -20,7 +22,6 @@ fn main() {
     println!("\nBIT:E");
 
     let listener = TcpListener::bind("0.0.0.0:1984").unwrap(); // Asumming Docker.
-    let mut pool = work::ThreadPool::new(4);
 
     // Map
     let map = map::Map::new();
@@ -49,13 +50,22 @@ fn main() {
     });
 
     // New job on incoming connections
+    let thread_count = Arc::new(AtomicUsize::new(0));
+
     for stream in listener.incoming() {
         let stream = stream.unwrap();
         let map_sender = map_sender.clone();
         let subs_sender = subs_sender.clone();
         let (conn_sndr, conn_recv) = unbounded::<map::Result>();
 
-        pool.execute(move || handle_conn(stream, map_sender, subs_sender, conn_sndr, conn_recv));
+        let thread_count_clone = thread_count.clone();
+        thread::spawn(move || {
+            let id = thread_count_clone.fetch_add(1, Ordering::Relaxed);
+
+            println!("Thread {} spawned!", id);
+            handle_conn(stream, map_sender, subs_sender, conn_sndr, conn_recv);
+            println!("Thread {} is done!", id);
+        });
     }
 
     // @todo Thread waiting q! in the input to quit.
