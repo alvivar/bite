@@ -14,6 +14,7 @@ use crate::{parse, subs};
 
 pub enum Result {
     Message(String),
+    Ping,
 }
 
 pub enum Command {
