@@ -59,7 +59,7 @@ fn main() {
         let mut orphans = Vec::<usize>::new();
 
         for (i, s) in streams_lock.iter().enumerate() {
-            if let Err(e) = s.peek(&mut [0]) {
+            if let Err(e) = s.local_addr() {
                 orphans.push(i);
 
                 println!("Client disconnected on ping: {}", e);
@@ -206,7 +206,7 @@ fn handle_conn(
                         subs::Result::Message(msg) => msg,
 
                         subs::Result::Ping => {
-                            if let Err(e) = stream.peek(&mut [0]) {
+                            if let Err(e) = stream.local_addr() {
                                 println!("Client disconnected on subscription ping: {}", e);
                                 break;
                             }
