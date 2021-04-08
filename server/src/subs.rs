@@ -52,7 +52,7 @@ impl Subs {
 
             match message {
                 Command::New(sender, key, instr) => {
-                    let called = Instant::now();
+                    let last_time = Instant::now();
 
                     let mut subs = self.subs.lock().unwrap();
                     let senders = subs.entry(key).or_insert_with(Vec::new);
@@ -60,7 +60,7 @@ impl Subs {
                     senders.push(Sub {
                         sender,
                         instr,
-                        last_time: called,
+                        last_time,
                     });
                 }
 
