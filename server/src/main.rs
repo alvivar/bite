@@ -58,7 +58,7 @@ fn main() {
         let mut orphans = Vec::<usize>::new();
 
         for (i, mut s) in streams_lock.iter().enumerate() {
-            if let Err(e) = s.write(&[0]) {
+            if let Err(e) = s.write(&[b'?']) {
                 orphans.push(i);
                 println!("Client error on ping: {}", e);
             }
