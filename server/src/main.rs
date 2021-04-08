@@ -48,10 +48,10 @@ fn main() {
     let sub_sender_clean = subs_sender.clone();
 
     thread::spawn(move || loop {
-        sleep(Duration::new(90, 0));
+        sleep(Duration::new(5, 0));
 
         // Cleaning subscriptions
-        sub_sender_clean.send(subs::Command::Clean(90)).unwrap();
+        sub_sender_clean.send(subs::Command::Clean(5)).unwrap();
 
         // Cleaning clients
         let mut streams_lock = streams.lock().unwrap();
