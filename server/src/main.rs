@@ -3,7 +3,7 @@ use crossbeam_channel::{unbounded, Receiver, Sender};
 use std::{
     io::{BufRead, BufReader, Write},
     net::{TcpListener, TcpStream},
-    sync::Arc,
+    sync::{Arc, Mutex},
     thread::{self, sleep},
     time::Duration,
 };
@@ -42,11 +42,33 @@ fn main() {
     thread::spawn(move || db.handle(3));
     thread::spawn(move || subs.handle());
 
-    // Subscritions maintenance
+    // Connections & Subscritions maintenance
+    let streams = Arc::new(Mutex::new(Vec::<TcpStream>::new()));
+    let streams_clone = streams.clone();
+
     let sub_sender_clean = subs_sender.clone();
     thread::spawn(move || loop {
-        sleep(Duration::new(60, 0));
+        sleep(Duration::new(15, 0));
+
+        // Cleaning subscriptions @todo Do we need this? Is below enough?
         sub_sender_clean.send(subs::Command::Clean(60)).unwrap();
+
+        // Cleaning clients
+        let mut streams_lock = streams.lock().unwrap();
+
+        let mut orphans = Vec::<usize>::new();
+
+        for (i, mut s) in streams_lock.iter().enumerate() {
+            if let Err(e) = s.write(&mut [0]) {
+                orphans.push(i);
+
+                println!("Client disconnected on ping: {}", e);
+            }
+        }
+
+        for &i in orphans.iter().rev() {
+            streams_lock.swap_remove(i);
+        }
     });
 
     // New job on incoming connections
@@ -58,6 +80,12 @@ fn main() {
         let subs_sender = subs_sender.clone();
         let (conn_sndr, conn_recv) = unbounded::<map::Result>();
 
+        // Save the stream to check later for connections and clean up.
+        let stream_clone = stream.try_clone().unwrap();
+        let streams_clone = streams_clone.clone();
+        streams_clone.lock().unwrap().push(stream_clone); // @todo When this lock gets released?
+
+        // New thread handling a connection.
         let thread_count_clone = thread_count.clone();
         thread::spawn(move || {
             let id = thread_count_clone.fetch_add(1, Ordering::Relaxed);
