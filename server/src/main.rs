@@ -42,32 +42,30 @@ fn main() {
     thread::spawn(move || db.handle(3));
     thread::spawn(move || subs.handle());
 
-    // Connections & Subscritions maintenance
-    let senders = Arc::new(Mutex::new(Vec::<Sender<map::Result>>::new()));
-    let senders_clone = senders.clone();
+    // Connections & Subscritions maintenance heartbeat
+    let streams = Arc::new(Mutex::new(Vec::<TcpStream>::new()));
+    let streams_clone = streams.clone();
 
-    let subs_sender_clean = subs_sender.clone();
+    let sub_sender_clean = subs_sender.clone();
     thread::spawn(move || loop {
         sleep(Duration::new(5, 0));
 
-        // Cleaning subscriptions @todo Do we need this? Is below enough?
-        subs_sender_clean.send(subs::Command::Clean(60)).unwrap();
+        // Cleaning subscriptions
+        sub_sender_clean.send(subs::Command::Clean(60)).unwrap();
 
         // Cleaning clients
-        let mut senders_lock = senders.lock().unwrap();
-
+        let mut streams_lock = streams.lock().unwrap();
         let mut orphans = Vec::<usize>::new();
 
-        for (i, s) in senders_lock.iter().enumerate() {
-            if let Err(e) = s.send(map::Result::Ping) {
+        for (i, mut s) in streams_lock.iter().enumerate() {
+            if let Err(e) = s.write(&[0]) {
                 orphans.push(i);
-
                 println!("Client error on ping: {}", e);
             }
         }
 
         for &i in orphans.iter().rev() {
-            senders_lock.swap_remove(i);
+            streams_lock.swap_remove(i);
         }
     });
 
@@ -81,9 +79,9 @@ fn main() {
         let (conn_sndr, conn_recv) = unbounded::<map::Result>();
 
         // Save the stream to check later for connections and clean up.
-        let conn_sndr_clone = conn_sndr.clone();
-        let senders_clone = senders_clone.clone();
-        senders_clone.lock().unwrap().push(conn_sndr_clone); // @todo When this lock gets released?
+        let stream_clone = stream.try_clone().unwrap();
+        let streams_clone = streams_clone.clone();
+        streams_clone.lock().unwrap().push(stream_clone); // @todo When this lock gets released?
 
         // New thread handling a connection.
         let thread_count_clone = thread_count.clone();
@@ -103,7 +101,7 @@ fn main() {
 }
 
 fn handle_conn(
-    mut stream: TcpStream,
+    stream: TcpStream,
     map_sender: Sender<map::Command>,
     subs_sender: Sender<subs::Command>,
     conn_sndr: Sender<map::Result>,
@@ -240,15 +238,6 @@ fn handle_conn(
         let message = match async_instr {
             AsyncInstr::Yes => match conn_recv.recv().unwrap() {
                 map::Result::Message(msg) => msg,
-
-                map::Result::Ping => {
-                    if let Err(e) = stream.write(&[0]) {
-                        println!("Client disconnected on ping: {}", e);
-                        break;
-                    }
-
-                    continue;
-                }
             },
 
             AsyncInstr::No(msg) => msg,
