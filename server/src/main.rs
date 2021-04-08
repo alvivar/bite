@@ -48,7 +48,7 @@ fn main() {
 
     let sub_sender_clean = subs_sender.clone();
     thread::spawn(move || loop {
-        sleep(Duration::new(15, 0));
+        sleep(Duration::new(5, 0));
 
         // Cleaning subscriptions @todo Do we need this? Is below enough?
         sub_sender_clean.send(subs::Command::Clean(60)).unwrap();
@@ -62,7 +62,7 @@ fn main() {
             if let Err(e) = s.write(&[0]) {
                 orphans.push(i);
 
-                println!("Client disconnected on ping: {}", e);
+                println!("Client error on ping: {}", e);
             }
         }
 
