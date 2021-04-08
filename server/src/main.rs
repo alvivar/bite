@@ -58,8 +58,8 @@ fn main() {
 
         let mut orphans = Vec::<usize>::new();
 
-        for (i, s) in streams_lock.iter().enumerate() {
-            if let Err(e) = s.local_addr() {
+        for (i, mut s) in streams_lock.iter().enumerate() {
+            if let Err(e) = s.write(&[0]) {
                 orphans.push(i);
 
                 println!("Client disconnected on ping: {}", e);
@@ -194,7 +194,7 @@ fn handle_conn(
             }
 
             Instr::SubJ | Instr::SubGet | Instr::SubBite => {
-                let stream = stream.try_clone().unwrap();
+                let mut stream = stream.try_clone().unwrap();
                 let (sub_sender, sub_receiver) = unbounded::<subs::Result>();
 
                 subs_sender
@@ -206,7 +206,7 @@ fn handle_conn(
                         subs::Result::Message(msg) => msg,
 
                         subs::Result::Ping => {
-                            if let Err(e) = stream.local_addr() {
+                            if let Err(e) = stream.write(&[0]) {
                                 println!("Client disconnected on subscription ping: {}", e);
                                 break;
                             }
