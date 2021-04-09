@@ -72,8 +72,6 @@ impl Heartbeat {
 
                     for (addr, conn) in conns.iter() {
                         if conn.last_time.elapsed().as_secs() > secs {
-                            println!("Testing {}", addr);
-
                             if let Err(e) = stream_write(&conn.stream, "\0") {
                                 orphans.push(addr.to_owned());
 

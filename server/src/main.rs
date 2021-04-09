@@ -52,14 +52,14 @@ fn main() {
 
     thread::spawn(move || heartbeat.handle());
 
-    let tick = 10;
+    const TICK: u64 = 90;
     thread::spawn(move || loop {
-        sleep(Duration::new(tick, 0));
+        sleep(Duration::new(TICK, 0));
 
-        subs_sender_clean.send(subs::Command::Clean(tick)).unwrap();
+        subs_sender_clean.send(subs::Command::Clean(TICK)).unwrap();
 
         heartbeat_sender_clean
-            .send(heartbeat::Command::Clean(tick))
+            .send(heartbeat::Command::Clean(TICK))
             .unwrap();
     });
 
@@ -131,12 +131,6 @@ fn handle_conn(
             println!("Client disconnected: 0 bytes read");
             break;
         }
-
-        // Touch the darkness within me.
-        let addr = stream.peer_addr().unwrap().to_string();
-        heartbeat_sender
-            .send(heartbeat::Command::Touch(addr))
-            .unwrap();
 
         // Parse the message.
         let proc = parse::proc_from_string(buffer.as_str());
@@ -230,6 +224,13 @@ fn handle_conn(
                     if let Err(e) = stream_write(&stream, message.as_str()) {
                         println!("Client disconnected: {}", e);
                         break;
+                    } else {
+                        // Touch the darkness within me.
+                        let addr = stream.peer_addr().unwrap().to_string();
+
+                        heartbeat_sender
+                            .send(heartbeat::Command::Touch(addr))
+                            .unwrap();
                     }
                 }
 
@@ -258,6 +259,13 @@ fn handle_conn(
         };
 
         stream_write(&stream, message.as_str()).unwrap();
+
+        // Touch the darkness within me.
+        let addr = stream.peer_addr().unwrap().to_string();
+
+        heartbeat_sender
+            .send(heartbeat::Command::Touch(addr))
+            .unwrap();
     }
 }
 
