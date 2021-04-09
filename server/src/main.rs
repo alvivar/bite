@@ -52,7 +52,7 @@ fn main() {
 
     thread::spawn(move || heartbeat.handle());
 
-    let tick = 5;
+    let tick = 10;
     thread::spawn(move || loop {
         sleep(Duration::new(tick, 0));
 
