@@ -43,30 +43,34 @@ fn main() {
     thread::spawn(move || subs.handle());
 
     // Connections & Subscritions maintenance heartbeat
-    // let streams = Arc::new(Mutex::new(Vec::<TcpStream>::new()));
-    // let streams_clone = streams.clone();
-    let sub_sender_clean = subs_sender.clone();
+    let streams = Arc::new(Mutex::new(Vec::<TcpStream>::new()));
+    let streams_clone = streams.clone();
+    let subs_sender_clean = subs_sender.clone();
 
     thread::spawn(move || loop {
-        sleep(Duration::new(90, 0));
+        sleep(Duration::new(5, 0));
 
         // Cleaning subscriptions
-        sub_sender_clean.send(subs::Command::Clean(90)).unwrap();
+        subs_sender_clean.send(subs::Command::Clean(90)).unwrap();
 
-        // Cleaning clients
-        // let mut streams_lock = streams.lock().unwrap();
-        // let mut orphans = Vec::<usize>::new();
+        // Cleaning other streams
+        let mut streams_lock = streams.lock().unwrap();
+        let mut orphans = Vec::<usize>::new();
 
-        // for (i, s) in streams_lock.iter().enumerate() {
-        //     if let Err(e) = stream_write(s, "\0") {
-        //         orphans.push(i);
-        //         println!("Client error on ping: {}", e);
-        //     }
-        // }
+        for (i, mut s) in streams_lock.iter().enumerate() {
+            if let Ok(_) = s.peek(&mut [0]) {
+                if let Err(e) = s.write(&[b' ']) {
+                    orphans.push(i);
+                    println!("Client error on ping: {}", e);
+                }
+            } else {
+                println!("Peeking but 0");
+            }
+        }
 
-        // for &i in orphans.iter().rev() {
-        //     streams_lock.swap_remove(i);
-        // }
+        for &i in orphans.iter().rev() {
+            streams_lock.swap_remove(i);
+        }
     });
 
     // New job on incoming connections
@@ -79,9 +83,9 @@ fn main() {
         let (conn_sndr, conn_recv) = unbounded::<map::Result>();
 
         // Save the stream to check later for connections and clean up.
-        // let stream_clone = stream.try_clone().unwrap();
-        // let streams_clone = streams_clone.clone();
-        // streams_clone.lock().unwrap().push(stream_clone); // @todo When this lock gets released?
+        let stream_clone = stream.try_clone().unwrap();
+        let streams_clone = streams_clone.clone();
+        streams_clone.lock().unwrap().push(stream_clone); // @todo When this lock gets released?
 
         // New thread handling a connection.
         let thread_count_clone = thread_count.clone();
