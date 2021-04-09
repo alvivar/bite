@@ -3,7 +3,7 @@ use crossbeam_channel::{unbounded, Receiver, Sender};
 use std::{
     io::{BufRead, BufReader, Write},
     net::{TcpListener, TcpStream},
-    sync::{Arc, Mutex},
+    sync::Arc,
     thread::{self, sleep},
     time::Duration,
 };
@@ -11,6 +11,7 @@ use std::{
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 mod db;
+mod heartbeat;
 mod map;
 mod parse;
 mod subs;
@@ -34,6 +35,7 @@ fn main() {
     // Subscriptions
     let subs = subs::Subs::new();
     let subs_sender = subs.sender.clone();
+    let subs_sender_clean = subs_sender.clone();
 
     // Channels
     let db_modified = db.modified.clone();
@@ -42,35 +44,22 @@ fn main() {
     thread::spawn(move || db.handle(3));
     thread::spawn(move || subs.handle());
 
-    // Connections & Subscritions maintenance heartbeat
-    let streams = Arc::new(Mutex::new(Vec::<TcpStream>::new()));
-    let streams_clone = streams.clone();
-    let subs_sender_clean = subs_sender.clone();
+    // Cleaning lost connections & subscriptions
+    let heartbeat = heartbeat::Heartbeat::new();
+    let heartbeat_sender = heartbeat.sender.clone();
+    let heartbeat_sender_clean = heartbeat.sender.clone();
 
+    thread::spawn(move || heartbeat.handle());
+
+    let tick = 5;
     thread::spawn(move || loop {
-        sleep(Duration::new(5, 0));
+        sleep(Duration::new(tick, 0));
 
-        // Cleaning subscriptions
-        subs_sender_clean.send(subs::Command::Clean(90)).unwrap();
+        subs_sender_clean.send(subs::Command::Clean(tick)).unwrap();
 
-        // Cleaning other streams
-        let mut streams_lock = streams.lock().unwrap();
-        let mut orphans = Vec::<usize>::new();
-
-        for (i, mut s) in streams_lock.iter().enumerate() {
-            if let Ok(_) = s.peek(&mut [0]) {
-                if let Err(e) = s.write(&[b' ']) {
-                    orphans.push(i);
-                    println!("Client error on ping: {}", e);
-                }
-            } else {
-                println!("Peeking but 0");
-            }
-        }
-
-        for &i in orphans.iter().rev() {
-            streams_lock.swap_remove(i);
-        }
+        heartbeat_sender_clean
+            .send(heartbeat::Command::Clean(tick))
+            .unwrap();
     });
 
     // New job on incoming connections
@@ -80,12 +69,16 @@ fn main() {
         let stream = stream.unwrap();
         let map_sender = map_sender.clone();
         let subs_sender = subs_sender.clone();
+        let heartbeat_sender = heartbeat_sender.clone();
         let (conn_sndr, conn_recv) = unbounded::<map::Result>();
 
-        // Save the stream to check later for connections and clean up.
+        // Hearbeat register
+        let addr = stream.peer_addr().unwrap().to_string();
         let stream_clone = stream.try_clone().unwrap();
-        let streams_clone = streams_clone.clone();
-        streams_clone.lock().unwrap().push(stream_clone); // @todo When this lock gets released?
+
+        heartbeat_sender
+            .send(heartbeat::Command::New(addr, stream_clone))
+            .unwrap();
 
         // New thread handling a connection.
         let thread_count_clone = thread_count.clone();
@@ -93,7 +86,16 @@ fn main() {
             let id = thread_count_clone.fetch_add(1, Ordering::Relaxed);
 
             println!("Client connected, thread #{} spawned", id);
-            handle_conn(stream, map_sender, subs_sender, conn_sndr, conn_recv);
+
+            handle_conn(
+                stream,
+                map_sender,
+                subs_sender,
+                heartbeat_sender,
+                conn_sndr,
+                conn_recv,
+            );
+
             println!("Thread #{} terminated", id);
 
             thread_count_clone.fetch_sub(1, Ordering::Relaxed);
@@ -108,6 +110,7 @@ fn handle_conn(
     stream: TcpStream,
     map_sender: Sender<map::Command>,
     subs_sender: Sender<subs::Command>,
+    heartbeat_sender: Sender<heartbeat::Command>,
     conn_sndr: Sender<map::Result>,
     conn_recv: Receiver<map::Result>,
 ) {
@@ -127,6 +130,12 @@ fn handle_conn(
             println!("Client disconnected: 0 bytes read");
             break;
         }
+
+        // Touch the darkness within me.
+        let addr = stream.peer_addr().unwrap().to_string();
+        heartbeat_sender
+            .send(heartbeat::Command::Touch(addr))
+            .unwrap();
 
         // Parse the message.
         let proc = parse::proc_from_string(buffer.as_str());
