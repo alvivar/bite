@@ -75,7 +75,7 @@ impl Heartbeat {
                             if let Err(e) = stream_write(&conn.stream, "\0") {
                                 orphans.push(addr.to_owned());
 
-                                println!("Client {} error on ping: {}", addr, e);
+                                println!("Cleaning: Client {}: {}", addr, e);
                             }
                         }
                     }
