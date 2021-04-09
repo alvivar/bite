@@ -71,9 +71,9 @@ impl Heartbeat {
                     let mut orphans = Vec::<String>::new();
 
                     for (addr, conn) in conns.iter() {
-                        println!("Checking {}", addr);
-
                         if conn.last_time.elapsed().as_secs() > secs {
+                            println!("Testing {}", addr);
+
                             if let Err(e) = stream_write(&conn.stream, "\0") {
                                 orphans.push(addr.to_owned());
 
