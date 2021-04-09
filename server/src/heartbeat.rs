@@ -1,3 +1,5 @@
+use crossbeam_channel::{unbounded, Receiver, Sender};
+
 use std::{
     collections::BTreeMap,
     io::Write,
@@ -6,8 +8,6 @@ use std::{
     time::Instant,
     u64,
 };
-
-use crossbeam_channel::{unbounded, Receiver, Sender};
 
 pub enum Command {
     New(String, TcpStream),
@@ -37,7 +37,6 @@ pub struct Heartbeat {
 impl Heartbeat {
     pub fn new() -> Heartbeat {
         let conns = Arc::new(Mutex::new(BTreeMap::<String, Conn>::new()));
-
         let (sender, receiver) = unbounded();
 
         Heartbeat {

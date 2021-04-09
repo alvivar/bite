@@ -3,12 +3,13 @@ use crossbeam_channel::{unbounded, Receiver, Sender};
 use std::{
     io::{BufRead, BufReader, Write},
     net::{TcpListener, TcpStream},
-    sync::Arc,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
     thread::{self, sleep},
     time::Duration,
 };
-
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 mod db;
 mod heartbeat;
