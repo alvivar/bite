@@ -12,7 +12,7 @@ use std::{
 };
 
 mod db;
-mod heartbeat;
+// mod heartbeat;
 mod map;
 mod parse;
 mod subs;
@@ -46,11 +46,11 @@ fn main() {
     thread::spawn(move || subs.handle());
 
     // Cleaning lost connections & subscriptions
-    let heartbeat = heartbeat::Heartbeat::new();
-    let heartbeat_sender = heartbeat.sender.clone();
-    let heartbeat_sender_clean = heartbeat.sender.clone();
+    // let heartbeat = heartbeat::Heartbeat::new();
+    // let heartbeat_sender = heartbeat.sender.clone();
+    // let heartbeat_sender_clean = heartbeat.sender.clone();
 
-    thread::spawn(move || heartbeat.handle());
+    // thread::spawn(move || heartbeat.handle());
 
     const TICK: u64 = 90;
     thread::spawn(move || loop {
@@ -58,9 +58,9 @@ fn main() {
 
         subs_sender_clean.send(subs::Command::Clean(TICK)).unwrap();
 
-        heartbeat_sender_clean
-            .send(heartbeat::Command::Clean(TICK))
-            .unwrap();
+        // heartbeat_sender_clean
+        //     .send(heartbeat::Command::Clean(TICK))
+        //     .unwrap();
     });
 
     // New job on incoming connections
@@ -70,16 +70,16 @@ fn main() {
         let stream = stream.unwrap();
         let map_sender = map_sender.clone();
         let subs_sender = subs_sender.clone();
-        let heartbeat_sender = heartbeat_sender.clone();
+        // let heartbeat_sender = heartbeat_sender.clone();
         let (conn_sndr, conn_recv) = unbounded::<map::Result>();
 
         // Hearbeat register
-        let addr = stream.peer_addr().unwrap().to_string();
-        let stream_clone = stream.try_clone().unwrap();
+        // let addr = stream.peer_addr().unwrap().to_string();
+        // let stream_clone = stream.try_clone().unwrap();
 
-        heartbeat_sender
-            .send(heartbeat::Command::New(addr, stream_clone))
-            .unwrap();
+        // heartbeat_sender
+        //     .send(heartbeat::Command::New(addr, stream_clone))
+        //     .unwrap();
 
         // New thread handling a connection.
         let thread_count_clone = thread_count.clone();
@@ -92,7 +92,7 @@ fn main() {
                 stream,
                 map_sender,
                 subs_sender,
-                heartbeat_sender,
+                // heartbeat_sender,
                 conn_sndr,
                 conn_recv,
             );
@@ -111,7 +111,7 @@ fn handle_conn(
     stream: TcpStream,
     map_sender: Sender<map::Command>,
     subs_sender: Sender<subs::Command>,
-    heartbeat_sender: Sender<heartbeat::Command>,
+    // heartbeat_sender: Sender<heartbeat::Command>,
     conn_sndr: Sender<map::Result>,
     conn_recv: Receiver<map::Result>,
 ) {
@@ -224,14 +224,15 @@ fn handle_conn(
                     if let Err(e) = stream_write(&stream, message.as_str()) {
                         println!("Client disconnected: {}", e);
                         break;
-                    } else {
-                        // Touch the darkness within me.
-                        let addr = stream.peer_addr().unwrap().to_string();
-
-                        heartbeat_sender
-                            .send(heartbeat::Command::Touch(addr))
-                            .unwrap();
                     }
+                    // else {
+                    //     // Touch the darkness within me.
+                    //     let addr = stream.peer_addr().unwrap().to_string();
+
+                    //     heartbeat_sender
+                    //         .send(heartbeat::Command::Touch(addr))
+                    //         .unwrap();
+                    // }
                 }
 
                 return;
@@ -261,11 +262,11 @@ fn handle_conn(
         stream_write(&stream, message.as_str()).unwrap();
 
         // Touch the darkness within me.
-        let addr = stream.peer_addr().unwrap().to_string();
+        // let addr = stream.peer_addr().unwrap().to_string();
 
-        heartbeat_sender
-            .send(heartbeat::Command::Touch(addr))
-            .unwrap();
+        // heartbeat_sender
+        //     .send(heartbeat::Command::Touch(addr))
+        //     .unwrap();
     }
 }
 
