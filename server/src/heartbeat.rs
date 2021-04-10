@@ -3,7 +3,7 @@ use crossbeam_channel::{unbounded, Receiver, Sender};
 use std::{
     collections::BTreeMap,
     io::Write,
-    net::TcpStream,
+    net::{Shutdown, TcpStream},
     sync::{Arc, Mutex},
     time::Instant,
     u64,
@@ -74,6 +74,8 @@ impl Heartbeat {
                         if conn.last_time.elapsed().as_secs() > secs {
                             if let Err(e) = stream_write(&conn.stream, "\0") {
                                 orphans.push(addr.to_owned());
+
+                                conn.stream.shutdown(Shutdown::Both).unwrap();
 
                                 println!("Cleaning connection with {}: {}", addr, e);
                             }
