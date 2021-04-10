@@ -52,9 +52,9 @@ fn main() {
 
     thread::spawn(move || heartbeat.handle());
 
-    const TICK: u64 = 10;
+    const TICK: u64 = 90;
     thread::spawn(move || loop {
-        sleep(Duration::new(TICK, 0));
+        sleep(Duration::new(TICK + 1, 0));
 
         subs_sender_clean.send(subs::Command::Clean(TICK)).unwrap();
 
