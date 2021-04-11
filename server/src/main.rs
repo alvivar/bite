@@ -118,10 +118,11 @@ fn handle_conn(
     let mut reader = BufReader::new(stream.try_clone().unwrap());
 
     loop {
+        let addr = stream.peer_addr().unwrap().to_string();
+
         let mut buffer = String::new();
 
         if let Err(e) = reader.read_line(&mut buffer) {
-            let addr = stream.peer_addr().unwrap().to_string();
             println!("Client {} disconnected: {}", addr, e);
             break;
         }
@@ -129,7 +130,6 @@ fn handle_conn(
         if buffer.len() > 0 {
             println!("> {}", buffer.trim());
         } else {
-            let addr = stream.peer_addr().unwrap().to_string();
             println!("Client {} disconnected: 0 bytes read", addr);
             break;
         }
@@ -215,7 +215,6 @@ fn handle_conn(
 
                         subs::Result::Ping => {
                             if let Err(e) = stream.write(&[0]) {
-                                let addr = stream.peer_addr().unwrap().to_string();
                                 println!("Client {} subscription ping failed: {}", addr, e);
                                 break;
                             }
@@ -225,15 +224,11 @@ fn handle_conn(
                     };
 
                     if let Err(e) = stream_write(&stream, message.as_str()) {
-                        let addr = stream.peer_addr().unwrap().to_string();
                         println!("Client {} disconnected: {}", addr, e);
                         break;
                     } else {
-                        // Touch the darkness within me.
-                        let addr = stream.peer_addr().unwrap().to_string();
-
                         heartbeat_sender
-                            .send(heartbeat::Command::Touch(addr))
+                            .send(heartbeat::Command::Touch(addr.to_owned()))
                             .unwrap();
                     }
                 }
@@ -263,9 +258,6 @@ fn handle_conn(
         };
 
         stream_write(&stream, message.as_str()).unwrap();
-
-        // Touch the darkness within me.
-        let addr = stream.peer_addr().unwrap().to_string();
 
         heartbeat_sender
             .send(heartbeat::Command::Touch(addr))
