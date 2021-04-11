@@ -78,7 +78,7 @@ fn main() {
         let stream_clone = stream.try_clone().unwrap();
 
         heartbeat_sender
-            .send(heartbeat::Command::New(addr, stream_clone))
+            .send(heartbeat::Command::New(addr.to_owned(), stream_clone))
             .unwrap();
 
         // New thread handling a connection.
@@ -86,7 +86,7 @@ fn main() {
         thread::spawn(move || {
             let id = thread_count_clone.fetch_add(1, Ordering::Relaxed);
 
-            println!("Client connected, thread #{} spawned", id);
+            println!("Client {} connected, thread #{} spawned", addr, id);
 
             handle_conn(
                 stream,
@@ -121,14 +121,16 @@ fn handle_conn(
         let mut buffer = String::new();
 
         if let Err(e) = reader.read_line(&mut buffer) {
-            println!("Client disconnected: {}", e);
+            let addr = stream.peer_addr().unwrap().to_string();
+            println!("Client {} disconnected: {}", addr, e);
             break;
         }
 
         if buffer.len() > 0 {
             println!("> {}", buffer.trim());
         } else {
-            println!("Client disconnected: 0 bytes read");
+            let addr = stream.peer_addr().unwrap().to_string();
+            println!("Client {} disconnected: 0 bytes read", addr);
             break;
         }
 
@@ -213,7 +215,8 @@ fn handle_conn(
 
                         subs::Result::Ping => {
                             if let Err(e) = stream.write(&[0]) {
-                                println!("Client disconnected on subscription ping: {}", e);
+                                let addr = stream.peer_addr().unwrap().to_string();
+                                println!("Client {} subscription ping failed: {}", addr, e);
                                 break;
                             }
 
@@ -222,7 +225,8 @@ fn handle_conn(
                     };
 
                     if let Err(e) = stream_write(&stream, message.as_str()) {
-                        println!("Client disconnected: {}", e);
+                        let addr = stream.peer_addr().unwrap().to_string();
+                        println!("Client {} disconnected: {}", addr, e);
                         break;
                     } else {
                         // Touch the darkness within me.

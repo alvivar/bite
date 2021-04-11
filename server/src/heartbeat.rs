@@ -75,7 +75,7 @@ impl Heartbeat {
                             if let Err(e) = stream_write(&conn.stream, "\0") {
                                 orphans.push(addr.to_owned());
 
-                                println!("Cleaning connection with {}: {}", addr, e);
+                                println!("Hearbeat to {} failed: {}", addr, e);
                             }
                         }
                     }

@@ -119,8 +119,12 @@ impl Subs {
                         }
 
                         for &i in bad_senders.iter().rev() {
-                            println!("Cleaning subscription related to {}", key);
                             sub_vec.swap_remove(i);
+                        }
+
+                        let count = bad_senders.len();
+                        if count > 0 {
+                            println!("Removing {} orphan subscriptions related to {}", count, key);
                         }
                     }
                 }
