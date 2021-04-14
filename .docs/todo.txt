@@ -1,4 +1,5 @@
 
+    ! instruction will send a subscription without recording in the db
     Optimize subscriptions calling by grouping connections by instructions when calling the map
     Ping instruction to measure the response time
 
