@@ -8,11 +8,3 @@ services:
     volumes:
       - ./data:/data
     restart: on-failure
-  # bite_jsyc:
-  #   container_name: bj
-  #   build: ./server/
-  #   ports:
-  #     - '1985:1984'
-  #   volumes:
-  #     - ./data_jsyc:/data
-  #   restart: on-failure
