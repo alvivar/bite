@@ -9,14 +9,15 @@ pub struct Proc {
 pub enum Instr {
     Nop,
     Set,
+    SetIfNone,
+    Inc,
     Get,
-    SubBite,
+    Bite,
     Json,
     Jtrim,
     SubJ,
     SubGet,
-    SetIfNone,
-    Inc,
+    SubBite,
 }
 
 pub enum AsyncInstr {
@@ -61,6 +62,7 @@ pub fn proc_from_string(content: &str) -> Proc {
         "s?" => Instr::SetIfNone,
         "+1" => Instr::Inc,
         "g" => Instr::Get,
+        "b" => Instr::Bite,
         "j" => Instr::Jtrim,
         "js" => Instr::Json,
         "#j" => Instr::SubJ,

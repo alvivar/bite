@@ -157,6 +157,14 @@ fn handle_conn(
                 }
             }
 
+            Instr::Bite => {
+                map_sender
+                    .send(map::Command::Bite(key, conn_sender))
+                    .unwrap();
+
+                AsyncInstr::Yes
+            }
+
             Instr::Set => {
                 if key.len() > 0 {
                     map_sender

@@ -18,6 +18,7 @@ pub enum Result {
 pub enum Command {
     Get(String, Sender<Result>),
     Set(String, String),
+    Bite(String, Sender<Result>),
     SetIfNone(String, String, Sender<subs::Command>),
     Json(String, Sender<Result>),
     Jtrim(String, Sender<Result>),
@@ -109,6 +110,26 @@ impl Map {
                     drop(&map);
 
                     conn_sender.send(Result::Message(msg.to_owned())).unwrap();
+                }
+
+                Command::Bite(key, conn_sender) => {
+                    let map = self.data.lock().unwrap();
+                    let range = map.range(key.to_owned()..);
+                    drop(&map);
+
+                    let kv: Vec<(&str, &str)> = range
+                        .take_while(|(k, _)| k.starts_with(&key))
+                        .map(|(k, v)| (k.as_str(), v.as_str()))
+                        .collect();
+
+                    let mut msg = String::new();
+                    for (k, v) in kv {
+                        let k = k.split(".").last().unwrap();
+                        msg.push_str(format!("{} {}\0", k, v).as_str());
+                    }
+                    let msg = msg.trim_end().to_owned(); // @todo What's happening here exactly?
+
+                    conn_sender.send(Result::Message(msg)).unwrap();
                 }
 
                 Command::Set(key, val) => {
