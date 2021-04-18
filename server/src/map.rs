@@ -182,6 +182,8 @@ impl Map {
                     map.insert(key.to_owned(), inc.to_string());
                     drop(map);
 
+                    db_modified.swap(true, Ordering::Relaxed);
+
                     subs_sender
                         .send(subs::Command::Call(key, inc.to_string()))
                         .unwrap();
