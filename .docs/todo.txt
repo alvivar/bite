@@ -1,13 +1,13 @@
 
     ! instruction will send a subscription without recording in the db
-    Optimize subscriptions calling by grouping connections by instructions when calling the map
-    Ping instruction to measure the response time
-
-    tungstenite to support websockets?
-    Handle casting, int, float, bool
+    + Append instruction
     Auth by password
 
     Send multiple commands, batch-like (Multiple sets, to receive multiple results)
+    Optimize subscriptions calling by grouping connections by instructions when calling the map?
+
+    tungstenite to support websockets?
+    Handle casting, int, float, bool?
 
     Could smol make the application faster?
     Document questions for the mentor
@@ -24,12 +24,10 @@
     I'm using the Cargo.toml dependencies correctly?
 
     Use a decent log system instead of println?
-    Use time and IP on the server log
     DB file name by environment
     IP and port by environment
 
     Use Error as results instead of unwrap
-
     Heroku script
 
     Thread waiting for q! in the input to quit.
@@ -37,12 +35,13 @@
 
     Connection handles needs to be a module?
 
-    A way to handle lists, maybe user.likes.1 or something
+    A way to handle lists, maybe user.likes.1 or something?
     Push # value should insert into a list, transform normal values
     Pop # should return and delete a value
 
 
     2021.04.18
+    x Use time and IP on the server log
     +1 doesn't save on the dictionary
 
     2021.04.05
