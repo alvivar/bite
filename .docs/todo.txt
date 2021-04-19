@@ -1,4 +1,5 @@
 
+    Update the docs with the new commands
     Auth by password
 
     Send multiple commands, batch-like (Multiple sets, to receive multiple results)
