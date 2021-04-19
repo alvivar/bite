@@ -193,6 +193,18 @@ fn handle_conn(
                 AsyncInstr::No("OK".to_owned())
             }
 
+            Instr::Inc => {
+                if key.len() <= 0 {
+                    AsyncInstr::No("NOP".to_owned())
+                } else {
+                    map_sender
+                        .send(map::Command::Inc(key, conn_sender, subs_sender.clone()))
+                        .unwrap();
+
+                    AsyncInstr::Yes
+                }
+            }
+
             Instr::Json => {
                 map_sender
                     .send(map::Command::Json(key, conn_sender))
@@ -242,18 +254,6 @@ fn handle_conn(
                 }
 
                 return;
-            }
-
-            Instr::Inc => {
-                if key.len() <= 0 {
-                    AsyncInstr::No("NOP".to_owned())
-                } else {
-                    map_sender
-                        .send(map::Command::Inc(key, conn_sender, subs_sender.clone()))
-                        .unwrap();
-
-                    AsyncInstr::Yes
-                }
             }
         };
 
