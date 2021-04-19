@@ -1,6 +1,4 @@
 
-    ! instruction will send a subscription without recording in the db
-    + Append instruction
     Auth by password
 
     Send multiple commands, batch-like (Multiple sets, to receive multiple results)
@@ -41,8 +39,10 @@
 
 
     2021.04.18
+    x ! instruction will send a subscription without recording in the db
+    x + Append instruction
+    x +1 doesn't save on the dictionary
     x Use time and IP on the server log
-    +1 doesn't save on the dictionary
 
     2021.04.05
     x Update the documentation

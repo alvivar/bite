@@ -17,12 +17,13 @@ pub enum Result {
 
 pub enum Command {
     Get(String, Sender<Result>),
-    Set(String, String),
     Bite(String, Sender<Result>),
+    Set(String, String),
     SetIfNone(String, String, Sender<subs::Command>),
+    Inc(String, Sender<Result>, Sender<subs::Command>),
+    Append(String, String, Sender<Result>, Sender<subs::Command>),
     Json(String, Sender<Result>),
     Jtrim(String, Sender<Result>),
-    Inc(String, Sender<Result>, Sender<subs::Command>),
 }
 
 pub struct Map {
@@ -144,22 +145,13 @@ impl Map {
                     let mut map = self.data.lock().unwrap();
 
                     match map.get(&key) {
-                        Some(val) => {
-                            drop(&map);
-
-                            let val = val.to_owned();
-                            subs_sender.send(subs::Command::Call(key, val)).unwrap();
-
-                            continue;
-                        }
+                        Some(_) => {}
 
                         None => {
-                            let k = key.to_owned();
-                            let v = val.to_owned();
-                            subs_sender.send(subs::Command::Call(k, v)).unwrap();
-
-                            map.insert(key, val);
+                            map.insert(key.to_owned(), val.to_owned());
                             drop(map);
+
+                            subs_sender.send(subs::Command::Call(key, val)).unwrap();
 
                             db_modified.swap(true, Ordering::Relaxed);
                         }
@@ -182,13 +174,43 @@ impl Map {
                     map.insert(key.to_owned(), inc.to_string());
                     drop(map);
 
-                    db_modified.swap(true, Ordering::Relaxed);
+                    conn_sender.send(Result::Message(inc.to_string())).unwrap();
 
                     subs_sender
                         .send(subs::Command::Call(key, inc.to_string()))
                         .unwrap();
 
-                    conn_sender.send(Result::Message(inc.to_string())).unwrap();
+                    db_modified.swap(true, Ordering::Relaxed);
+                }
+
+                Command::Append(key, val, conn_sender, subs_sender) => {
+                    let mut map = self.data.lock().unwrap();
+
+                    let mut append = String::new();
+
+                    match map.get_mut(&key) {
+                        Some(v) => {
+                            append.push_str(v.as_str());
+                            append.push_str(val.as_str());
+
+                            v.push_str(val.as_str());
+                        }
+
+                        None => {
+                            append = val;
+                            map.insert(key.to_owned(), append.to_owned());
+                        }
+                    };
+
+                    drop(map);
+
+                    conn_sender
+                        .send(Result::Message(append.to_owned()))
+                        .unwrap();
+
+                    subs_sender.send(subs::Command::Call(key, append)).unwrap();
+
+                    db_modified.swap(true, Ordering::Relaxed);
                 }
             }
         }

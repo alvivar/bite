@@ -201,6 +201,27 @@ fn handle_conn(
                         .send(map::Command::Inc(key, conn_sender, subs_sender.clone()))
                         .unwrap();
 
+                    // ^ Subscription resolves after the map operation.
+
+                    AsyncInstr::Yes
+                }
+            }
+
+            Instr::Append => {
+                if key.len() <= 0 {
+                    AsyncInstr::No("NOP".to_owned())
+                } else {
+                    map_sender
+                        .send(map::Command::Append(
+                            key,
+                            val,
+                            conn_sender,
+                            subs_sender.clone(),
+                        ))
+                        .unwrap();
+
+                    // ^ Subscription resolves after the map operation.
+
                     AsyncInstr::Yes
                 }
             }
@@ -219,6 +240,14 @@ fn handle_conn(
                     .unwrap();
 
                 AsyncInstr::Yes
+            }
+
+            Instr::PingSub => {
+                if key.len() > 0 {
+                    subs_sender.send(subs::Command::Call(key, val)).unwrap();
+                }
+
+                AsyncInstr::No("OK".to_owned())
             }
 
             Instr::SubJ | Instr::SubGet | Instr::SubBite => {

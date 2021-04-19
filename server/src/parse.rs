@@ -8,11 +8,13 @@ pub struct Proc {
 
 pub enum Instr {
     Nop,
+    Get,
+    Bite,
     Set,
     SetIfNone,
     Inc,
-    Get,
-    Bite,
+    Append,
+    PingSub,
     Json,
     Jtrim,
     SubJ,
@@ -58,13 +60,15 @@ pub fn proc_from_string(content: &str) -> Proc {
     }
 
     let instruction = match inst.trim().to_lowercase().as_str() {
+        "g" => Instr::Get,
+        "b" => Instr::Bite,
         "s" => Instr::Set,
         "s?" => Instr::SetIfNone,
         "+1" => Instr::Inc,
-        "g" => Instr::Get,
-        "b" => Instr::Bite,
+        "+" => Instr::Append,
         "j" => Instr::Jtrim,
         "js" => Instr::Json,
+        "!" => Instr::PingSub,
         "#j" => Instr::SubJ,
         "#g" => Instr::SubGet,
         "#b" => Instr::SubBite,
