@@ -1,4 +1,6 @@
 
+    x Delete instruction "d"
+
     Update the docs with the new commands
     Auth by password
 

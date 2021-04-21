@@ -165,6 +165,22 @@ fn handle_conn(
                 AsyncInstr::Yes
             }
 
+            Instr::Jtrim => {
+                map_sender
+                    .send(map::Command::Jtrim(key, conn_sender))
+                    .unwrap();
+
+                AsyncInstr::Yes
+            }
+
+            Instr::Json => {
+                map_sender
+                    .send(map::Command::Json(key, conn_sender))
+                    .unwrap();
+
+                AsyncInstr::Yes
+            }
+
             Instr::Set => {
                 if key.len() > 0 {
                     map_sender
@@ -226,23 +242,17 @@ fn handle_conn(
                 }
             }
 
-            Instr::Json => {
-                map_sender
-                    .send(map::Command::Json(key, conn_sender))
-                    .unwrap();
+            Instr::Delete => {
+                if key.len() <= 0 {
+                    AsyncInstr::No("KEY?".to_owned())
+                } else {
+                    map_sender.send(map::Command::Delete(key)).unwrap();
 
-                AsyncInstr::Yes
+                    AsyncInstr::No("OK".to_owned())
+                }
             }
 
-            Instr::Jtrim => {
-                map_sender
-                    .send(map::Command::Jtrim(key, conn_sender))
-                    .unwrap();
-
-                AsyncInstr::Yes
-            }
-
-            Instr::PingSub => {
+            Instr::Signal => {
                 if key.len() > 0 {
                     subs_sender.send(subs::Command::Call(key, val)).unwrap();
                 }

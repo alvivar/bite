@@ -10,13 +10,14 @@ pub enum Instr {
     Nop,
     Get,
     Bite,
+    Jtrim,
+    Json,
     Set,
     SetIfNone,
     Inc,
     Append,
-    PingSub,
-    Json,
-    Jtrim,
+    Delete,
+    Signal,
     SubJ,
     SubGet,
     SubBite,
@@ -62,13 +63,14 @@ pub fn proc_from_string(content: &str) -> Proc {
     let instruction = match inst.trim().to_lowercase().as_str() {
         "g" => Instr::Get,
         "b" => Instr::Bite,
+        "j" => Instr::Jtrim,
+        "js" => Instr::Json,
         "s" => Instr::Set,
         "s?" => Instr::SetIfNone,
         "+1" => Instr::Inc,
         "+" => Instr::Append,
-        "j" => Instr::Jtrim,
-        "js" => Instr::Json,
-        "!" => Instr::PingSub,
+        "d" => Instr::Delete,
+        "!" => Instr::Signal,
         "#j" => Instr::SubJ,
         "#g" => Instr::SubGet,
         "#b" => Instr::SubBite,
@@ -89,7 +91,7 @@ pub fn proc_from_string(content: &str) -> Proc {
 pub fn kv_to_json(kv: &[(&str, &str)]) -> Value {
     let mut merged_json = json!({});
 
-    // NOTE(Wojciech): Unfinised alternative.
+    // NOTE(Wojciech): Unfinished alternative.
     // kv.iter().map(|(k, v)| k.split(".").map(|name| {}));
 
     for (k, v) in kv.iter().rev() {
