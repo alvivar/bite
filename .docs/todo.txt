@@ -1,5 +1,6 @@
 
-    x Delete instruction "d"
+    Revise NOP responses
+    Revise Key length, maybe you should be able to subscribe to all
 
     Update the docs with the new commands
     Auth by password
@@ -40,6 +41,9 @@
     Push # value should insert into a list, transform normal values
     Pop # should return and delete a value
 
+
+    2021.04.20
+    x Delete instruction "d"
 
     2021.04.18
     x ! instruction will send a subscription without recording in the db
