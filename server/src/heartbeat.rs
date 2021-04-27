@@ -73,6 +73,7 @@ impl Heartbeat {
                     for (addr, conn) in conns.iter() {
                         if conn.last_time.elapsed().as_secs() > secs {
                             if let Err(e) = beat(&conn.stream) {
+                                conn.stream.shutdown(std::net::Shutdown::Both).unwrap();
                                 orphans.push(addr.to_owned());
 
                                 println!("Hearbeat to {} failed: {}", addr, e);

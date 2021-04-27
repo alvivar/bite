@@ -274,6 +274,7 @@ fn handle_conn(
 
                         subs::Result::Ping => {
                             if let Err(e) = beat(&stream) {
+                                stream.shutdown(std::net::Shutdown::Both).unwrap();
                                 println!("Client {} subscription ping failed: {}", addr, e);
                                 break;
                             }
