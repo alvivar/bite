@@ -261,7 +261,7 @@ fn handle_conn(
             }
 
             Instr::SubJ | Instr::SubGet | Instr::SubBite => {
-                let mut stream = stream.try_clone().unwrap();
+                let stream = stream.try_clone().unwrap();
                 let (sub_sender, sub_receiver) = unbounded::<subs::Result>();
 
                 subs_sender
@@ -273,7 +273,7 @@ fn handle_conn(
                         subs::Result::Message(msg) => msg,
 
                         subs::Result::Ping => {
-                            if let Err(e) = stream.write(&[0]) {
+                            if let Err(e) = stream_write(&stream, "?") {
                                 println!("Client {} subscription ping failed: {}", addr, e);
                                 break;
                             }
