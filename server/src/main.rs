@@ -273,7 +273,7 @@ fn handle_conn(
                         subs::Result::Message(msg) => msg,
 
                         subs::Result::Ping => {
-                            if let Err(e) = stream_write(&stream, "?") {
+                            if let Err(e) = beat(&stream) {
                                 println!("Client {} subscription ping failed: {}", addr, e);
                                 break;
                             }
@@ -314,6 +314,13 @@ fn handle_conn(
 
 fn stream_write(mut stream: &TcpStream, message: &str) -> std::io::Result<()> {
     stream.write(message.as_bytes())?;
+    stream.write(&[0xA])?; // Write line.
+    stream.flush()?;
+
+    Ok(())
+}
+
+fn beat(mut stream: &TcpStream) -> std::io::Result<()> {
     stream.write(&[0xA])?; // Write line.
     stream.flush()?;
 

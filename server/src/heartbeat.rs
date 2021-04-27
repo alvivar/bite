@@ -72,7 +72,7 @@ impl Heartbeat {
 
                     for (addr, conn) in conns.iter() {
                         if conn.last_time.elapsed().as_secs() > secs {
-                            if let Err(e) = stream_write(&conn.stream, "?") {
+                            if let Err(e) = beat(&conn.stream) {
                                 orphans.push(addr.to_owned());
 
                                 println!("Hearbeat to {} failed: {}", addr, e);
@@ -89,8 +89,7 @@ impl Heartbeat {
     }
 }
 
-fn stream_write(mut stream: &TcpStream, message: &str) -> std::io::Result<()> {
-    stream.write(message.as_bytes())?;
+fn beat(mut stream: &TcpStream) -> std::io::Result<()> {
     stream.write(&[0xA])?; // Write line.
     stream.flush()?;
 
