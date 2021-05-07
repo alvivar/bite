@@ -75,7 +75,7 @@ impl Map {
                     let mut msg = String::new();
                     for (k, v) in kv {
                         let k = k.split(".").last().unwrap();
-                        msg.push_str(format!("{} {}\0", k, v).as_str());
+                        msg.push_str(format!("{} {}\n", k, v).as_str());
                     }
                     let msg = msg.trim_end().to_owned(); // @todo What's happening here exactly?
 
