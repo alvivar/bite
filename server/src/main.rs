@@ -320,10 +320,9 @@ fn stream_write(mut stream: &TcpStream, message: &str) -> std::io::Result<()> {
     Ok(())
 }
 
-fn beat(stream: &TcpStream) -> std::io::Result<()> {
-    stream.peek(&mut [1]).unwrap();
-    // stream.write(&[0xA])?; // Write line.
-    // stream.flush()?;
+fn beat(mut stream: &TcpStream) -> std::io::Result<()> {
+    stream.write(b"!")?;
+    stream.flush()?;
 
     Ok(())
 }
