@@ -90,7 +90,7 @@ impl Heartbeat {
 }
 
 fn beat(mut stream: &TcpStream) -> std::io::Result<()> {
-    stream.write(&[0xA])?; // Write line.
+    // stream.write(&[0xA])?; // Write line.
     stream.flush()?;
 
     Ok(())
