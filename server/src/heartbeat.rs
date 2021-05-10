@@ -89,8 +89,9 @@ impl Heartbeat {
     }
 }
 
-// Protocol: Bell, Enquiry, Acknowledge, End of Transmission.
+// Protocol to test idle connections.
 pub fn beat(mut stream: &TcpStream) -> std::io::Result<()> {
+    // Bell, Enquiry, Acknowledge, End of Transmission.
     stream.write(&[0x7, 0x5, 0x6, 0x4])?;
     stream.flush()?;
 
