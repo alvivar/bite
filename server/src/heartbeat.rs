@@ -91,8 +91,8 @@ impl Heartbeat {
 
 pub fn beat(mut stream: &TcpStream) -> std::io::Result<()> {
     stream.write(b"?")?;
-    stream.flush()?;
     stream.read(&mut [1])?;
+    stream.flush()?;
 
     Ok(())
 }
