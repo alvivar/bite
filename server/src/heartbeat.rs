@@ -89,8 +89,8 @@ impl Heartbeat {
     }
 }
 
-fn beat(mut stream: &TcpStream) -> std::io::Result<()> {
-    stream.write(b"!")?;
+pub fn beat(mut stream: &TcpStream) -> std::io::Result<()> {
+    stream.write(b"?")?;
     stream.read(&mut [1])?;
 
     Ok(())

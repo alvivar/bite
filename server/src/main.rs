@@ -1,7 +1,7 @@
 use crossbeam_channel::{unbounded, Receiver, Sender};
 
 use std::{
-    io::{BufRead, BufReader, Read, Write},
+    io::{BufRead, BufReader, Write},
     net::{TcpListener, TcpStream},
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -52,7 +52,7 @@ fn main() {
 
     thread::spawn(move || heartbeat.handle());
 
-    const TICK: u64 = 5;
+    const TICK: u64 = 3;
     thread::spawn(move || loop {
         sleep(Duration::new(TICK + 1, 0));
 
@@ -273,7 +273,7 @@ fn handle_conn(
                         subs::Result::Message(msg) => msg,
 
                         subs::Result::Ping => {
-                            if let Err(e) = beat(&stream) {
+                            if let Err(e) = heartbeat::beat(&stream) {
                                 println!("Client {} subscription ping failed: {}", addr, e);
                                 break;
                             }
@@ -316,13 +316,6 @@ fn stream_write(mut stream: &TcpStream, message: &str) -> std::io::Result<()> {
     stream.write(message.as_bytes())?;
     stream.write(&[0xA])?; // Write line.
     stream.flush()?;
-
-    Ok(())
-}
-
-fn beat(mut stream: &TcpStream) -> std::io::Result<()> {
-    stream.write(b"!")?;
-    stream.read(&mut [1])?;
 
     Ok(())
 }
