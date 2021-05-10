@@ -1,7 +1,7 @@
 use crossbeam_channel::{unbounded, Receiver, Sender};
 
 use std::{
-    io::{BufRead, BufReader, Write},
+    io::{BufRead, BufReader, Read, Write},
     net::{TcpListener, TcpStream},
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -322,7 +322,7 @@ fn stream_write(mut stream: &TcpStream, message: &str) -> std::io::Result<()> {
 
 fn beat(mut stream: &TcpStream) -> std::io::Result<()> {
     stream.write(b"!")?;
-    stream.flush()?;
+    stream.read(&mut [1])?;
 
     Ok(())
 }

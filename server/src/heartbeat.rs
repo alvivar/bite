@@ -2,7 +2,7 @@ use crossbeam_channel::{unbounded, Receiver, Sender};
 
 use std::{
     collections::BTreeMap,
-    io::Write,
+    io::{Read, Write},
     net::TcpStream,
     sync::{Arc, Mutex},
     time::Instant,
@@ -91,7 +91,7 @@ impl Heartbeat {
 
 fn beat(mut stream: &TcpStream) -> std::io::Result<()> {
     stream.write(b"!")?;
-    stream.flush()?;
+    stream.read(&mut [1])?;
 
     Ok(())
 }
