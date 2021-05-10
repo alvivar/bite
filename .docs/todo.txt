@@ -1,8 +1,15 @@
 
-    Why the subs cleaner and the heartbeat cleaner can't be solved with just one thing?
+    2021.05.10
+    x Revise Key length
+    x Revise NOP responses
+    x Heartbeat fixed by using a simple protocol that clients need to deal with
+    x Why the subs cleaner and the heartbeat cleaner can't be solved with just one thing?
 
-    Revise NOP responses
-    Revise Key length, maybe you should be able to subscribe to all (?)
+    Maybe you should be able to subscribe to all the content when you don't specify the key
+
+    Consider one channel for messages, other to receive subscriptions
+    It should be possible to have multiple subscriptions
+    You should be able to send multiple subscriptions messages without blocking the thread (right now subscriptions block)
 
     Update the docs with the new commands
     Auth by password
