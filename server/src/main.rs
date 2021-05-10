@@ -103,7 +103,7 @@ fn main() {
         });
     }
 
-    // @todo Thread waiting q! in the input to quit.
+    // @todo Thread waiting for CTRL+C (character?).
     println!("Shutting down");
 }
 
@@ -146,8 +146,8 @@ fn handle_conn(
             Instr::Nop => AsyncInstr::No("NOP".to_owned()),
 
             Instr::Get => {
-                if key.len() <= 0 {
-                    AsyncInstr::No("OK".to_owned())
+                if key.len() < 1 {
+                    AsyncInstr::No("KEY?".to_owned())
                 } else {
                     map_sender
                         .send(map::Command::Get(key, conn_sender))
@@ -182,19 +182,23 @@ fn handle_conn(
             }
 
             Instr::Set => {
-                if key.len() > 0 {
+                if key.len() < 1 {
+                    AsyncInstr::No("KEY?".to_owned())
+                } else {
                     map_sender
                         .send(map::Command::Set(key.to_owned(), val.to_owned()))
                         .unwrap();
 
                     subs_sender.send(subs::Command::Call(key, val)).unwrap();
-                }
 
-                AsyncInstr::No("OK".to_owned())
+                    AsyncInstr::No("OK".to_owned())
+                }
             }
 
             Instr::SetIfNone => {
-                if key.len() > 0 {
+                if key.len() < 1 {
+                    AsyncInstr::No("KEY?".to_owned())
+                } else {
                     map_sender
                         .send(map::Command::SetIfNone(
                             key.to_owned(),
@@ -203,29 +207,29 @@ fn handle_conn(
                         ))
                         .unwrap();
 
-                    // ^ Subscription resolves after the map operation.
-                }
+                    // ^ Subscription resolves after map operation.
 
-                AsyncInstr::No("OK".to_owned())
+                    AsyncInstr::No("OK".to_owned())
+                }
             }
 
             Instr::Inc => {
-                if key.len() <= 0 {
-                    AsyncInstr::No("NOP".to_owned())
+                if key.len() < 1 {
+                    AsyncInstr::No("KEY?".to_owned())
                 } else {
                     map_sender
                         .send(map::Command::Inc(key, conn_sender, subs_sender.clone()))
                         .unwrap();
 
-                    // ^ Subscription resolves after the map operation.
+                    // ^ Subscription resolves after map operation.
 
                     AsyncInstr::Yes
                 }
             }
 
             Instr::Append => {
-                if key.len() <= 0 {
-                    AsyncInstr::No("NOP".to_owned())
+                if key.len() < 1 {
+                    AsyncInstr::No("KEY?".to_owned())
                 } else {
                     map_sender
                         .send(map::Command::Append(
@@ -243,7 +247,7 @@ fn handle_conn(
             }
 
             Instr::Delete => {
-                if key.len() <= 0 {
+                if key.len() < 1 {
                     AsyncInstr::No("KEY?".to_owned())
                 } else {
                     map_sender.send(map::Command::Delete(key)).unwrap();
@@ -253,11 +257,13 @@ fn handle_conn(
             }
 
             Instr::Signal => {
-                if key.len() > 0 {
+                if key.len() < 1 {
+                    AsyncInstr::No("KEY?".to_owned())
+                } else {
                     subs_sender.send(subs::Command::Call(key, val)).unwrap();
-                }
 
-                AsyncInstr::No("OK".to_owned())
+                    AsyncInstr::No("OK".to_owned())
+                }
             }
 
             Instr::SubJ | Instr::SubGet | Instr::SubBite => {
@@ -274,7 +280,7 @@ fn handle_conn(
 
                         subs::Result::Ping => {
                             if let Err(e) = heartbeat::beat(&stream) {
-                                println!("Client {} subscription ping failed: {}", addr, e);
+                                println!("Client {} subscription ping error: {}", addr, e);
                                 break;
                             }
 

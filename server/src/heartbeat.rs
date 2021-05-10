@@ -75,7 +75,7 @@ impl Heartbeat {
                             if let Err(e) = beat(&conn.stream) {
                                 orphans.push(addr.to_owned());
 
-                                println!("Hearbeat to {} failed: {}", addr, e);
+                                println!("Hearbeat to {} error: {}", addr, e);
                             }
                         }
                     }
