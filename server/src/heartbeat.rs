@@ -2,7 +2,7 @@ use crossbeam_channel::{unbounded, Receiver, Sender};
 
 use std::{
     collections::BTreeMap,
-    io::{Read, Write},
+    io::Write,
     net::TcpStream,
     sync::{Arc, Mutex},
     time::Instant,
@@ -90,8 +90,8 @@ impl Heartbeat {
 }
 
 // Protocol to test idle connections.
+// Bell, Enquiry, Acknowledge, End of Transmission.
 pub fn beat(mut stream: &TcpStream) -> std::io::Result<()> {
-    // Bell, Enquiry, Acknowledge, End of Transmission.
     stream.write(&[0x7, 0x5, 0x6, 0x4])?;
     stream.flush()?;
 
