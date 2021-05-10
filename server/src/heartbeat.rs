@@ -89,9 +89,9 @@ impl Heartbeat {
     }
 }
 
+// Protocol: Bell, Enquiry, Acknowledge, End of Transmission.
 pub fn beat(mut stream: &TcpStream) -> std::io::Result<()> {
-    stream.write(b"?")?;
-    stream.read(&mut [1])?;
+    stream.write(&[0x7, 0x5, 0x6, 0x4])?;
     stream.flush()?;
 
     Ok(())
