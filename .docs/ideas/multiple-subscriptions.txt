@@ -1,0 +1,11 @@
+
+    Client Query
+
+    Decompose
+        Query
+        Subscription
+
+    If Subscription
+        Create Subthread to handle subscriptions
+
+    Loop for Client query
