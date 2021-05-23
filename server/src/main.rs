@@ -23,8 +23,6 @@ use parse::{AsyncInstr, Instr};
 fn main() {
     println!("\nBIT:E");
 
-    let listener = TcpListener::bind("0.0.0.0:1984").unwrap(); // Asumming Docker.
-
     // Map
     let map = map::Map::new();
     let map_sender = map.sender.clone();
@@ -65,15 +63,16 @@ fn main() {
 
     // New job on incoming connections
     let thread_count = Arc::new(AtomicUsize::new(0));
+    let server = TcpListener::bind("0.0.0.0:1984").unwrap(); // Asumming Docker.
 
-    for stream in listener.incoming() {
+    for stream in server.incoming() {
         let stream = stream.unwrap();
         let map_sender = map_sender.clone();
         let subs_sender = subs_sender.clone();
         let heartbeat_sender = heartbeat_sender.clone();
         let (conn_sndr, conn_recv) = unbounded::<map::Result>();
 
-        // Hearbeat register
+        // Hearbeat registry
         let addr = stream.peer_addr().unwrap().to_string();
         let stream_clone = stream.try_clone().unwrap();
 
@@ -81,8 +80,9 @@ fn main() {
             .send(heartbeat::Command::New(addr.to_owned(), stream_clone))
             .unwrap();
 
-        // New thread handling a connection.
+        // Handling the connection
         let thread_count_clone = thread_count.clone();
+
         thread::spawn(move || {
             let id = thread_count_clone.fetch_add(1, Ordering::Relaxed);
 
@@ -118,24 +118,25 @@ fn handle_conn(
     let mut reader = BufReader::new(stream.try_clone().unwrap());
 
     loop {
+        // Get the message
         let addr = stream.peer_addr().unwrap().to_string();
 
-        let mut buffer = String::new();
+        let mut message = String::new();
 
-        if let Err(e) = reader.read_line(&mut buffer) {
+        if let Err(e) = reader.read_line(&mut message) {
             println!("Client {} disconnected: {}", addr, e);
             break;
         }
 
-        if buffer.len() > 0 {
-            println!("> {}", buffer.trim());
+        if message.len() > 0 {
+            println!("> {}", message.trim());
         } else {
             println!("Client {} disconnected: 0 bytes read", addr);
             break;
         }
 
-        // Parse the message.
-        let proc = parse::proc_from_string(buffer.as_str());
+        // Parse the message
+        let proc = parse::proc_from_string(message.as_str());
         let instr = proc.instr;
         let key = proc.key;
         let val = proc.value;
@@ -310,6 +311,8 @@ fn handle_conn(
             AsyncInstr::No(msg) => msg,
         };
 
+        // Response
+
         stream_write(&stream, message.as_str()).unwrap();
 
         heartbeat_sender
@@ -320,7 +323,7 @@ fn handle_conn(
 
 fn stream_write(mut stream: &TcpStream, message: &str) -> std::io::Result<()> {
     stream.write(message.as_bytes())?;
-    stream.write(&[0xA])?; // Write line.
+    stream.write(&[0xA])?; // New line
     stream.flush()?;
 
     Ok(())
