@@ -51,16 +51,16 @@ fn main() {
 
     thread::spawn(move || heartbeat.handle());
 
-    const TICK: u64 = 30;
-    thread::spawn(move || loop {
-        sleep(Duration::new(TICK + 1, 0));
+    // const TICK: u64 = 30;
+    // thread::spawn(move || loop {
+    //     sleep(Duration::new(TICK + 1, 0));
 
-        subs_sender_clean.send(subs::Command::Clean(TICK)).unwrap();
+    //     subs_sender_clean.send(subs::Command::Clean(TICK)).unwrap();
 
-        heartbeat_sender_clean
-            .send(heartbeat::Command::Clean(TICK))
-            .unwrap();
-    });
+    //     heartbeat_sender_clean
+    //         .send(heartbeat::Command::Clean(TICK))
+    //         .unwrap();
+    // });
 
     // New job on incoming connections
     let thread_count = Arc::new(AtomicUsize::new(0));
@@ -296,15 +296,22 @@ fn handle_conn(
             }
         };
 
-        let message = match async_instr {
+        let mut message = match async_instr {
             AsyncInstr::Yes => match conn_recv.recv().unwrap() {
-                map::Result::Message(msg) => msg,
+                map::Result::Message(msg) => {
+                    println!("Received! {}", msg);
+
+                    msg
+                }
             },
 
             AsyncInstr::No(msg) => msg,
         };
 
         // Response
+        if message.len() < 1 {
+            message = "\0".to_owned();
+        }
 
         websocket.write_message(Message::Text(message)).unwrap();
 

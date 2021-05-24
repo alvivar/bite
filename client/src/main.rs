@@ -1,21 +1,17 @@
-use std::{
-    env,
-    io::{self, BufRead, BufReader, BufWriter, Write},
-    net::TcpStream,
-};
+use tungstenite::{connect, Message};
+use url::Url;
+
+use std::{env, io};
 
 fn main() {
-    let mut server = "127.0.0.1:1984".to_owned();
+    let mut server = "ws://localhost:1984/socket".to_owned();
 
     let args: Vec<String> = env::args().collect();
     if args.len() > 1 {
         server = args[1].to_owned();
     }
 
-    let stream = TcpStream::connect(server).unwrap();
-    let stream_clone = stream.try_clone().unwrap();
-    let mut writer = BufWriter::new(stream);
-    let mut reader = BufReader::new(stream_clone);
+    let (mut socket, _) = connect(Url::parse(&server).unwrap()).unwrap();
 
     let mut sub_mode = false;
     let mut input = String::new();
@@ -24,20 +20,20 @@ fn main() {
         if !sub_mode {
             input = String::new();
             io::stdin().read_line(&mut input).unwrap();
-
-            writer.write(input.as_bytes()).unwrap();
-            writer.flush().unwrap();
+            socket
+                .write_message(Message::Text(input.trim().to_string()))
+                .unwrap();
         }
 
         if !sub_mode && input.trim().starts_with("#") {
             sub_mode = true;
         }
 
-        let mut message = String::new();
-        reader.read_line(&mut message).unwrap();
+        socket.write_pending().unwrap();
+        let message = socket.read_message().unwrap();
 
         match message.len() > 0 {
-            true => println!("> {}\n", message.trim()),
+            true => println!("> {}\n", message),
             false => {
                 println!("\n[!] Disconnected from the Server.\n");
                 break;
