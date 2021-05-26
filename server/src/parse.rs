@@ -6,6 +6,7 @@ pub struct Proc {
     pub value: String,
 }
 
+#[derive(Debug)]
 pub enum Instr {
     Nop,
     Get,

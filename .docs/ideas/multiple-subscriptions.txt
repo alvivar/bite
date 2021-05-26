@@ -1,11 +1,18 @@
 
-    Client Query
+    Client Handler
 
-    Decompose
-        Query
-        Subscription
+        Receiver
+            Receives from the client
 
-    If Subscription
-        Create Subthread to handle subscriptions
+            Decodes message
+                If Query
+                    Asks the Map for data
+                    If Map changes
+                        Propagate subscription
+                    Send data to Sender
 
-    Loop for Client query
+                If Subscription
+                    Register the subscription
+
+        Sender
+            Sends to the client

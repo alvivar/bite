@@ -29,8 +29,8 @@ fn main() {
             sub_mode = true;
         }
 
-        socket.write_pending().unwrap();
         let message = socket.read_message().unwrap();
+        println!("read_message(), {}", message);
 
         match message.len() > 0 {
             true => println!("> {}\n", message),
