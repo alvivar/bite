@@ -13,7 +13,7 @@ tungstenite = "0.13.0"
 url = "2.1.0"
 
 [workspace]
-members = ["server", "client"]
+members = ["server", "client", "wsserver", "wsclient"]
 
 [[bin]]
 name = "server"
@@ -22,3 +22,11 @@ path = "server/src/main.rs"
 [[bin]]
 name = "client"
 path = "client/src/main.rs"
+
+[[bin]]
+name = "wsserver"
+path = "wsserver/src/main.rs"
+
+[[bin]]
+name = "wsclient"
+path = "wsclient/src/main.rs"
