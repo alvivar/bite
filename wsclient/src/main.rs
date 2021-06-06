@@ -55,9 +55,7 @@ fn main() {
     let mut msg = Messenger::new("ws://localhost:1984/socket".into());
     msg.print_headers();
 
-    // thread::spawn(move || loop {
-    msg.handle_msg();
-    // });
+    thread::spawn(move || msg.handle_msg());
 
     // let mut sub = Messenger::new("ws://localhost:1984/socket".into());
     // sub.print_headers();
