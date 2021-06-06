@@ -3,7 +3,6 @@ use std::{net::TcpListener, thread::spawn};
 use tungstenite::{
     accept_hdr,
     handshake::server::{Request, Response},
-    Message,
 };
 
 fn main() {
@@ -18,8 +17,8 @@ fn main() {
                 println!("The request's path is: {}", req.uri().path());
                 println!("The request's headers are:");
 
-                for (ref header, _value) in req.headers() {
-                    println!("* {}", header);
+                for (ref header, ref value) in req.headers() {
+                    println!("* {}: {:?}", header, value);
                 }
 
                 // Let's add an additional header to our response to the client.
