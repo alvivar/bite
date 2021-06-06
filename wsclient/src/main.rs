@@ -13,18 +13,18 @@ fn main() {
     println!("Response HTTP code: {}", response.status());
     println!("Response contains the following headers:");
 
-    for (ref header, _value) in response.headers() {
-        println!("* {}", header);
+    for (ref header, ref value) in response.headers() {
+        println!("* {}: {:?}", header, value);
     }
 
     loop {
-        // socket
-        //     .write_message(Message::Text("Hello WebSocket".into()))
-        //     .unwrap();
+        socket
+            .write_message(Message::Text("Hello WebSocket".into()))
+            .unwrap();
 
         let msg = socket.read_message().expect("Error reading message");
 
-        // sleep(Duration::new(3, 0));
+        sleep(Duration::new(3, 0));
 
         println!("Received: {}", msg);
     }
