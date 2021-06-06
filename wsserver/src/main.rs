@@ -6,7 +6,7 @@ use tungstenite::{
 };
 
 fn main() {
-    env_logger::init();
+    // env_logger::init();
 
     let server = TcpListener::bind("127.0.0.1:1984").unwrap();
 
