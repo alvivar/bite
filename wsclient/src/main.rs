@@ -18,13 +18,13 @@ fn main() {
     }
 
     loop {
-        socket
-            .write_message(Message::Text("Hello WebSocket".into()))
-            .unwrap();
+        // socket
+        //     .write_message(Message::Text("Hello WebSocket".into()))
+        //     .unwrap();
 
         let msg = socket.read_message().expect("Error reading message");
 
-        sleep(Duration::new(3, 0));
+        // sleep(Duration::new(3, 0));
 
         println!("Received: {}", msg);
     }

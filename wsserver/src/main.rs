@@ -3,6 +3,7 @@ use std::{net::TcpListener, thread::spawn};
 use tungstenite::{
     accept_hdr,
     handshake::server::{Request, Response},
+    Message,
 };
 
 fn main() {
@@ -32,10 +33,12 @@ fn main() {
             let mut websocket = accept_hdr(stream.unwrap(), callback).unwrap();
 
             loop {
-                let msg = websocket.read_message().unwrap();
-                if msg.is_binary() || msg.is_text() {
-                    websocket.write_message(msg.to_owned()).unwrap();
-                }
+                // let msg = websocket.read_message().unwrap();
+                // if msg.is_binary() || msg.is_text() {
+                websocket
+                    .write_message(Message::Text("Wat".into()))
+                    .unwrap();
+                // }
             }
         });
     }
