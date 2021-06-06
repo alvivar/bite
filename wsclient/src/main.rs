@@ -1,7 +1,4 @@
-use std::{
-    thread::{self, sleep},
-    time::Duration,
-};
+use std::thread::{self};
 
 use tungstenite::{client::AutoStream, connect, http::Response, Message, WebSocket};
 use url::Url;
