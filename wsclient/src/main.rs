@@ -1,58 +1,25 @@
-use log::*;
+use tungstenite::{connect, Message};
 use url::Url;
 
-use tungstenite::{connect, Error, Message, Result};
-
-const AGENT: &str = "Tungstenite";
-
-fn get_case_count() -> Result<u32> {
-    let (mut socket, _) = connect(Url::parse("ws://localhost:9001/getCaseCount").unwrap())?;
-    let msg = socket.read_message()?;
-    socket.close(None)?;
-    Ok(msg.into_text()?.parse::<u32>().unwrap())
-}
-
-fn update_reports() -> Result<()> {
-    let (mut socket, _) = connect(
-        Url::parse(&format!(
-            "ws://localhost:9001/updateReports?agent={}",
-            AGENT
-        ))
-        .unwrap(),
-    )?;
-    socket.close(None)?;
-    Ok(())
-}
-
-fn run_test(case: u32) -> Result<()> {
-    info!("Running test case {}", case);
-    let case_url = Url::parse(&format!(
-        "ws://localhost:9001/runCase?case={}&agent={}",
-        case, AGENT
-    ))
-    .unwrap();
-    let (mut socket, _) = connect(case_url)?;
-    loop {
-        match socket.read_message()? {
-            msg @ Message::Text(_) | msg @ Message::Binary(_) => {
-                socket.write_message(msg)?;
-            }
-            Message::Ping(_) | Message::Pong(_) | Message::Close(_) => {}
-        }
-    }
-}
-
 fn main() {
-    let total = get_case_count().unwrap();
+    env_logger::init();
 
-    for case in 1..=total {
-        if let Err(e) = run_test(case) {
-            match e {
-                Error::ConnectionClosed | Error::Protocol(_) | Error::Utf8 => (),
-                err => error!("test: {}", err),
-            }
-        }
+    let (mut socket, response) =
+        connect(Url::parse("ws://localhost:3012/socket").unwrap()).expect("Can't connect");
+
+    println!("Connected to the server");
+    println!("Response HTTP code: {}", response.status());
+    println!("Response contains the following headers:");
+    for (ref header, _value) in response.headers() {
+        println!("* {}", header);
     }
 
-    update_reports().unwrap();
+    socket
+        .write_message(Message::Text("Hello WebSocket".into()))
+        .unwrap();
+    loop {
+        let msg = socket.read_message().expect("Error reading message");
+        println!("Received: {}", msg);
+    }
+    // socket.close(None);
 }

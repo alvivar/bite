@@ -12,6 +12,7 @@ crossbeam-channel = "0.5.1"
 tungstenite = "0.13.0"
 url = "2.1.0"
 log = "0.4.14"
+env_logger = "0.8.3"
 
 [workspace]
 members = ["server", "client", "wsserver", "wsclient"]

@@ -1,45 +1,38 @@
-use std::{
-    net::{TcpListener, TcpStream},
-    thread::spawn,
+use std::{net::TcpListener, thread::spawn};
+
+use tungstenite::{
+    accept_hdr,
+    handshake::server::{Request, Response},
 };
 
-use log::*;
-use tungstenite::{accept, handshake::HandshakeRole, Error, HandshakeError, Message, Result};
-
-fn must_not_block<Role: HandshakeRole>(err: HandshakeError<Role>) -> Error {
-    match err {
-        HandshakeError::Interrupted(_) => panic!("Bug: blocking socket would block"),
-        HandshakeError::Failure(f) => f,
-    }
-}
-
-fn handle_client(stream: TcpStream) -> Result<()> {
-    let mut socket = accept(stream).map_err(must_not_block)?;
-    info!("Running test");
-    loop {
-        match socket.read_message()? {
-            msg @ Message::Text(_) | msg @ Message::Binary(_) => {
-                socket.write_message(msg)?;
-            }
-            Message::Ping(_) | Message::Pong(_) | Message::Close(_) => {}
-        }
-    }
-}
-
 fn main() {
-    let server = TcpListener::bind("127.0.0.1:9002").unwrap();
-
+    env_logger::init();
+    let server = TcpListener::bind("127.0.0.1:3012").unwrap();
     for stream in server.incoming() {
-        spawn(move || match stream {
-            Ok(stream) => {
-                if let Err(err) = handle_client(stream) {
-                    match err {
-                        Error::ConnectionClosed | Error::Protocol(_) | Error::Utf8 => (),
-                        e => error!("test: {}", e),
-                    }
+        spawn(move || {
+            let callback = |req: &Request, mut response: Response| {
+                println!("Received a new ws handshake");
+                println!("The request's path is: {}", req.uri().path());
+                println!("The request's headers are:");
+                for (ref header, _value) in req.headers() {
+                    println!("* {}", header);
+                }
+
+                // Let's add an additional header to our response to the client.
+                let headers = response.headers_mut();
+                headers.append("MyCustomHeader", ":)".parse().unwrap());
+                headers.append("SOME_TUNGSTENITE_HEADER", "header_value".parse().unwrap());
+
+                Ok(response)
+            };
+            let mut websocket = accept_hdr(stream.unwrap(), callback).unwrap();
+
+            loop {
+                let msg = websocket.read_message().unwrap();
+                if msg.is_binary() || msg.is_text() {
+                    websocket.write_message(msg).unwrap();
                 }
             }
-            Err(e) => error!("Error accepting stream: {}", e),
         });
     }
 }
