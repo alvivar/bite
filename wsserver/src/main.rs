@@ -7,7 +7,9 @@ use tungstenite::{
 
 fn main() {
     env_logger::init();
-    let server = TcpListener::bind("127.0.0.1:3012").unwrap();
+
+    let server = TcpListener::bind("127.0.0.1:1984").unwrap();
+
     for stream in server.incoming() {
         spawn(move || {
             let callback = |req: &Request, mut response: Response| {
@@ -25,6 +27,7 @@ fn main() {
 
                 Ok(response)
             };
+
             let mut websocket = accept_hdr(stream.unwrap(), callback).unwrap();
 
             loop {
