@@ -290,10 +290,11 @@ fn main() -> io::Result<()> {
                 }
 
                 println!("Trying to write");
-                match conn.rx.try_recv() {
-                    Ok(msg) => {
-                        if msg.len() > 0 {
-                            println!("Writing: {:?}", &msg);
+                loop {
+                    match conn.rx.try_recv() {
+                        Ok(mut msg) => {
+                            println!("Writing: {:?}", msg);
+                            msg.push(0xA); // New line.
 
                             // We can (maybe) write to the connection.
                             match conn.socket.write(&msg) {
@@ -304,13 +305,13 @@ fn main() -> io::Result<()> {
                                     let id = conn.token.0;
                                     let addr = conn.address;
                                     println!("WriteZero error with connection {} to {}", id, addr,);
-                                    // println!("WriteZero error with connection");
                                     break;
                                 }
                                 Ok(_) => {
-                                    // After we've written something we'll reregister
-                                    // the connection to only respond to readable
-                                    // events, and clear the information to send buffer.
+                                    // @todo @old After we've written something
+                                    // we'll reregister the connection to only
+                                    // respond to readable events, and clear the
+                                    // information to send buffer.
                                 }
                                 // Would block "errors" are the OS's way of saying that
                                 // the connection is not actually ready to perform this
@@ -318,7 +319,7 @@ fn main() -> io::Result<()> {
                                 Err(ref err) if would_block(err) => {}
                                 // Got interrupted (how rude!), we'll try again.
                                 Err(ref err) if interrupted(err) => {
-                                    // @todo Retry, old:
+                                    // @todo @old Retry probably.
                                     // return handle_connection_event(registry, connection, event)
                                 }
                                 // Other errors we'll consider fatal.
@@ -326,15 +327,16 @@ fn main() -> io::Result<()> {
                                     let id = conn.token.0;
                                     let addr = conn.address;
                                     println!("Error with connection {} to {}: {}", id, addr, err);
-                                    // println!("Error with connection: {}", err);
                                     break;
                                 }
                             }
-                        }
-                    }
 
-                    Err(_) => {
-                        break;
+                            conn.socket.flush().unwrap();
+                        }
+
+                        Err(_) => {
+                            break;
+                        }
                     }
                 }
 
@@ -430,7 +432,7 @@ fn main() -> io::Result<()> {
                         poll.registry().reregister(
                             &mut conn.socket,
                             conn.token,
-                            Interest::READABLE,
+                            Interest::WRITABLE.add(Interest::READABLE), // Interest::READABLE.add(Interest::WRITABLE),
                         )?;
                     }
 
