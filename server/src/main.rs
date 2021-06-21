@@ -265,44 +265,73 @@ fn main() -> io::Result<()> {
                                 }
                             }
 
-                            _ => AsyncInstr::Nop("?".to_owned()),
-                            // Instr::SubJ | Instr::SubGet | Instr::SubBite => {
-                            //     let stream = stream.try_clone().unwrap();
-                            //     let (sub_sender, sub_receiver) = unbounded::<subs::Result>();
+                            Instr::SubJ | Instr::SubGet | Instr::SubBite => {
+                                let (sub_tx, sub_rx) = unbounded::<subs::Result>();
 
-                            //     subs_sender
-                            //         .send(subs::Command::New(sub_sender, key, instr))
-                            //         .unwrap();
+                                subs_tx
+                                    .send(subs::Command::New(sub_tx, key, instr))
+                                    .unwrap();
 
-                            //     loop {
-                            //         let message = match sub_receiver.recv().unwrap() {
-                            //             subs::Result::Message(msg) => msg,
+                                loop {
+                                    let res = match sub_rx.recv().unwrap() {
+                                        subs::Result::Message(msg) => msg,
+                                    };
 
-                            //             subs::Result::Ping => {
-                            //                 if let Err(e) = heartbeat::beat(&stream) {
-                            //                     println!(
-                            //                         "Client {} subscription ping error: {}",
-                            //                         addr, e
-                            //                     );
-                            //                     break;
-                            //                 }
+                                    let res = res.trim_end();
+                                    conn.to_send.append(&mut res.into());
+                                    conn.to_send.push(0xA);
 
-                            //                 continue;
-                            //             }
-                            //         };
+                                    println!("Trying to write");
+                                    if conn.to_send.len() > 0 {
+                                        println!("Writing: {:?}", &conn.to_send);
 
-                            //         if let Err(e) = stream_write(&stream, message.as_str()) {
-                            //             println!("Client {} disconnected: {}", addr, e);
-                            //             break;
-                            //         } else {
-                            //             heartbeat_sender
-                            //                 .send(heartbeat::Command::Touch(addr.to_owned()))
-                            //                 .unwrap();
-                            //         }
-                            //     }
+                                        // We can (maybe) write to the connection.
+                                        match conn.socket.write(&conn.to_send) {
+                                            // We want to write the entire `DATA` buffer in a
+                                            // single go. If we write less we'll return a short
+                                            // write error (same as `io::Write::write_all` does).
+                                            Ok(n) if n < conn.to_send.len() => {
+                                                let id = conn.token.0;
+                                                let addr = conn.address;
+                                                println!(
+                                                    "WriteZero error with connection {} to {}",
+                                                    id, addr,
+                                                );
+                                                // println!("WriteZero error with connection");
+                                                break;
+                                            }
+                                            Ok(_) => {
+                                                // After we've written something we'll reregister
+                                                // the connection to only respond to readable
+                                                // events, and clear the information to send buffer.
+                                                conn.to_send.clear();
+                                            }
+                                            // Would block "errors" are the OS's way of saying that
+                                            // the connection is not actually ready to perform this
+                                            // I/O operation.
+                                            Err(ref err) if would_block(err) => {}
+                                            // Got interrupted (how rude!), we'll try again.
+                                            Err(ref err) if interrupted(err) => {
+                                                // @todo Retry, old:
+                                                // return handle_connection_event(registry, connection, event)
+                                            }
+                                            // Other errors we'll consider fatal.
+                                            Err(err) => {
+                                                let id = conn.token.0;
+                                                let addr = conn.address;
+                                                println!(
+                                                    "Error with connection {} to {}: {}",
+                                                    id, addr, err
+                                                );
+                                                // println!("Error with connection: {}", err);
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
 
-                            //     return;
-                            // }
+                                continue;
+                            }
                         };
 
                         let res = match async_instr {

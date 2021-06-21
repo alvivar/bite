@@ -9,14 +9,14 @@ pub struct Proc {
 #[derive(Debug)]
 pub enum Instr {
     Nop,
-    Get,
-    Bite,
-    Jtrim,
-    Json,
     Set,
     SetIfNone,
     Inc,
     Append,
+    Get,
+    Bite,
+    Jtrim,
+    Json,
     Delete,
     Signal,
     SubJ,

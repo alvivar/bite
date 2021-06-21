@@ -12,7 +12,6 @@ use crate::parse::Instr;
 
 pub enum Result {
     Message(String),
-    Ping,
 }
 
 pub enum Command {
@@ -130,22 +129,24 @@ impl Subs {
 
                     let mut count: u32 = 0;
 
-                    for (_, subs_vec) in subs.iter_mut() {
-                        let mut orphans = Vec::<usize>::new();
+                    // @todo We may need a way to test those connections.
 
-                        for (i, sub) in subs_vec.iter().enumerate() {
-                            if sub.last_time.elapsed().as_secs() > secs {
-                                if let Err(_) = sub.sender.send(Result::Ping) {
-                                    orphans.push(i);
-                                }
-                            }
-                        }
+                    // for (_, subs_vec) in subs.iter_mut() {
+                    //     let mut orphans = Vec::<usize>::new();
 
-                        for &i in orphans.iter().rev() {
-                            subs_vec.swap_remove(i);
-                            count += 1;
-                        }
-                    }
+                    //     for (i, sub) in subs_vec.iter().enumerate() {
+                    //         if sub.last_time.elapsed().as_secs() > secs {
+                    //             if let Err(_) = sub.sender.send(Result::Ping) {
+                    //                 orphans.push(i);
+                    //             }
+                    //         }
+                    //     }
+
+                    //     for &i in orphans.iter().rev() {
+                    //         subs_vec.swap_remove(i);
+                    //         count += 1;
+                    //     }
+                    // }
 
                     if count > 0 {
                         println!("Removing {} orphan subscriptions", count);
