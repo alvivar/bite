@@ -1,11 +1,12 @@
 
     2021.06.21
+    x Consider channels instead of to_send, to try non blocking subscriptions
+
+    2021.06.21
     x Implement subscriptions as it is, just a writing blocking thread after subscribing
     x Implement Set, read, delete operations
     x Implement MIO from github.com/alvivar/sock
 
-
-    Consider channels instead of to_send, to try non blocking subscriptions
 
     Consider one channel for messages, other to receive subscriptions
     It should be possible to have multiple subscriptions
