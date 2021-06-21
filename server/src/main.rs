@@ -1,8 +1,7 @@
-use tungstenite::{accept, Message, WebSocket};
-
 use crossbeam_channel::{unbounded, Receiver, Sender};
 
 use std::{
+    io::{BufRead, BufReader, Write},
     net::{TcpListener, TcpStream},
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -67,11 +66,7 @@ fn main() {
     let server = TcpListener::bind("0.0.0.0:1984").unwrap(); // Asumming Docker.
 
     for stream in server.incoming() {
-        // Websocket
         let stream = stream.unwrap();
-        let ws_stream = stream.try_clone().unwrap();
-        let mut websocket = accept(ws_stream).unwrap();
-
         let map_sender = map_sender.clone();
         let subs_sender = subs_sender.clone();
         let heartbeat_sender = heartbeat_sender.clone();
@@ -79,10 +74,10 @@ fn main() {
 
         // Hearbeat registry
         let addr = stream.peer_addr().unwrap().to_string();
-        let ws_clone = stream.try_clone().unwrap();
+        let stream_clone = stream.try_clone().unwrap();
 
         heartbeat_sender
-            .send(heartbeat::Command::New(addr.to_owned(), ws_clone))
+            .send(heartbeat::Command::New(addr.to_owned(), stream_clone))
             .unwrap();
 
         // Handling the connection
@@ -94,7 +89,7 @@ fn main() {
             println!("Client {} connected, thread #{} spawned", addr, id);
 
             handle_conn(
-                &mut websocket,
+                stream,
                 map_sender,
                 subs_sender,
                 heartbeat_sender,
@@ -113,32 +108,38 @@ fn main() {
 }
 
 fn handle_conn(
-    websocket: &mut WebSocket<TcpStream>,
+    stream: TcpStream,
     map_sender: Sender<map::Command>,
     subs_sender: Sender<subs::Command>,
     heartbeat_sender: Sender<heartbeat::Command>,
     conn_sndr: Sender<map::Result>,
     conn_recv: Receiver<map::Result>,
 ) {
+    let mut reader = BufReader::new(stream.try_clone().unwrap());
+
     loop {
         // Get the message
-        let addr = websocket.get_ref().peer_addr().unwrap().to_string();
+        let addr = stream.peer_addr().unwrap().to_string();
 
-        let message = websocket.read_message().unwrap();
-        let content = message.to_text().unwrap();
+        let mut message = String::new();
 
-        if content.len() > 0 {
-            println!("> {}", content);
+        if let Err(e) = reader.read_line(&mut message) {
+            println!("Client {} disconnected: {}", addr, e);
+            break;
+        }
+
+        if message.len() > 0 {
+            println!("> {}", message.trim());
+        } else {
+            println!("Client {} disconnected: 0 bytes read", addr);
+            break;
         }
 
         // Parse the message
-        let proc = parse::proc_from_string(content);
-
+        let proc = parse::proc_from_string(message.as_str());
         let instr = proc.instr;
         let key = proc.key;
         let val = proc.value;
-
-        println!("Proc {:?}, {}, {}", instr, key, val);
 
         let conn_sender = conn_sndr.clone();
 
@@ -267,13 +268,9 @@ fn handle_conn(
             }
 
             Instr::SubJ | Instr::SubGet | Instr::SubBite => {
-                println!("Sub sound!");
-
-                let stream = websocket.get_ref().try_clone().unwrap();
-                let mut ws = accept(websocket.get_ref()).unwrap();
+                let stream = stream.try_clone().unwrap();
                 let (sub_sender, sub_receiver) = unbounded::<subs::Result>();
 
-                println!("Calling sub");
                 subs_sender
                     .send(subs::Command::New(sub_sender, key, instr))
                     .unwrap();
@@ -292,7 +289,7 @@ fn handle_conn(
                         }
                     };
 
-                    if let Err(e) = ws.write_message(Message::Text(message)) {
+                    if let Err(e) = stream_write(&stream, message.as_str()) {
                         println!("Client {} disconnected: {}", addr, e);
                         break;
                     } else {
@@ -306,24 +303,17 @@ fn handle_conn(
             }
         };
 
-        let mut message = match async_instr {
+        let message = match async_instr {
             AsyncInstr::Yes => match conn_recv.recv().unwrap() {
-                map::Result::Message(msg) => {
-                    println!("Received! {}", msg);
-
-                    msg
-                }
+                map::Result::Message(msg) => msg,
             },
 
             AsyncInstr::No(msg) => msg,
         };
 
         // Response
-        if message.len() < 1 {
-            message = "\0".to_owned();
-        }
 
-        websocket.write_message(Message::Text(message)).unwrap();
+        stream_write(&stream, message.as_str()).unwrap();
 
         heartbeat_sender
             .send(heartbeat::Command::Touch(addr))
@@ -331,10 +321,10 @@ fn handle_conn(
     }
 }
 
-// fn stream_write(mut stream: &TcpStream, message: &str) -> std::io::Result<()> {
-//     stream.write(message.as_bytes())?;
-//     stream.write(&[0xA])?; // New line
-//     stream.flush()?;
+fn stream_write(mut stream: &TcpStream, message: &str) -> std::io::Result<()> {
+    stream.write(message.as_bytes())?;
+    stream.write(&[0xA])?; // New line
+    stream.flush()?;
 
-//     Ok(())
-// }
+    Ok(())
+}

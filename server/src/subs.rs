@@ -52,8 +52,6 @@ impl Subs {
 
             match message {
                 Command::New(sender, key, instr) => {
-                    println!("Subscription New {}", key);
-
                     let last_time = Instant::now();
 
                     let mut subs = self.subs.lock().unwrap();
@@ -67,8 +65,6 @@ impl Subs {
                 }
 
                 Command::Call(key, val) => {
-                    println!("Subscription Call {}, {}", key, val);
-
                     let mut subs = self.subs.lock().unwrap();
 
                     for alt_key in get_key_combinations(key.as_str()) {
