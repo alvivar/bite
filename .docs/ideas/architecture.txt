@@ -1,5 +1,7 @@
 
-    *Current v3*
+    v5
+        Based on the prototype github.com/alvivar/sock everything changed from
+        *v3* to MIO + Multi-thread.
 
 
     v4 (bananas and incomplete)
