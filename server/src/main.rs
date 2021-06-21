@@ -1,18 +1,25 @@
+use crossbeam_channel::unbounded;
 use mio::net::TcpListener;
 use mio::{Events, Interest, Poll, Token};
 
 use std::collections::HashMap;
 use std::io::{self, Read, Write};
 use std::str::from_utf8;
-use std::sync::mpsc::channel;
 use std::sync::{Arc, Mutex};
+use std::thread;
 
-use env_logger;
+use env_logger; // @todo
 
 mod connection;
+mod db;
+mod map;
+mod parse;
 mod pool;
+mod subs;
 
 use connection::Connection;
+use db::DB;
+use parse::{AsyncInstr, Instr};
 use pool::ThreadPool;
 
 fn would_block(err: &io::Error) -> bool {
@@ -53,22 +60,49 @@ fn main() -> io::Result<()> {
     // Unique token for each incoming connection.
     let mut unique_token = Token(SERVER.0 + 1);
 
+    // The data Map to get / set information.
+    let map = map::Map::new();
+    let map_tx = map.tx.clone();
+
+    // The persistent JSON db.
+    let mut db = DB::new(map.data.clone());
+    let db_modified = db.modified.clone();
+    db.load_from_file();
+
+    // Subscriptions
+    let subs = subs::Subs::new();
+    let subs_tx = subs.tx.clone();
+    // let clean_subs_tx = subs_tx.clone();
+
     // A thread pool handles each connection IO operations with these channels.
-    let (work_tx, work_rx) = channel::<Connection>();
+    let (work_tx, work_rx) = unbounded::<Connection>();
     let work_rx = Arc::new(Mutex::new(work_rx));
 
-    // When the work is done, we reregister with this for more IO events.
-    let (ready_tx, ready_rx) = channel::<Connection>();
+    // When the work is done, we use this channel to reregister IO events.
+    let (ready_tx, ready_rx) = unbounded::<Connection>();
+
+    // Threads for the btree map query, the persistent db file, and
+    // subscriptions.
+    thread::spawn(move || map.handle(db_modified));
+    thread::spawn(move || db.handle(3));
+    thread::spawn(move || subs.handle());
 
     let mut pool = ThreadPool::new(4);
     for _ in 0..pool.size() {
         let pool_rx = work_rx.clone();
         let ready_tx = ready_tx.clone();
 
+        let map_tx = map_tx.clone();
+        let (res_tx, res_rx) = unbounded::<String>();
+
+        let subs_tx = subs_tx.clone();
+
         // Waiting for work!
         pool.submit(move || {
             loop {
                 let mut conn = pool_rx.lock().unwrap().recv().unwrap();
+
+                // First read, then write.
 
                 // We can (maybe) read from the connection.
                 println!("Trying to read");
@@ -95,7 +129,10 @@ fn main() -> io::Result<()> {
                         // the connection is not actually ready to perform this
                         // I/O operation.
                         Err(ref err) if would_block(err) => break,
-                        Err(ref err) if interrupted(err) => continue,
+                        Err(ref err) if interrupted(err) => {
+                            println!("Interrupted!");
+                            continue;
+                        }
                         // Other errors we'll consider fatal.
                         Err(err) => {
                             let id = conn.token.0;
@@ -108,16 +145,178 @@ fn main() -> io::Result<()> {
 
                 if bytes_read != 0 {
                     let received_data = &received_data[..bytes_read];
-                    if let Ok(str_buf) = from_utf8(received_data) {
-                        println!("Received data: {}", str_buf.trim_end());
+                    if let Ok(str_utf8) = from_utf8(received_data) {
+                        // Data received. This is a good place to parse and
+                        // respond accordingly.
+
+                        // Parse the message
+                        let proc = parse::proc_from(str_utf8);
+                        let instr = proc.instr;
+                        let key = proc.key;
+                        let val = proc.value;
+
+                        println!("Received data: {}", str_utf8.trim_end());
+                        println!("Instr: {:?}\nKey: {}\nValue: {}", instr, key, val);
+
+                        let tx = res_tx.clone();
+                        let async_instr = match instr {
+                            Instr::Nop => AsyncInstr::Nop("NOP".to_owned()),
+
+                            Instr::Set => {
+                                if key.len() < 1 {
+                                    AsyncInstr::Nop("KEY?".to_owned())
+                                } else {
+                                    map_tx
+                                        .send(map::Command::Set(key.to_owned(), val.to_owned()))
+                                        .unwrap();
+
+                                    subs_tx.send(subs::Command::Call(key, val)).unwrap();
+
+                                    AsyncInstr::Nop("OK".to_owned())
+                                }
+                            }
+
+                            Instr::SetIfNone => {
+                                if key.len() < 1 {
+                                    AsyncInstr::Nop("KEY?".to_owned())
+                                } else {
+                                    map_tx
+                                        .send(map::Command::SetIfNone(
+                                            key.to_owned(),
+                                            val.to_owned(),
+                                            subs_tx.clone(),
+                                        ))
+                                        .unwrap();
+
+                                    // ^ Subscription resolves after map operation.
+
+                                    AsyncInstr::Nop("OK".to_owned())
+                                }
+                            }
+
+                            Instr::Inc => {
+                                if key.len() < 1 {
+                                    AsyncInstr::Nop("KEY?".to_owned())
+                                } else {
+                                    map_tx
+                                        .send(map::Command::Inc(key, tx, subs_tx.clone()))
+                                        .unwrap();
+
+                                    // ^ Subscription resolves after map operation.
+
+                                    AsyncInstr::Yes
+                                }
+                            }
+
+                            Instr::Append => {
+                                if key.len() < 1 {
+                                    AsyncInstr::Nop("KEY?".to_owned())
+                                } else {
+                                    map_tx
+                                        .send(map::Command::Append(key, val, tx, subs_tx.clone()))
+                                        .unwrap();
+
+                                    // ^ Subscription resolves after the map operation.
+
+                                    AsyncInstr::Yes
+                                }
+                            }
+
+                            Instr::Delete => {
+                                if key.len() < 1 {
+                                    AsyncInstr::Nop("KEY?".to_owned())
+                                } else {
+                                    map_tx.send(map::Command::Delete(key)).unwrap();
+
+                                    AsyncInstr::Nop("OK".to_owned())
+                                }
+                            }
+
+                            Instr::Get => {
+                                if key.len() < 1 {
+                                    AsyncInstr::Nop("KEY?".to_owned())
+                                } else {
+                                    map_tx.send(map::Command::Get(key, tx)).unwrap();
+                                    AsyncInstr::Yes
+                                }
+                            }
+
+                            Instr::Bite => {
+                                map_tx.send(map::Command::Bite(key, tx)).unwrap();
+                                AsyncInstr::Yes
+                            }
+
+                            Instr::Jtrim => {
+                                map_tx.send(map::Command::Jtrim(key, tx)).unwrap();
+                                AsyncInstr::Yes
+                            }
+
+                            Instr::Json => {
+                                map_tx.send(map::Command::Json(key, tx)).unwrap();
+                                AsyncInstr::Yes
+                            }
+
+                            Instr::Signal => {
+                                if key.len() < 1 {
+                                    AsyncInstr::Nop("KEY?".to_owned())
+                                } else {
+                                    subs_tx.send(subs::Command::Call(key, val)).unwrap();
+                                    AsyncInstr::Nop("OK".to_owned())
+                                }
+                            }
+
+                            _ => AsyncInstr::Nop("?".to_owned()),
+                            // Instr::SubJ | Instr::SubGet | Instr::SubBite => {
+                            //     let stream = stream.try_clone().unwrap();
+                            //     let (sub_sender, sub_receiver) = unbounded::<subs::Result>();
+
+                            //     subs_sender
+                            //         .send(subs::Command::New(sub_sender, key, instr))
+                            //         .unwrap();
+
+                            //     loop {
+                            //         let message = match sub_receiver.recv().unwrap() {
+                            //             subs::Result::Message(msg) => msg,
+
+                            //             subs::Result::Ping => {
+                            //                 if let Err(e) = heartbeat::beat(&stream) {
+                            //                     println!(
+                            //                         "Client {} subscription ping error: {}",
+                            //                         addr, e
+                            //                     );
+                            //                     break;
+                            //                 }
+
+                            //                 continue;
+                            //             }
+                            //         };
+
+                            //         if let Err(e) = stream_write(&stream, message.as_str()) {
+                            //             println!("Client {} disconnected: {}", addr, e);
+                            //             break;
+                            //         } else {
+                            //             heartbeat_sender
+                            //                 .send(heartbeat::Command::Touch(addr.to_owned()))
+                            //                 .unwrap();
+                            //         }
+                            //     }
+
+                            //     return;
+                            // }
+                        };
+
+                        let res = match async_instr {
+                            AsyncInstr::Yes => res_rx.recv().unwrap(),
+                            AsyncInstr::Nop(s) => s,
+                        };
+
+                        let res = res.trim_end();
+                        conn.to_send.append(&mut res.into());
+                        conn.to_send.push(0xA);
                     } else {
                         println!("Received (none UTF-8) data: {:?}", received_data);
+                        println!("Ignoring ^ for the moment.");
                     }
-
-                    // Data received. This is a good place to parse and respond
-                    // accordingly.
-
-                    conn.to_send.append(&mut received_data.into());
                 }
 
                 println!("Trying to write");
@@ -133,6 +332,7 @@ fn main() -> io::Result<()> {
                             let id = conn.token.0;
                             let addr = conn.address;
                             println!("WriteZero error with connection {} to {}", id, addr,);
+                            // println!("WriteZero error with connection");
                             break;
                         }
                         Ok(_) => {
@@ -147,6 +347,7 @@ fn main() -> io::Result<()> {
                         Err(ref err) if would_block(err) => {}
                         // Got interrupted (how rude!), we'll try again.
                         Err(ref err) if interrupted(err) => {
+                            // @todo Retry, old:
                             // return handle_connection_event(registry, connection, event)
                         }
                         // Other errors we'll consider fatal.
@@ -154,17 +355,17 @@ fn main() -> io::Result<()> {
                             let id = conn.token.0;
                             let addr = conn.address;
                             println!("Error with connection {} to {}: {}", id, addr, err);
+                            // println!("Error with connection: {}", err);
                             break;
                         }
                     }
                 }
 
-                // Is the end?
-                if !conn.open {
-                    println!("Connection closed");
-                }
+                // @todo Working on the map channel ^ up there, we probably
+                // don't need this below.
 
                 // Let's reregister the connection for more IO events.
+                println!("ready_tx on complete cycle!");
                 ready_tx.send(conn).unwrap();
             }
         });
@@ -206,7 +407,8 @@ fn main() -> io::Result<()> {
                     poll.registry().register(
                         &mut socket,
                         token,
-                        Interest::WRITABLE.add(Interest::READABLE),
+                        Interest::READABLE,
+                        // Interest::WRITABLE.add(Interest::READABLE),
                     )?;
 
                     let conn = Connection::new(token, socket, address);
@@ -215,6 +417,9 @@ fn main() -> io::Result<()> {
                 token => {
                     // Maybe received an event for a TCP connection.
                     if let Some(connection) = connections.remove(&token) {
+                        // @todo Experiment, but better not.
+                        // poll.registry().deregister(&mut connection.socket)?;
+
                         if event.is_readable() {
                             work_tx.send(connection).unwrap();
                         } else if event.is_writable() {
@@ -230,26 +435,41 @@ fn main() -> io::Result<()> {
         // Let's reregister the connection as needed.
         loop {
             let try_conn = ready_rx.try_recv();
+            println!("try");
+
             match try_conn {
-                Ok(conn) if !conn.open => {
+                Ok(mut conn) if !conn.open => {
                     println!("Connection {} closed", conn.token.0);
+                    poll.registry().deregister(&mut conn.socket)?;
+                    connections.remove(&conn.token);
                 }
+
                 Ok(mut conn) => {
+                    println!("try_conn: {:?}", conn.to_send);
+
                     if conn.to_send.len() > 0 {
                         println!("Connection {} has something to write", conn.token.0);
-                        poll.registry()
-                            .reregister(&mut conn.socket, conn.token, Interest::WRITABLE)
-                            .unwrap();
+                        poll.registry().reregister(
+                            &mut conn.socket,
+                            conn.token,
+                            Interest::WRITABLE,
+                        )?;
                     } else {
                         println!("Connection {} could read something", conn.token.0);
-                        poll.registry()
-                            .reregister(&mut conn.socket, conn.token, Interest::READABLE)
-                            .unwrap();
+                        poll.registry().reregister(
+                            &mut conn.socket,
+                            conn.token,
+                            Interest::READABLE,
+                        )?;
                     }
 
                     connections.insert(conn.token, conn);
                 }
-                _ => break,
+
+                _ => {
+                    println!("Unusual try_conn");
+                    break;
+                }
             }
         }
     }
