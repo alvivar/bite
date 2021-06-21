@@ -29,26 +29,22 @@ pub struct Sub {
 
 pub struct Subs {
     pub subs: Arc<Mutex<BTreeMap<String, Vec<Sub>>>>,
-    pub sender: Sender<Command>,
-    receiver: Receiver<Command>,
+    pub tx: Sender<Command>,
+    rx: Receiver<Command>,
 }
 
 impl Subs {
     pub fn new() -> Subs {
         let subs = Arc::new(Mutex::new(BTreeMap::<String, Vec<Sub>>::new()));
 
-        let (sender, receiver) = unbounded();
+        let (tx, rx) = unbounded();
 
-        Subs {
-            subs,
-            sender,
-            receiver,
-        }
+        Subs { subs, tx, rx }
     }
 
     pub fn handle(&self) {
         loop {
-            let message = self.receiver.recv().unwrap();
+            let message = self.rx.recv().unwrap();
 
             match message {
                 Command::New(sender, key, instr) => {
