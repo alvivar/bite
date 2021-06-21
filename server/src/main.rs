@@ -1,330 +1,256 @@
-use crossbeam_channel::{unbounded, Receiver, Sender};
+use mio::net::TcpListener;
+use mio::{Events, Interest, Poll, Token};
 
-use std::{
-    io::{BufRead, BufReader, Write},
-    net::{TcpListener, TcpStream},
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
-    thread::{self, sleep},
-    time::Duration,
-};
+use std::collections::HashMap;
+use std::io::{self, Read, Write};
+use std::str::from_utf8;
+use std::sync::mpsc::channel;
+use std::sync::{Arc, Mutex};
 
-mod db;
-mod heartbeat;
-mod map;
-mod parse;
-mod subs;
+use env_logger;
 
-use db::DB;
-use parse::{AsyncInstr, Instr};
+mod connection;
+mod pool;
 
-fn main() {
-    println!("\nBIT:E");
+use connection::Connection;
+use pool::ThreadPool;
 
-    // Map
-    let map = map::Map::new();
-    let map_sender = map.sender.clone();
-
-    // DB
-    let mut db = DB::new(map.data.clone());
-    db.load_from_file();
-
-    // Subscriptions
-    let subs = subs::Subs::new();
-    let subs_sender = subs.sender.clone();
-    let subs_sender_clean = subs_sender.clone();
-
-    // Channels
-    let db_modified = db.modified.clone();
-
-    thread::spawn(move || map.handle(db_modified));
-    thread::spawn(move || db.handle(3));
-    thread::spawn(move || subs.handle());
-
-    // Cleaning lost connections & subscriptions
-    let heartbeat = heartbeat::Heartbeat::new();
-    let heartbeat_sender = heartbeat.sender.clone();
-    let heartbeat_sender_clean = heartbeat.sender.clone();
-
-    thread::spawn(move || heartbeat.handle());
-
-    const TICK: u64 = 30;
-    thread::spawn(move || loop {
-        sleep(Duration::new(TICK + 1, 0));
-
-        subs_sender_clean.send(subs::Command::Clean(TICK)).unwrap();
-
-        heartbeat_sender_clean
-            .send(heartbeat::Command::Clean(TICK))
-            .unwrap();
-    });
-
-    // New job on incoming connections
-    let thread_count = Arc::new(AtomicUsize::new(0));
-    let server = TcpListener::bind("0.0.0.0:1984").unwrap(); // Asumming Docker.
-
-    for stream in server.incoming() {
-        let stream = stream.unwrap();
-        let map_sender = map_sender.clone();
-        let subs_sender = subs_sender.clone();
-        let heartbeat_sender = heartbeat_sender.clone();
-        let (conn_sndr, conn_recv) = unbounded::<map::Result>();
-
-        // Hearbeat registry
-        let addr = stream.peer_addr().unwrap().to_string();
-        let stream_clone = stream.try_clone().unwrap();
-
-        heartbeat_sender
-            .send(heartbeat::Command::New(addr.to_owned(), stream_clone))
-            .unwrap();
-
-        // Handling the connection
-        let thread_count_clone = thread_count.clone();
-
-        thread::spawn(move || {
-            let id = thread_count_clone.fetch_add(1, Ordering::Relaxed);
-
-            println!("Client {} connected, thread #{} spawned", addr, id);
-
-            handle_conn(
-                stream,
-                map_sender,
-                subs_sender,
-                heartbeat_sender,
-                conn_sndr,
-                conn_recv,
-            );
-
-            println!("Thread #{} terminated", id);
-
-            thread_count_clone.fetch_sub(1, Ordering::Relaxed);
-        });
-    }
-
-    // @todo Thread waiting for CTRL+C (character?).
-    println!("Shutting down");
+fn would_block(err: &io::Error) -> bool {
+    err.kind() == io::ErrorKind::WouldBlock
 }
 
-fn handle_conn(
-    stream: TcpStream,
-    map_sender: Sender<map::Command>,
-    subs_sender: Sender<subs::Command>,
-    heartbeat_sender: Sender<heartbeat::Command>,
-    conn_sndr: Sender<map::Result>,
-    conn_recv: Receiver<map::Result>,
-) {
-    let mut reader = BufReader::new(stream.try_clone().unwrap());
+fn interrupted(err: &io::Error) -> bool {
+    err.kind() == io::ErrorKind::Interrupted
+}
 
-    loop {
-        // Get the message
-        let addr = stream.peer_addr().unwrap().to_string();
+fn next(current: &mut Token) -> Token {
+    let next = current.0;
+    current.0 += 1;
 
-        let mut message = String::new();
+    Token(next)
+}
 
-        if let Err(e) = reader.read_line(&mut message) {
-            println!("Client {} disconnected: {}", addr, e);
-            break;
-        }
+fn main() -> io::Result<()> {
+    env_logger::init();
 
-        if message.len() > 0 {
-            println!("> {}", message.trim());
-        } else {
-            println!("Client {} disconnected: 0 bytes read", addr);
-            break;
-        }
+    // Create a poll instance,
+    let mut poll = Poll::new()?;
+    // and a storage for events.
+    let mut events = Events::with_capacity(1024);
 
-        // Parse the message
-        let proc = parse::proc_from_string(message.as_str());
-        let instr = proc.instr;
-        let key = proc.key;
-        let val = proc.value;
+    // Setup the TCP server socket.
+    let addr = "0.0.0.0:1984".parse().unwrap();
+    let mut server = TcpListener::bind(addr)?;
 
-        let conn_sender = conn_sndr.clone();
+    // Register the server with poll to receive events for it.
+    const SERVER: Token = Token(0);
+    poll.registry()
+        .register(&mut server, SERVER, Interest::READABLE)?;
 
-        let async_instr = match instr {
-            Instr::Nop => AsyncInstr::No("NOP".to_owned()),
+    // Map of `Token` -> `TcpStream`.
+    let mut connections = HashMap::<Token, Connection>::new();
 
-            Instr::Get => {
-                if key.len() < 1 {
-                    AsyncInstr::No("KEY?".to_owned())
-                } else {
-                    map_sender
-                        .send(map::Command::Get(key, conn_sender))
-                        .unwrap();
+    // Unique token for each incoming connection.
+    let mut unique_token = Token(SERVER.0 + 1);
 
-                    AsyncInstr::Yes
-                }
-            }
+    // A thread pool handles each connection IO operations with these channels.
+    let (work_tx, work_rx) = channel::<Connection>();
+    let work_rx = Arc::new(Mutex::new(work_rx));
 
-            Instr::Bite => {
-                map_sender
-                    .send(map::Command::Bite(key, conn_sender))
-                    .unwrap();
+    // When the work is done, we reregister with this for more IO events.
+    let (ready_tx, ready_rx) = channel::<Connection>();
 
-                AsyncInstr::Yes
-            }
+    let mut pool = ThreadPool::new(4);
+    for _ in 0..pool.size() {
+        let pool_rx = work_rx.clone();
+        let ready_tx = ready_tx.clone();
 
-            Instr::Jtrim => {
-                map_sender
-                    .send(map::Command::Jtrim(key, conn_sender))
-                    .unwrap();
+        // Waiting for work!
+        pool.submit(move || {
+            loop {
+                let mut conn = pool_rx.lock().unwrap().recv().unwrap();
 
-                AsyncInstr::Yes
-            }
+                // We can (maybe) read from the connection.
+                println!("Trying to read");
 
-            Instr::Json => {
-                map_sender
-                    .send(map::Command::Json(key, conn_sender))
-                    .unwrap();
-
-                AsyncInstr::Yes
-            }
-
-            Instr::Set => {
-                if key.len() < 1 {
-                    AsyncInstr::No("KEY?".to_owned())
-                } else {
-                    map_sender
-                        .send(map::Command::Set(key.to_owned(), val.to_owned()))
-                        .unwrap();
-
-                    subs_sender.send(subs::Command::Call(key, val)).unwrap();
-
-                    AsyncInstr::No("OK".to_owned())
-                }
-            }
-
-            Instr::SetIfNone => {
-                if key.len() < 1 {
-                    AsyncInstr::No("KEY?".to_owned())
-                } else {
-                    map_sender
-                        .send(map::Command::SetIfNone(
-                            key.to_owned(),
-                            val.to_owned(),
-                            subs_sender.clone(),
-                        ))
-                        .unwrap();
-
-                    // ^ Subscription resolves after map operation.
-
-                    AsyncInstr::No("OK".to_owned())
-                }
-            }
-
-            Instr::Inc => {
-                if key.len() < 1 {
-                    AsyncInstr::No("KEY?".to_owned())
-                } else {
-                    map_sender
-                        .send(map::Command::Inc(key, conn_sender, subs_sender.clone()))
-                        .unwrap();
-
-                    // ^ Subscription resolves after map operation.
-
-                    AsyncInstr::Yes
-                }
-            }
-
-            Instr::Append => {
-                if key.len() < 1 {
-                    AsyncInstr::No("KEY?".to_owned())
-                } else {
-                    map_sender
-                        .send(map::Command::Append(
-                            key,
-                            val,
-                            conn_sender,
-                            subs_sender.clone(),
-                        ))
-                        .unwrap();
-
-                    // ^ Subscription resolves after the map operation.
-
-                    AsyncInstr::Yes
-                }
-            }
-
-            Instr::Delete => {
-                if key.len() < 1 {
-                    AsyncInstr::No("KEY?".to_owned())
-                } else {
-                    map_sender.send(map::Command::Delete(key)).unwrap();
-
-                    AsyncInstr::No("OK".to_owned())
-                }
-            }
-
-            Instr::Signal => {
-                if key.len() < 1 {
-                    AsyncInstr::No("KEY?".to_owned())
-                } else {
-                    subs_sender.send(subs::Command::Call(key, val)).unwrap();
-
-                    AsyncInstr::No("OK".to_owned())
-                }
-            }
-
-            Instr::SubJ | Instr::SubGet | Instr::SubBite => {
-                let stream = stream.try_clone().unwrap();
-                let (sub_sender, sub_receiver) = unbounded::<subs::Result>();
-
-                subs_sender
-                    .send(subs::Command::New(sub_sender, key, instr))
-                    .unwrap();
+                let mut received_data = vec![0; 4096];
+                let mut bytes_read = 0;
 
                 loop {
-                    let message = match sub_receiver.recv().unwrap() {
-                        subs::Result::Message(msg) => msg,
-
-                        subs::Result::Ping => {
-                            if let Err(e) = heartbeat::beat(&stream) {
-                                println!("Client {} subscription ping error: {}", addr, e);
-                                break;
-                            }
-
-                            continue;
+                    match conn.socket.read(&mut received_data[bytes_read..]) {
+                        Ok(0) => {
+                            // Reading 0 bytes means the other side has closed
+                            // the connection or is done writing, then so are
+                            // we.
+                            conn.open = false;
+                            break;
                         }
-                    };
-
-                    if let Err(e) = stream_write(&stream, message.as_str()) {
-                        println!("Client {} disconnected: {}", addr, e);
-                        break;
-                    } else {
-                        heartbeat_sender
-                            .send(heartbeat::Command::Touch(addr.to_owned()))
-                            .unwrap();
+                        Ok(n) => {
+                            bytes_read += n;
+                            if bytes_read == received_data.len() {
+                                received_data.resize(received_data.len() + 1024, 0);
+                            }
+                        }
+                        // Would block "errors" are the OS's way of saying that
+                        // the connection is not actually ready to perform this
+                        // I/O operation.
+                        Err(ref err) if would_block(err) => break,
+                        Err(ref err) if interrupted(err) => continue,
+                        // Other errors we'll consider fatal.
+                        Err(err) => {
+                            let id = conn.token.0;
+                            let addr = conn.address;
+                            println!("Error with connection {} to {}: {}", id, addr, err);
+                            break;
+                        }
                     }
                 }
 
-                return;
+                if bytes_read != 0 {
+                    let received_data = &received_data[..bytes_read];
+                    if let Ok(str_buf) = from_utf8(received_data) {
+                        println!("Received data: {}", str_buf.trim_end());
+                    } else {
+                        println!("Received (none UTF-8) data: {:?}", received_data);
+                    }
+
+                    // Data received. This is a good place to parse and respond
+                    // accordingly.
+
+                    conn.to_send.append(&mut received_data.into());
+                }
+
+                println!("Trying to write");
+                if conn.to_send.len() > 0 {
+                    println!("Writing: {:?}", &conn.to_send);
+
+                    // We can (maybe) write to the connection.
+                    match conn.socket.write(&conn.to_send) {
+                        // We want to write the entire `DATA` buffer in a
+                        // single go. If we write less we'll return a short
+                        // write error (same as `io::Write::write_all` does).
+                        Ok(n) if n < conn.to_send.len() => {
+                            let id = conn.token.0;
+                            let addr = conn.address;
+                            println!("WriteZero error with connection {} to {}", id, addr,);
+                            break;
+                        }
+                        Ok(_) => {
+                            // After we've written something we'll reregister
+                            // the connection to only respond to readable
+                            // events, and clear the information to send buffer.
+                            conn.to_send.clear();
+                        }
+                        // Would block "errors" are the OS's way of saying that
+                        // the connection is not actually ready to perform this
+                        // I/O operation.
+                        Err(ref err) if would_block(err) => {}
+                        // Got interrupted (how rude!), we'll try again.
+                        Err(ref err) if interrupted(err) => {
+                            // return handle_connection_event(registry, connection, event)
+                        }
+                        // Other errors we'll consider fatal.
+                        Err(err) => {
+                            let id = conn.token.0;
+                            let addr = conn.address;
+                            println!("Error with connection {} to {}: {}", id, addr, err);
+                            break;
+                        }
+                    }
+                }
+
+                // Is the end?
+                if !conn.open {
+                    println!("Connection closed");
+                }
+
+                // Let's reregister the connection for more IO events.
+                ready_tx.send(conn).unwrap();
             }
-        };
-
-        let message = match async_instr {
-            AsyncInstr::Yes => match conn_recv.recv().unwrap() {
-                map::Result::Message(msg) => msg,
-            },
-
-            AsyncInstr::No(msg) => msg,
-        };
-
-        // Response
-
-        stream_write(&stream, message.as_str()).unwrap();
-
-        heartbeat_sender
-            .send(heartbeat::Command::Touch(addr))
-            .unwrap();
+        });
     }
-}
 
-fn stream_write(mut stream: &TcpStream, message: &str) -> std::io::Result<()> {
-    stream.write(message.as_bytes())?;
-    stream.write(&[0xA])?; // New line
-    stream.flush()?;
+    // Simple to test.
+    println!("You can connect to the server using 'nc':");
+    println!(" $ nc 127.0.0.1 1984");
+    println!("Send a message to receive the same message.");
 
-    Ok(())
+    // IO events.
+    loop {
+        poll.poll(&mut events, None)?;
+
+        for event in events.iter() {
+            match event.token() {
+                SERVER => loop {
+                    // Received an event for the TCP server socket, which
+                    // indicates we can accept an connection.
+                    let (mut socket, address) = match server.accept() {
+                        Ok((connection, address)) => (connection, address),
+                        Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                            // If we get a `WouldBlock` error we know our
+                            // listener has no more incoming connections queued,
+                            // so we can return to polling and wait for some
+                            // more.
+                            break;
+                        }
+                        Err(e) => {
+                            // If it was any other kind of error, something went
+                            // wrong and we terminate with an error.
+                            return Err(e);
+                        }
+                    };
+
+                    println!("Accepted connection from: {}", address);
+
+                    let token = next(&mut unique_token);
+                    poll.registry().register(
+                        &mut socket,
+                        token,
+                        Interest::WRITABLE.add(Interest::READABLE),
+                    )?;
+
+                    let conn = Connection::new(token, socket, address);
+                    connections.insert(token, conn);
+                },
+                token => {
+                    // Maybe received an event for a TCP connection.
+                    if let Some(connection) = connections.remove(&token) {
+                        if event.is_readable() {
+                            work_tx.send(connection).unwrap();
+                        } else if event.is_writable() {
+                            work_tx.send(connection).unwrap();
+                        }
+                    }
+
+                    // Sporadic events happen, we can safely ignore them.
+                }
+            }
+        }
+
+        // Let's reregister the connection as needed.
+        loop {
+            let try_conn = ready_rx.try_recv();
+            match try_conn {
+                Ok(conn) if !conn.open => {
+                    println!("Connection {} closed", conn.token.0);
+                }
+                Ok(mut conn) => {
+                    if conn.to_send.len() > 0 {
+                        println!("Connection {} has something to write", conn.token.0);
+                        poll.registry()
+                            .reregister(&mut conn.socket, conn.token, Interest::WRITABLE)
+                            .unwrap();
+                    } else {
+                        println!("Connection {} could read something", conn.token.0);
+                        poll.registry()
+                            .reregister(&mut conn.socket, conn.token, Interest::READABLE)
+                            .unwrap();
+                    }
+
+                    connections.insert(conn.token, conn);
+                }
+                _ => break,
+            }
+        }
+    }
 }
