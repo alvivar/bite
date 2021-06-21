@@ -8,7 +8,7 @@ use std::str::from_utf8;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use env_logger; // @todo
+use env_logger; // @todo Use this?
 
 mod connection;
 mod db;
@@ -21,6 +21,11 @@ use connection::Connection;
 use db::DB;
 use parse::{AsyncInstr, Instr};
 use pool::ThreadPool;
+
+enum WorkLoad {
+    Read(Connection),
+    Write(Connection),
+}
 
 fn would_block(err: &io::Error) -> bool {
     err.kind() == io::ErrorKind::WouldBlock
@@ -75,7 +80,7 @@ fn main() -> io::Result<()> {
     // let clean_subs_tx = subs_tx.clone();
 
     // A thread pool handles each connection IO operations with these channels.
-    let (work_tx, work_rx) = unbounded::<Connection>();
+    let (work_tx, work_rx) = unbounded::<WorkLoad>();
     let work_rx = Arc::new(Mutex::new(work_rx));
 
     // When the work is done, we use this channel to reregister IO events.
@@ -89,7 +94,9 @@ fn main() -> io::Result<()> {
 
     let mut pool = ThreadPool::new(4);
     for _ in 0..pool.size() {
+        let work_tx = work_tx.clone();
         let work_rx = work_rx.clone();
+
         let ready_tx = ready_tx.clone();
 
         let map_tx = map_tx.clone();
@@ -100,227 +107,36 @@ fn main() -> io::Result<()> {
         // Waiting for work!
         pool.submit(move || {
             loop {
-                let mut conn = work_rx.lock().unwrap().recv().unwrap();
+                match work_rx.lock().unwrap().recv().unwrap() {
+                    WorkLoad::Read(mut conn) => {
+                        // We can (maybe) read from the connection.
+                        println!("Trying to read");
 
-                // First read, then write.
+                        let mut received_data = vec![0; 4096];
+                        let mut bytes_read = 0;
 
-                // We can (maybe) read from the connection.
-                println!("Trying to read");
-
-                let mut received_data = vec![0; 4096];
-                let mut bytes_read = 0;
-
-                loop {
-                    match conn.socket.read(&mut received_data[bytes_read..]) {
-                        Ok(0) => {
-                            // Reading 0 bytes means the other side has closed
-                            // the connection or is done writing, then so are
-                            // we.
-                            conn.open = false;
-                            break;
-                        }
-                        Ok(n) => {
-                            bytes_read += n;
-                            if bytes_read == received_data.len() {
-                                received_data.resize(received_data.len() + 1024, 0);
-                            }
-                        }
-                        // Would block "errors" are the OS's way of saying that
-                        // the connection is not actually ready to perform this
-                        // I/O operation.
-                        Err(ref err) if would_block(err) => break,
-                        Err(ref err) if interrupted(err) => {
-                            println!("Interrupted!");
-                            continue;
-                        }
-                        // Other errors we'll consider fatal.
-                        Err(err) => {
-                            let id = conn.token.0;
-                            let addr = conn.address;
-                            println!("Error with connection {} to {}: {}", id, addr, err);
-                            break;
-                        }
-                    }
-                }
-
-                if bytes_read != 0 {
-                    let received_data = &received_data[..bytes_read];
-                    if let Ok(str_utf8) = from_utf8(received_data) {
-                        // Data received. This is a good place to parse and
-                        // respond accordingly.
-
-                        // Parse the message
-                        let proc = parse::proc_from(str_utf8);
-                        let instr = proc.instr;
-                        let key = proc.key;
-                        let val = proc.value;
-
-                        println!("Received data: {}", str_utf8.trim_end());
-                        println!("Instr: {:?}\nKey: {}\nValue: {}", instr, key, val);
-
-                        let tx = res_tx.clone();
-                        let async_instr = match instr {
-                            Instr::Nop => AsyncInstr::Nop("NOP".to_owned()),
-
-                            Instr::Set => {
-                                if key.len() < 1 {
-                                    AsyncInstr::Nop("KEY?".to_owned())
-                                } else {
-                                    map_tx
-                                        .send(map::Command::Set(key.to_owned(), val.to_owned()))
-                                        .unwrap();
-
-                                    subs_tx.send(subs::Command::Call(key, val)).unwrap();
-
-                                    AsyncInstr::Nop("OK".to_owned())
-                                }
-                            }
-
-                            Instr::SetIfNone => {
-                                if key.len() < 1 {
-                                    AsyncInstr::Nop("KEY?".to_owned())
-                                } else {
-                                    map_tx
-                                        .send(map::Command::SetIfNone(
-                                            key.to_owned(),
-                                            val.to_owned(),
-                                            subs_tx.clone(),
-                                        ))
-                                        .unwrap();
-
-                                    // ^ Subscription resolves after map operation.
-
-                                    AsyncInstr::Nop("OK".to_owned())
-                                }
-                            }
-
-                            Instr::Inc => {
-                                if key.len() < 1 {
-                                    AsyncInstr::Nop("KEY?".to_owned())
-                                } else {
-                                    map_tx
-                                        .send(map::Command::Inc(key, tx, subs_tx.clone()))
-                                        .unwrap();
-
-                                    // ^ Subscription resolves after map operation.
-
-                                    AsyncInstr::Yes
-                                }
-                            }
-
-                            Instr::Append => {
-                                if key.len() < 1 {
-                                    AsyncInstr::Nop("KEY?".to_owned())
-                                } else {
-                                    map_tx
-                                        .send(map::Command::Append(key, val, tx, subs_tx.clone()))
-                                        .unwrap();
-
-                                    // ^ Subscription resolves after the map operation.
-
-                                    AsyncInstr::Yes
-                                }
-                            }
-
-                            Instr::Delete => {
-                                if key.len() < 1 {
-                                    AsyncInstr::Nop("KEY?".to_owned())
-                                } else {
-                                    map_tx.send(map::Command::Delete(key)).unwrap();
-
-                                    AsyncInstr::Nop("OK".to_owned())
-                                }
-                            }
-
-                            Instr::Get => {
-                                if key.len() < 1 {
-                                    AsyncInstr::Nop("KEY?".to_owned())
-                                } else {
-                                    map_tx.send(map::Command::Get(key, tx)).unwrap();
-                                    AsyncInstr::Yes
-                                }
-                            }
-
-                            Instr::Bite => {
-                                map_tx.send(map::Command::Bite(key, tx)).unwrap();
-                                AsyncInstr::Yes
-                            }
-
-                            Instr::Jtrim => {
-                                map_tx.send(map::Command::Jtrim(key, tx)).unwrap();
-                                AsyncInstr::Yes
-                            }
-
-                            Instr::Json => {
-                                map_tx.send(map::Command::Json(key, tx)).unwrap();
-                                AsyncInstr::Yes
-                            }
-
-                            Instr::Signal => {
-                                if key.len() < 1 {
-                                    AsyncInstr::Nop("KEY?".to_owned())
-                                } else {
-                                    subs_tx.send(subs::Command::Call(key, val)).unwrap();
-                                    AsyncInstr::Nop("OK".to_owned())
-                                }
-                            }
-
-                            Instr::SubJ | Instr::SubGet | Instr::SubBite => {
-                                let conn_tx = conn.tx.clone();
-
-                                subs_tx
-                                    .send(subs::Command::New(conn_tx, key, instr))
-                                    .unwrap();
-
-                                AsyncInstr::Nop("OK".to_owned())
-                            }
-                        };
-
-                        let res = match async_instr {
-                            AsyncInstr::Yes => res_rx.recv().unwrap(),
-                            AsyncInstr::Nop(s) => s,
-                        };
-
-                        let res = res.trim_end();
-                        conn.tx.send(res.into()).unwrap();
-                    } else {
-                        println!("Received (none UTF-8) data: {:?}", received_data);
-                        println!("Ignoring ^ for the moment.");
-                    }
-                }
-
-                println!("Trying to write");
-                loop {
-                    match conn.rx.try_recv() {
-                        Ok(mut msg) => {
-                            println!("Writing: {:?}", msg);
-                            msg.push(0xA); // New line to be friendly with nc.
-
-                            // We can (maybe) write to the connection.
-                            match conn.socket.write(&msg) {
-                                // We want to write the entire `DATA` buffer in a
-                                // single go. If we write less we'll return a short
-                                // write error (same as `io::Write::write_all` does).
-                                Ok(n) if n < msg.len() => {
-                                    let id = conn.token.0;
-                                    let addr = conn.address;
-                                    println!("WriteZero error with connection {} to {}", id, addr,);
+                        loop {
+                            match conn.socket.read(&mut received_data[bytes_read..]) {
+                                Ok(0) => {
+                                    // Reading 0 bytes means the other side has closed
+                                    // the connection or is done writing, then so are
+                                    // we.
+                                    conn.open = false;
                                     break;
                                 }
-                                Ok(_) => {
-                                    // @todo @old After we've written something
-                                    // we'll reregister the connection to only
-                                    // respond to readable events, and clear the
-                                    // information to send buffer.
+                                Ok(n) => {
+                                    bytes_read += n;
+                                    if bytes_read == received_data.len() {
+                                        received_data.resize(received_data.len() + 1024, 0);
+                                    }
                                 }
                                 // Would block "errors" are the OS's way of saying that
                                 // the connection is not actually ready to perform this
                                 // I/O operation.
-                                Err(ref err) if would_block(err) => {}
-                                // Got interrupted (how rude!), we'll try again.
+                                Err(ref err) if would_block(err) => break,
                                 Err(ref err) if interrupted(err) => {
-                                    // @todo @old Retry probably.
-                                    // return handle_connection_event(registry, connection, event)
+                                    println!("Interrupted!");
+                                    continue;
                                 }
                                 // Other errors we'll consider fatal.
                                 Err(err) => {
@@ -332,15 +148,234 @@ fn main() -> io::Result<()> {
                             }
                         }
 
-                        Err(_) => {
-                            break;
+                        if bytes_read != 0 {
+                            let received_data = &received_data[..bytes_read];
+                            if let Ok(str_utf8) = from_utf8(received_data) {
+                                // Data received. This is a good place to parse and
+                                // respond accordingly.
+
+                                // Parse the message
+                                let proc = parse::proc_from(str_utf8);
+                                let instr = proc.instr;
+                                let key = proc.key;
+                                let val = proc.value;
+
+                                println!("Received data: {}", str_utf8.trim_end());
+                                println!("Instr: {:?}\nKey: {}\nValue: {}", instr, key, val);
+
+                                let tx = res_tx.clone();
+                                let async_instr = match instr {
+                                    Instr::Nop => AsyncInstr::Nop("NOP".to_owned()),
+
+                                    Instr::Set => {
+                                        if key.len() < 1 {
+                                            AsyncInstr::Nop("KEY?".to_owned())
+                                        } else {
+                                            map_tx
+                                                .send(map::Command::Set(
+                                                    key.to_owned(),
+                                                    val.to_owned(),
+                                                ))
+                                                .unwrap();
+
+                                            subs_tx.send(subs::Command::Call(key, val)).unwrap();
+
+                                            AsyncInstr::Nop("OK".to_owned())
+                                        }
+                                    }
+
+                                    Instr::SetIfNone => {
+                                        if key.len() < 1 {
+                                            AsyncInstr::Nop("KEY?".to_owned())
+                                        } else {
+                                            map_tx
+                                                .send(map::Command::SetIfNone(
+                                                    key.to_owned(),
+                                                    val.to_owned(),
+                                                    subs_tx.clone(),
+                                                ))
+                                                .unwrap();
+
+                                            // ^ Subscription resolves after map operation.
+
+                                            AsyncInstr::Nop("OK".to_owned())
+                                        }
+                                    }
+
+                                    Instr::Inc => {
+                                        if key.len() < 1 {
+                                            AsyncInstr::Nop("KEY?".to_owned())
+                                        } else {
+                                            map_tx
+                                                .send(map::Command::Inc(key, tx, subs_tx.clone()))
+                                                .unwrap();
+
+                                            // ^ Subscription resolves after map operation.
+
+                                            AsyncInstr::Yes
+                                        }
+                                    }
+
+                                    Instr::Append => {
+                                        if key.len() < 1 {
+                                            AsyncInstr::Nop("KEY?".to_owned())
+                                        } else {
+                                            map_tx
+                                                .send(map::Command::Append(
+                                                    key,
+                                                    val,
+                                                    tx,
+                                                    subs_tx.clone(),
+                                                ))
+                                                .unwrap();
+
+                                            // ^ Subscription resolves after the map operation.
+
+                                            AsyncInstr::Yes
+                                        }
+                                    }
+
+                                    Instr::Delete => {
+                                        if key.len() < 1 {
+                                            AsyncInstr::Nop("KEY?".to_owned())
+                                        } else {
+                                            map_tx.send(map::Command::Delete(key)).unwrap();
+
+                                            AsyncInstr::Nop("OK".to_owned())
+                                        }
+                                    }
+
+                                    Instr::Get => {
+                                        if key.len() < 1 {
+                                            AsyncInstr::Nop("KEY?".to_owned())
+                                        } else {
+                                            map_tx.send(map::Command::Get(key, tx)).unwrap();
+                                            AsyncInstr::Yes
+                                        }
+                                    }
+
+                                    Instr::Bite => {
+                                        map_tx.send(map::Command::Bite(key, tx)).unwrap();
+                                        AsyncInstr::Yes
+                                    }
+
+                                    Instr::Jtrim => {
+                                        map_tx.send(map::Command::Jtrim(key, tx)).unwrap();
+                                        AsyncInstr::Yes
+                                    }
+
+                                    Instr::Json => {
+                                        map_tx.send(map::Command::Json(key, tx)).unwrap();
+                                        AsyncInstr::Yes
+                                    }
+
+                                    Instr::Signal => {
+                                        if key.len() < 1 {
+                                            AsyncInstr::Nop("KEY?".to_owned())
+                                        } else {
+                                            subs_tx.send(subs::Command::Call(key, val)).unwrap();
+                                            AsyncInstr::Nop("OK".to_owned())
+                                        }
+                                    }
+
+                                    Instr::SubJ | Instr::SubGet | Instr::SubBite => {
+                                        let conn_tx = conn.tx.clone();
+
+                                        subs_tx
+                                            .send(subs::Command::New(conn_tx, key, instr))
+                                            .unwrap();
+
+                                        AsyncInstr::Nop("OK".to_owned())
+                                    }
+                                };
+
+                                let res = match async_instr {
+                                    AsyncInstr::Yes => res_rx.recv().unwrap(),
+                                    AsyncInstr::Nop(s) => s,
+                                };
+
+                                let res = res.trim_end();
+                                conn.tx.send(res.into()).unwrap();
+
+                                println!("Read successful, writing!");
+                                work_tx.send(WorkLoad::Write(conn)).unwrap();
+                            } else {
+                                println!("Received (none UTF-8) data: {:?}", received_data);
+                                println!("Ignoring ^ for the moment.");
+                            }
+                        } else {
+                            // Let's reregister the connection for more IO events.
+                            println!("Read tried, sending to write!");
+                            ready_tx.send(conn).unwrap();
                         }
                     }
-                }
 
-                // Let's reregister the connection for more IO events.
-                println!("ready_tx on complete cycle!");
-                ready_tx.send(conn).unwrap();
+                    WorkLoad::Write(mut conn) => {
+                        println!("Trying to write");
+
+                        loop {
+                            match conn.rx.try_recv() {
+                                Ok(mut msg) => {
+                                    println!("Writing: {:?}", msg);
+                                    msg.push(0xA); // New line to be friendly with nc.
+
+                                    // We can (maybe) write to the connection.
+                                    match conn.socket.write(&msg) {
+                                        // We want to write the entire `DATA` buffer in a
+                                        // single go. If we write less we'll return a short
+                                        // write error (same as `io::Write::write_all` does).
+                                        Ok(n) if n < msg.len() => {
+                                            let id = conn.token.0;
+                                            let addr = conn.address;
+                                            println!(
+                                                "WriteZero error with connection {} to {}",
+                                                id, addr,
+                                            );
+                                            break;
+                                        }
+                                        Ok(_) => {
+                                            // @todo @old After we've written something
+                                            // we'll reregister the connection to only
+                                            // respond to readable events, and clear the
+                                            // information to send buffer.
+                                            // conn.socket.flush().unwrap();
+                                        }
+                                        // Would block "errors" are the OS's way of saying that
+                                        // the connection is not actually ready to perform this
+                                        // I/O operation.
+                                        Err(ref err) if would_block(err) => {}
+                                        // Got interrupted (how rude!), we'll try again.
+                                        Err(ref err) if interrupted(err) => {
+                                            // @todo @old Retry probably.
+                                            // return handle_connection_event(registry, connection, event)
+                                        }
+                                        // Other errors we'll consider fatal.
+                                        Err(err) => {
+                                            let id = conn.token.0;
+                                            let addr = conn.address;
+                                            println!(
+                                                "Error with connection {} to {}: {}",
+                                                id, addr, err
+                                            );
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                Err(_) => {
+                                    break;
+                                }
+                            }
+                        }
+
+                        // Let's reregister the connection for more IO events.
+                        println!("Write tried, sending to read/write!");
+                        conn.socket.flush().unwrap();
+                        ready_tx.send(conn).unwrap();
+
+                        // work_tx.send(WorkLoad::Read(conn)).unwrap();
+                    }
+                }
             }
         });
     }
@@ -381,8 +416,8 @@ fn main() -> io::Result<()> {
                     poll.registry().register(
                         &mut socket,
                         token,
-                        Interest::READABLE,
-                        // Interest::WRITABLE.add(Interest::READABLE),
+                        Interest::WRITABLE.add(Interest::READABLE),
+                        // Interest::READABLE,
                     )?;
 
                     let conn = Connection::new(token, socket, address);
@@ -392,9 +427,9 @@ fn main() -> io::Result<()> {
                     // Maybe received an event for a TCP connection.
                     if let Some(connection) = connections.remove(&token) {
                         if event.is_readable() {
-                            work_tx.send(connection).unwrap();
+                            work_tx.send(WorkLoad::Read(connection)).unwrap();
                         } else if event.is_writable() {
-                            work_tx.send(connection).unwrap();
+                            work_tx.send(WorkLoad::Write(connection)).unwrap();
                         }
                     }
 
