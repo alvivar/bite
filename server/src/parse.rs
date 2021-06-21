@@ -6,6 +6,7 @@ pub struct Proc {
     pub value: String,
 }
 
+#[derive(Debug)]
 pub enum Instr {
     Nop,
     Get,
@@ -25,10 +26,10 @@ pub enum Instr {
 
 pub enum AsyncInstr {
     Yes,
-    No(String),
+    Nop(String),
 }
 
-pub fn proc_from_string(content: &str) -> Proc {
+pub fn proc_from(content: &str) -> Proc {
     let mut inst = String::new();
     let mut key = String::new();
     let mut val = String::new();
