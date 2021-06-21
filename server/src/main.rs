@@ -89,7 +89,7 @@ fn main() -> io::Result<()> {
 
     let mut pool = ThreadPool::new(4);
     for _ in 0..pool.size() {
-        let pool_rx = work_rx.clone();
+        let work_rx = work_rx.clone();
         let ready_tx = ready_tx.clone();
 
         let map_tx = map_tx.clone();
@@ -100,7 +100,7 @@ fn main() -> io::Result<()> {
         // Waiting for work!
         pool.submit(move || {
             loop {
-                let mut conn = pool_rx.lock().unwrap().recv().unwrap();
+                let mut conn = work_rx.lock().unwrap().recv().unwrap();
 
                 // First read, then write.
 
@@ -294,7 +294,7 @@ fn main() -> io::Result<()> {
                     match conn.rx.try_recv() {
                         Ok(mut msg) => {
                             println!("Writing: {:?}", msg);
-                            msg.push(0xA); // New line.
+                            msg.push(0xA); // New line to be friendly with nc.
 
                             // We can (maybe) write to the connection.
                             match conn.socket.write(&msg) {
@@ -330,8 +330,6 @@ fn main() -> io::Result<()> {
                                     break;
                                 }
                             }
-
-                            conn.socket.flush().unwrap();
                         }
 
                         Err(_) => {
