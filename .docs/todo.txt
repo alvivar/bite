@@ -1,9 +1,15 @@
 
-    Maybe you should be able to subscribe to all the content when you don't specify the key
+    2021.06.21
+    x Implement Set, read, delete operations
+    x Implement MIO from github.com/alvivar/sock
 
+
+    Implement subscriptions as it is, just a writing blocking thread after subscribing
     Consider one channel for messages, other to receive subscriptions
     It should be possible to have multiple subscriptions
     You should be able to send multiple subscriptions messages without blocking the thread (right now subscriptions block)
+
+    Maybe you should be able to subscribe to all the content when you don't specify the key
 
     Update the docs with the new commands
     Auth by password
