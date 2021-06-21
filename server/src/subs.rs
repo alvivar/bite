@@ -125,9 +125,11 @@ impl Subs {
                 }
 
                 Command::Clean(secs) => {
-                    let mut subs = self.subs.lock().unwrap();
+                    // @todo
 
-                    let mut count: u32 = 0;
+                    // let mut subs = self.subs.lock().unwrap();
+
+                    // let mut count: u32 = 0;
 
                     // @todo We may need a way to test those connections.
 
@@ -148,9 +150,9 @@ impl Subs {
                     //     }
                     // }
 
-                    if count > 0 {
-                        println!("Removing {} orphan subscriptions", count);
-                    }
+                    // if count > 0 {
+                    //     println!("Removing {} orphan subscriptions", count);
+                    // }
                 }
             }
         }
