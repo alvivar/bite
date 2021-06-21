@@ -1,6 +1,6 @@
-use std::net::SocketAddr;
-
 use mio::{net::TcpStream, Token};
+
+use std::net::SocketAddr;
 
 pub struct Connection {
     pub token: Token,
