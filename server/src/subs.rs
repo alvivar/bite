@@ -10,18 +10,14 @@ use std::{
 
 use crate::parse::Instr;
 
-pub enum Result {
-    Message(String),
-}
-
 pub enum Command {
-    New(Sender<Result>, String, Instr),
+    New(Sender<Vec<u8>>, String, Instr),
     Call(String, String),
     Clean(u64),
 }
 
 pub struct Sub {
-    sender: Sender<Result>,
+    sender: Sender<Vec<u8>>,
     instr: Instr,
     last_time: Instant,
 }
@@ -106,7 +102,8 @@ impl Subs {
                                 }
                             };
 
-                            if let Err(_) = sender.send(Result::Message(msg)) {
+                            println!("Sending sub {}", msg);
+                            if let Err(_) = sender.send(msg.into()) {
                                 bad_senders.push(i);
                             } else {
                                 sub.last_time = Instant::now();

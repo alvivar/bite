@@ -266,71 +266,13 @@ fn main() -> io::Result<()> {
                             }
 
                             Instr::SubJ | Instr::SubGet | Instr::SubBite => {
-                                let (sub_tx, sub_rx) = unbounded::<subs::Result>();
+                                let conn_tx = conn.tx.clone();
 
                                 subs_tx
-                                    .send(subs::Command::New(sub_tx, key, instr))
+                                    .send(subs::Command::New(conn_tx, key, instr))
                                     .unwrap();
 
-                                loop {
-                                    let res = match sub_rx.recv().unwrap() {
-                                        subs::Result::Message(msg) => msg,
-                                    };
-
-                                    let res = res.trim_end();
-                                    conn.to_send.append(&mut res.into());
-                                    conn.to_send.push(0xA);
-
-                                    println!("Trying to write");
-                                    if conn.to_send.len() > 0 {
-                                        println!("Writing: {:?}", &conn.to_send);
-
-                                        // We can (maybe) write to the connection.
-                                        match conn.socket.write(&conn.to_send) {
-                                            // We want to write the entire `DATA` buffer in a
-                                            // single go. If we write less we'll return a short
-                                            // write error (same as `io::Write::write_all` does).
-                                            Ok(n) if n < conn.to_send.len() => {
-                                                let id = conn.token.0;
-                                                let addr = conn.address;
-                                                println!(
-                                                    "WriteZero error with connection {} to {}",
-                                                    id, addr,
-                                                );
-                                                // println!("WriteZero error with connection");
-                                                break;
-                                            }
-                                            Ok(_) => {
-                                                // After we've written something we'll reregister
-                                                // the connection to only respond to readable
-                                                // events, and clear the information to send buffer.
-                                                conn.to_send.clear();
-                                            }
-                                            // Would block "errors" are the OS's way of saying that
-                                            // the connection is not actually ready to perform this
-                                            // I/O operation.
-                                            Err(ref err) if would_block(err) => {}
-                                            // Got interrupted (how rude!), we'll try again.
-                                            Err(ref err) if interrupted(err) => {
-                                                // @todo Retry, old:
-                                                // return handle_connection_event(registry, connection, event)
-                                            }
-                                            // Other errors we'll consider fatal.
-                                            Err(err) => {
-                                                let id = conn.token.0;
-                                                let addr = conn.address;
-                                                println!(
-                                                    "Error with connection {} to {}: {}",
-                                                    id, addr, err
-                                                );
-                                                // println!("Error with connection: {}", err);
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-
-                                continue;
+                                AsyncInstr::Nop("OK".to_owned())
                             }
                         };
 
@@ -340,8 +282,7 @@ fn main() -> io::Result<()> {
                         };
 
                         let res = res.trim_end();
-                        conn.to_send.append(&mut res.into());
-                        conn.to_send.push(0xA);
+                        conn.tx.send(res.into()).unwrap();
                     } else {
                         println!("Received (none UTF-8) data: {:?}", received_data);
                         println!("Ignoring ^ for the moment.");
@@ -349,49 +290,53 @@ fn main() -> io::Result<()> {
                 }
 
                 println!("Trying to write");
-                if conn.to_send.len() > 0 {
-                    println!("Writing: {:?}", &conn.to_send);
+                match conn.rx.try_recv() {
+                    Ok(msg) => {
+                        if msg.len() > 0 {
+                            println!("Writing: {:?}", &msg);
 
-                    // We can (maybe) write to the connection.
-                    match conn.socket.write(&conn.to_send) {
-                        // We want to write the entire `DATA` buffer in a
-                        // single go. If we write less we'll return a short
-                        // write error (same as `io::Write::write_all` does).
-                        Ok(n) if n < conn.to_send.len() => {
-                            let id = conn.token.0;
-                            let addr = conn.address;
-                            println!("WriteZero error with connection {} to {}", id, addr,);
-                            // println!("WriteZero error with connection");
-                            break;
-                        }
-                        Ok(_) => {
-                            // After we've written something we'll reregister
-                            // the connection to only respond to readable
-                            // events, and clear the information to send buffer.
-                            conn.to_send.clear();
-                        }
-                        // Would block "errors" are the OS's way of saying that
-                        // the connection is not actually ready to perform this
-                        // I/O operation.
-                        Err(ref err) if would_block(err) => {}
-                        // Got interrupted (how rude!), we'll try again.
-                        Err(ref err) if interrupted(err) => {
-                            // @todo Retry, old:
-                            // return handle_connection_event(registry, connection, event)
-                        }
-                        // Other errors we'll consider fatal.
-                        Err(err) => {
-                            let id = conn.token.0;
-                            let addr = conn.address;
-                            println!("Error with connection {} to {}: {}", id, addr, err);
-                            // println!("Error with connection: {}", err);
-                            break;
+                            // We can (maybe) write to the connection.
+                            match conn.socket.write(&msg) {
+                                // We want to write the entire `DATA` buffer in a
+                                // single go. If we write less we'll return a short
+                                // write error (same as `io::Write::write_all` does).
+                                Ok(n) if n < msg.len() => {
+                                    let id = conn.token.0;
+                                    let addr = conn.address;
+                                    println!("WriteZero error with connection {} to {}", id, addr,);
+                                    // println!("WriteZero error with connection");
+                                    break;
+                                }
+                                Ok(_) => {
+                                    // After we've written something we'll reregister
+                                    // the connection to only respond to readable
+                                    // events, and clear the information to send buffer.
+                                }
+                                // Would block "errors" are the OS's way of saying that
+                                // the connection is not actually ready to perform this
+                                // I/O operation.
+                                Err(ref err) if would_block(err) => {}
+                                // Got interrupted (how rude!), we'll try again.
+                                Err(ref err) if interrupted(err) => {
+                                    // @todo Retry, old:
+                                    // return handle_connection_event(registry, connection, event)
+                                }
+                                // Other errors we'll consider fatal.
+                                Err(err) => {
+                                    let id = conn.token.0;
+                                    let addr = conn.address;
+                                    println!("Error with connection {} to {}: {}", id, addr, err);
+                                    // println!("Error with connection: {}", err);
+                                    break;
+                                }
+                            }
                         }
                     }
-                }
 
-                // @todo Working on the map channel ^ up there, we probably
-                // don't need this below.
+                    Err(_) => {
+                        break;
+                    }
+                }
 
                 // Let's reregister the connection for more IO events.
                 println!("ready_tx on complete cycle!");
@@ -446,9 +391,6 @@ fn main() -> io::Result<()> {
                 token => {
                     // Maybe received an event for a TCP connection.
                     if let Some(connection) = connections.remove(&token) {
-                        // @todo Experiment, but better not.
-                        // poll.registry().deregister(&mut connection.socket)?;
-
                         if event.is_readable() {
                             work_tx.send(connection).unwrap();
                         } else if event.is_writable() {
@@ -464,7 +406,7 @@ fn main() -> io::Result<()> {
         // Let's reregister the connection as needed.
         loop {
             let try_conn = ready_rx.try_recv();
-            println!("try");
+            println!("try_conn");
 
             match try_conn {
                 Ok(mut conn) if !conn.open => {
@@ -474,9 +416,9 @@ fn main() -> io::Result<()> {
                 }
 
                 Ok(mut conn) => {
-                    println!("try_conn: {:?}", conn.to_send);
+                    println!("try_conn: {:?}", conn.rx);
 
-                    if conn.to_send.len() > 0 {
+                    if conn.rx.len() > 0 {
                         println!("Connection {} has something to write", conn.token.0);
                         poll.registry().reregister(
                             &mut conn.socket,
