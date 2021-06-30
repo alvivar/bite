@@ -70,14 +70,16 @@ fn main() -> io::Result<()> {
     let mut work = ThreadPool::new(4);
 
     for _ in 0..work.size() {
+        let work_tx = work_tx.clone();
         let work_rx = work_rx.clone();
         let subs_tx = subs_tx.clone();
         let ready_tx = ready_tx.clone();
 
         work.submit(move || loop {
+            let work_tx = work_tx.clone();
             let reader_subs_tx = subs_tx.clone();
             let reader_ready_tx = ready_tx.clone();
-            let reader = Reader::new(reader_subs_tx, reader_ready_tx);
+            let reader = Reader::new(work_tx, reader_subs_tx, reader_ready_tx);
 
             let writer_subs_tx = subs_tx.clone();
             let writer_ready_tx = ready_tx.clone();

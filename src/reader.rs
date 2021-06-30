@@ -6,19 +6,29 @@ use std::{
 
 use crate::{
     conn::Connection,
-    parse::parse,
+    parse::proc_from_string,
     ready,
     subs::{self},
+    Work,
 };
 
 pub struct Reader {
+    work_tx: Sender<Work>,
     subs_tx: Sender<subs::Cmd>,
     ready_tx: Sender<ready::Cmd>,
 }
 
 impl Reader {
-    pub fn new(subs_tx: Sender<subs::Cmd>, ready_tx: Sender<ready::Cmd>) -> Reader {
-        Reader { subs_tx, ready_tx }
+    pub fn new(
+        work_tx: Sender<Work>,
+        subs_tx: Sender<subs::Cmd>,
+        ready_tx: Sender<ready::Cmd>,
+    ) -> Reader {
+        Reader {
+            work_tx,
+            subs_tx,
+            ready_tx,
+        }
     }
 
     pub fn handle(self, mut conn: Connection) {
@@ -32,41 +42,56 @@ impl Reader {
 
         // Handle the message as string.
         if let Ok(utf8) = from_utf8(&data) {
-            let msg = parse(utf8);
-            let op = msg.op.as_str();
-            let key = msg.key;
-            let val = msg.value;
+            let proc = proc_from_string(utf8);
+            let instr = proc.instr;
+            let key = proc.key;
+            let val = proc.value;
 
             if !key.is_empty() {
-                match op {
-                    // A subscription and a first message.
-                    "+" => {
-                        self.subs_tx
-                            .send(subs::Cmd::Add(key.to_owned(), conn.id))
-                            .unwrap();
-
-                        if !val.is_empty() {
-                            self.subs_tx.send(subs::Cmd::Call(key, val)).unwrap()
-                        }
+                match instr {
+                    crate::parse::Instr::Nop => {
+                        // self.work_tx.send(Work::Write())
                     }
+                    crate::parse::Instr::Get => todo!(),
+                    crate::parse::Instr::Bite => todo!(),
+                    crate::parse::Instr::Jtrim => todo!(),
+                    crate::parse::Instr::Json => todo!(),
+                    crate::parse::Instr::Set => todo!(),
+                    crate::parse::Instr::SetIfNone => todo!(),
+                    crate::parse::Instr::Inc => todo!(),
+                    crate::parse::Instr::Append => todo!(),
+                    crate::parse::Instr::Delete => todo!(),
+                    crate::parse::Instr::Signal => todo!(),
+                    crate::parse::Instr::SubJ => todo!(),
+                    crate::parse::Instr::SubGet => todo!(),
+                    crate::parse::Instr::SubBite => todo!(),
+                    // // A subscription and a first message.
+                    // "+" => {
+                    //     self.subs_tx
+                    //         .send(subs::Cmd::Add(key.to_owned(), conn.id))
+                    //         .unwrap();
 
-                    // A message to subscriptions.
-                    ":" => {
-                        self.subs_tx.send(subs::Cmd::Call(key, val)).unwrap();
-                    }
+                    //     if !val.is_empty() {
+                    //         self.subs_tx.send(subs::Cmd::Call(key, val)).unwrap()
+                    //     }
+                    // }
 
-                    // A desubscription and a last message.
-                    "-" => {
-                        if !val.is_empty() {
-                            self.subs_tx
-                                .send(subs::Cmd::Call(key.to_owned(), val))
-                                .unwrap();
-                        }
+                    // // A message to subscriptions.
+                    // ":" => {
+                    //     self.subs_tx.send(subs::Cmd::Call(key, val)).unwrap();
+                    // }
 
-                        self.subs_tx.send(subs::Cmd::Del(key, conn.id)).unwrap();
-                    }
+                    // // A desubscription and a last message.
+                    // "-" => {
+                    //     if !val.is_empty() {
+                    //         self.subs_tx
+                    //             .send(subs::Cmd::Call(key.to_owned(), val))
+                    //             .unwrap();
+                    //     }
 
-                    _ => (),
+                    //     self.subs_tx.send(subs::Cmd::Del(key, conn.id)).unwrap();
+                    // }
+                    // _ => (),
                 }
             }
 

@@ -1,57 +1,116 @@
-pub struct Msg {
-    pub op: String,
+use serde_json::{json, Value};
+
+pub struct Proc {
+    pub instr: Instr,
     pub key: String,
     pub value: String,
 }
 
-/// Returns a Msg with the first character found as op, the next word as key,
-/// and the rest as value.
+pub enum Instr {
+    Nop,
+    Get,
+    Bite,
+    Jtrim,
+    Json,
+    Set,
+    SetIfNone,
+    Inc,
+    Append,
+    Delete,
+    Signal,
+    SubJ,
+    SubGet,
+    SubBite,
+}
 
-/// This text: +hello world is a pretty old meme
-/// Returns: Msg { "+", "hello", "world is a pretty old meme" }
+pub enum AsyncInstr {
+    Yes,
+    No(String),
+}
 
-pub fn parse(text: &str) -> Msg {
-    let mut op = String::new();
+pub fn proc_from_string(content: &str) -> Proc {
+    let mut inst = String::new();
     let mut key = String::new();
-    let mut value = String::new();
+    let mut val = String::new();
 
-    let mut next = 0;
-    for c in text.chars() {
+    let mut found = 0;
+    for c in content.trim().chars() {
         match c {
             ' ' => {
-                if !value.is_empty() {
-                    value.push(' ');
-                } else if !key.is_empty() {
-                    next = 2;
-                } else if !op.is_empty() {
-                    next = 1;
+                if val.len() > 0 {
+                    val.push(' ');
+                } else if key.len() > 0 {
+                    found = 2;
+                } else if inst.len() > 0 {
+                    found = 1;
                 }
             }
 
-            _ => match next {
+            _ => match found {
                 0 => {
-                    op.push(c);
-
-                    // The firts non-space found is the (op)erator. Separated or
-                    // not by a space.
-                    next = 1;
+                    inst.push(c);
                 }
-
                 1 => {
                     key.push(c);
                 }
-
                 _ => {
-                    // @doubt There may be a way to push the rest of the
-                    // iterator instead of moving one by one after this point.
-                    value.push(c);
+                    val.push(c);
                 }
             },
         }
     }
 
-    let op = op.trim_end().to_owned();
-    let key = key.trim().to_owned();
+    let instruction = match inst.trim().to_lowercase().as_str() {
+        "g" => Instr::Get,
+        "b" => Instr::Bite,
+        "j" => Instr::Jtrim,
+        "js" => Instr::Json,
+        "s" => Instr::Set,
+        "s?" => Instr::SetIfNone,
+        "+1" => Instr::Inc,
+        "+" => Instr::Append,
+        "d" => Instr::Delete,
+        "!" => Instr::Signal,
+        "#j" => Instr::SubJ,
+        "#g" => Instr::SubGet,
+        "#b" => Instr::SubBite,
+        _ => {
+            key = format!("{} {}", inst, key);
 
-    Msg { op, key, value }
+            Instr::Nop
+        }
+    };
+
+    Proc {
+        instr: instruction,
+        key: key.trim().to_owned(),
+        value: val.trim().to_owned(),
+    }
+}
+
+pub fn kv_to_json(kv: &[(&str, &str)]) -> Value {
+    let mut merged_json = json!({});
+
+    // NOTE(Wojciech): Unfinished alternative.
+    // kv.iter().map(|(k, v)| k.split(".").map(|name| {}));
+
+    for (k, v) in kv.iter().rev() {
+        insert(&mut merged_json, k, json!(v));
+    }
+
+    return merged_json;
+}
+
+fn insert(mut json: &mut Value, key: &str, val: Value) {
+    for k in key.split('.') {
+        json = json
+            .as_object_mut()
+            .unwrap()
+            .entry(k)
+            .or_insert_with(|| json!({}));
+    }
+
+    if **&json == json!({}) {
+        *json = val;
+    }
 }

@@ -1,10 +1,4 @@
 
-    2021.05.10
-    x Revise Key length
-    x Revise NOP responses
-    x Heartbeat fixed by using a simple protocol that clients need to deal with
-    x Why the subs cleaner and the heartbeat cleaner can't be solved with just one thing?
-
     Maybe you should be able to subscribe to all the content when you don't specify the key
 
     Consider one channel for messages, other to receive subscriptions
@@ -50,6 +44,12 @@
     Push # value should insert into a list, transform normal values
     Pop # should return and delete a value
 
+
+    2021.05.10
+    x Revise Key length
+    x Revise NOP responses
+    x Heartbeat fixed by using a simple protocol that clients need to deal with
+    x Why the subs cleaner and the heartbeat cleaner can't be solved with just one thing?
 
     2021.04.20
     x Delete instruction "d"
