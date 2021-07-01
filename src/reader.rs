@@ -87,11 +87,19 @@ impl Reader {
 
                 crate::parse::Instr::Get => {
                     if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
-                        let tx = self.tx.clone();
-                        self.map_tx.send(map::Cmd::Get(key, tx)).unwrap();
+                        self.map_tx.send(map::Cmd::Get(key, self.tx)).unwrap();
+                        let val = self.rx.recv().unwrap();
+                        self.work_tx.send(Work::WriteVal(conn, val)).unwrap();
+                    }
+                }
 
-                        let value = self.rx.recv().unwrap();
-                        self.work_tx.send(Work::WriteVal(conn, value)).unwrap();
+                crate::parse::Instr::SetIfNone => {
+                    self.map_tx.send(map::Cmd::SetIfNone(key, val)).unwrap();
+
+                    if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
+                        self.work_tx
+                            .send(Work::WriteVal(conn, OK.to_owned()))
+                            .unwrap();
                     }
                 }
 
@@ -104,8 +112,6 @@ impl Reader {
                             .unwrap();
                     }
                 }
-
-                crate::parse::Instr::SetIfNone => todo!(),
 
                 crate::parse::Instr::Bite => todo!(),
                 crate::parse::Instr::Jtrim => todo!(),

@@ -17,14 +17,14 @@ pub enum Result {
 
 pub enum Cmd {
     Get(String, Sender<String>),
+    Set(String, String),
+    SetIfNone(String, String),
+    Delete(String),
     Bite(String, Sender<Result>),
     Jtrim(String, Sender<Result>),
     Json(String, Sender<Result>),
-    Set(String, String),
-    // SetIfNone(String, String, Sender<subs::Command>),
     // Inc(String, Sender<Result>, Sender<subs::Command>),
     // Append(String, String, Sender<Result>, Sender<subs::Command>),
-    Delete(String),
 }
 
 pub struct Map {
@@ -45,11 +45,6 @@ impl Map {
             let cmd = self.rx.recv().unwrap();
 
             match cmd {
-                Cmd::Set(key, val) => {
-                    self.data.lock().unwrap().insert(key, val);
-                    db_modified.swap(true, Ordering::Relaxed);
-                }
-
                 Cmd::Get(key, tx) => {
                     let map = self.data.lock().unwrap();
                     let msg = match map.get(&key) {
@@ -58,6 +53,19 @@ impl Map {
                     };
 
                     tx.send(msg.to_owned()).unwrap();
+                }
+
+                Cmd::Set(key, val) => {
+                    self.data.lock().unwrap().insert(key, val);
+                    db_modified.swap(true, Ordering::Relaxed);
+                }
+
+                Cmd::SetIfNone(key, val) => {
+                    let mut map = self.data.lock().unwrap();
+                    if let None = map.get(&key) {
+                        map.insert(key.to_owned(), val.to_owned());
+                        db_modified.swap(true, Ordering::Relaxed);
+                    }
                 }
 
                 Cmd::Delete(key) => {
@@ -138,23 +146,7 @@ impl Map {
                     };
 
                     conn_sender.send(Result::Message(msg)).unwrap();
-                } // Command::SetIfNone(key, val, subs_sender) => {
-                  //     let mut map = self.data.lock().unwrap();
-
-                  //     match map.get(&key) {
-                  //         Some(_) => {}
-
-                  //         None => {
-                  //             map.insert(key.to_owned(), val.to_owned());
-                  //             drop(map);
-
-                  //             subs_sender.send(subs::Command::Call(key, val)).unwrap();
-
-                  //             db_modified.swap(true, Ordering::Relaxed);
-                  //         }
-                  //     };
-                  // }
-                  // Command::Inc(key, conn_sender, subs_sender) => {
+                } // Command::Inc(key, conn_sender, subs_sender) => {
                   //     let mut map = self.data.lock().unwrap();
 
                   //     let inc = match map.get(&key) {
