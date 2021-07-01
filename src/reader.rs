@@ -147,13 +147,30 @@ impl Reader {
                     }
                 }
 
-                crate::parse::Instr::Jtrim => todo!(),
+                crate::parse::Instr::Jtrim => {
+                    if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
+                        self.map_tx.send(map::Cmd::Jtrim(key, self.tx)).unwrap();
 
-                crate::parse::Instr::Json => todo!(),
-                crate::parse::Instr::Signal => todo!(),
+                        let val = self.rx.recv().unwrap();
+
+                        self.work_tx.send(Work::WriteVal(conn, val)).unwrap();
+                    }
+                }
+
+                crate::parse::Instr::Json => {
+                    if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
+                        self.map_tx.send(map::Cmd::Json(key, self.tx)).unwrap();
+
+                        let val = self.rx.recv().unwrap();
+
+                        self.work_tx.send(Work::WriteVal(conn, val)).unwrap();
+                    }
+                }
+
                 crate::parse::Instr::SubJ => todo!(),
                 crate::parse::Instr::SubGet => todo!(),
                 crate::parse::Instr::SubBite => todo!(),
+                crate::parse::Instr::Signal => todo!(),
                 // // A subscription and a first message.
                 // "+" => {
                 //     self.subs_tx

@@ -22,9 +22,9 @@ pub enum Cmd {
     Append(String, String, Sender<String>),
     Get(String, Sender<String>),
     Bite(String, Sender<String>),
+    Jtrim(String, Sender<String>),
+    Json(String, Sender<String>),
     Delete(String),
-    Jtrim(String, Sender<Result>),
-    Json(String, Sender<Result>),
 }
 
 pub struct Map {
@@ -64,10 +64,8 @@ impl Map {
                     let inc = match map.get(&key) {
                         Some(val) => match val.parse::<u32>() {
                             Ok(n) => n + 1,
-
                             Err(_) => 0,
                         },
-
                         None => 0,
                     };
 
@@ -131,15 +129,9 @@ impl Map {
                     tx.send(msg).unwrap();
                 }
 
-                Cmd::Delete(key) => {
-                    self.data.lock().unwrap().remove(&key);
-                    db_modified.swap(true, Ordering::Relaxed);
-                }
-
-                Cmd::Jtrim(key, conn_sender) => {
+                Cmd::Jtrim(key, tx) => {
                     let map = self.data.lock().unwrap();
                     let range = map.range(key.to_owned()..);
-                    drop(&map);
 
                     let kv: Vec<(&str, &str)> = range
                         .take_while(|(k, _)| k.starts_with(&key))
@@ -159,13 +151,12 @@ impl Map {
                         }
                     };
 
-                    conn_sender.send(Result::Message(msg)).unwrap();
+                    tx.send(msg).unwrap();
                 }
 
-                Cmd::Json(key, conn_sender) => {
+                Cmd::Json(key, tx) => {
                     let map = self.data.lock().unwrap();
                     let range = map.range(key.to_owned()..);
-                    drop(&map);
 
                     let kv: Vec<(&str, &str)> = range
                         .take_while(|(k, _)| k.starts_with(&key))
@@ -185,7 +176,12 @@ impl Map {
                         }
                     };
 
-                    conn_sender.send(Result::Message(msg)).unwrap();
+                    tx.send(msg).unwrap();
+                }
+
+                Cmd::Delete(key) => {
+                    self.data.lock().unwrap().remove(&key);
+                    db_modified.swap(true, Ordering::Relaxed);
                 }
             }
         }
