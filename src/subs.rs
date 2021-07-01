@@ -1,10 +1,9 @@
 use std::{
     collections::HashMap,
-    sync::{
-        mpsc::{channel, Receiver, Sender},
-        Arc, Mutex,
-    },
+    sync::{Arc, Mutex},
 };
+
+use crossbeam_channel::{unbounded, Receiver, Sender};
 
 use crate::{conn::Connection, Work};
 
@@ -25,7 +24,7 @@ pub struct Subs {
 impl Subs {
     pub fn new(write_map: Arc<Mutex<HashMap<usize, Connection>>>, work_tx: Sender<Work>) -> Subs {
         let registry = HashMap::<String, Vec<usize>>::new();
-        let (tx, rx) = channel::<Cmd>();
+        let (tx, rx) = unbounded::<Cmd>();
 
         Subs {
             registry,
@@ -40,7 +39,7 @@ impl Subs {
         loop {
             match self.rx.recv() {
                 Ok(Cmd::Add(key, id)) => {
-                    let subs = self.registry.entry(key.to_owned()).or_insert_with(Vec::new);
+                    let subs = self.registry.entry(key).or_insert_with(Vec::new);
 
                     if subs.iter().any(|x| x == &id) {
                         continue;
@@ -50,14 +49,15 @@ impl Subs {
                 }
 
                 Ok(Cmd::Del(key, id)) => {
-                    let subs = self.registry.entry(key.to_owned()).or_insert_with(Vec::new);
+                    let subs = self.registry.entry(key).or_insert_with(Vec::new);
                     subs.retain(|x| x != &id);
                 }
 
                 Ok(Cmd::Call(key, value)) => {
                     if let Some(subs) = self.registry.get(&key) {
+                        let mut write_map = self.write_map.lock().unwrap();
                         for id in subs {
-                            if let Some(conn) = self.write_map.lock().unwrap().remove(id) {
+                            if let Some(conn) = write_map.remove(id) {
                                 self.work_tx
                                     .send(Work::Write(conn, key.to_owned(), value.to_owned()))
                                     .unwrap();
@@ -66,7 +66,7 @@ impl Subs {
                     }
                 }
 
-                Err(err) => panic!("The sub channel failed: {}", err),
+                Err(err) => panic!("The subs channel failed: {}", err),
             }
         }
     }

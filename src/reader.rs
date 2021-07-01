@@ -1,11 +1,15 @@
 use std::{
+    collections::HashMap,
     io::{self, Read},
     str::from_utf8,
-    sync::mpsc::Sender,
+    sync::{Arc, Mutex},
 };
+
+use crossbeam_channel::{unbounded, Receiver, Sender};
 
 use crate::{
     conn::Connection,
+    map,
     parse::proc_from_string,
     ready,
     subs::{self},
@@ -13,6 +17,8 @@ use crate::{
 };
 
 pub struct Reader {
+    write_map: Arc<Mutex<HashMap<usize, Connection>>>,
+    map_tx: Sender<map::Cmd>,
     work_tx: Sender<Work>,
     subs_tx: Sender<subs::Cmd>,
     ready_tx: Sender<ready::Cmd>,
@@ -20,11 +26,15 @@ pub struct Reader {
 
 impl Reader {
     pub fn new(
+        write_map: Arc<Mutex<HashMap<usize, Connection>>>,
+        map_tx: Sender<map::Cmd>,
         work_tx: Sender<Work>,
         subs_tx: Sender<subs::Cmd>,
         ready_tx: Sender<ready::Cmd>,
     ) -> Reader {
         Reader {
+            write_map,
+            map_tx,
             work_tx,
             subs_tx,
             ready_tx,
@@ -47,52 +57,65 @@ impl Reader {
             let key = proc.key;
             let val = proc.value;
 
-            if !key.is_empty() {
-                match instr {
-                    crate::parse::Instr::Nop => {
-                        // self.work_tx.send(Work::Write())
+            match instr {
+                crate::parse::Instr::Nop => {
+                    if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
+                        self.work_tx
+                            .send(Work::Write(conn, "".to_owned(), "NOP".to_owned()))
+                            .unwrap();
                     }
-                    crate::parse::Instr::Get => todo!(),
-                    crate::parse::Instr::Bite => todo!(),
-                    crate::parse::Instr::Jtrim => todo!(),
-                    crate::parse::Instr::Json => todo!(),
-                    crate::parse::Instr::Set => todo!(),
-                    crate::parse::Instr::SetIfNone => todo!(),
-                    crate::parse::Instr::Inc => todo!(),
-                    crate::parse::Instr::Append => todo!(),
-                    crate::parse::Instr::Delete => todo!(),
-                    crate::parse::Instr::Signal => todo!(),
-                    crate::parse::Instr::SubJ => todo!(),
-                    crate::parse::Instr::SubGet => todo!(),
-                    crate::parse::Instr::SubBite => todo!(),
-                    // // A subscription and a first message.
-                    // "+" => {
-                    //     self.subs_tx
-                    //         .send(subs::Cmd::Add(key.to_owned(), conn.id))
-                    //         .unwrap();
-
-                    //     if !val.is_empty() {
-                    //         self.subs_tx.send(subs::Cmd::Call(key, val)).unwrap()
-                    //     }
-                    // }
-
-                    // // A message to subscriptions.
-                    // ":" => {
-                    //     self.subs_tx.send(subs::Cmd::Call(key, val)).unwrap();
-                    // }
-
-                    // // A desubscription and a last message.
-                    // "-" => {
-                    //     if !val.is_empty() {
-                    //         self.subs_tx
-                    //             .send(subs::Cmd::Call(key.to_owned(), val))
-                    //             .unwrap();
-                    //     }
-
-                    //     self.subs_tx.send(subs::Cmd::Del(key, conn.id)).unwrap();
-                    // }
-                    // _ => (),
                 }
+
+                crate::parse::Instr::Set => {
+                    self.map_tx.send(map::Cmd::Set(key, val)).unwrap();
+
+                    if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
+                        self.work_tx
+                            .send(Work::Write(conn, "".to_owned(), "OK".to_owned()))
+                            .unwrap();
+                    }
+                }
+
+                crate::parse::Instr::Get => todo!(),
+
+                crate::parse::Instr::Bite => todo!(),
+                crate::parse::Instr::Jtrim => todo!(),
+                crate::parse::Instr::Json => todo!(),
+                crate::parse::Instr::SetIfNone => todo!(),
+                crate::parse::Instr::Inc => todo!(),
+                crate::parse::Instr::Append => todo!(),
+                crate::parse::Instr::Delete => todo!(),
+                crate::parse::Instr::Signal => todo!(),
+                crate::parse::Instr::SubJ => todo!(),
+                crate::parse::Instr::SubGet => todo!(),
+                crate::parse::Instr::SubBite => todo!(),
+                // // A subscription and a first message.
+                // "+" => {
+                //     self.subs_tx
+                //         .send(subs::Cmd::Add(key.to_owned(), conn.id))
+                //         .unwrap();
+
+                //     if !val.is_empty() {
+                //         self.subs_tx.send(subs::Cmd::Call(key, val)).unwrap()
+                //     }
+                // }
+
+                // // A message to subscriptions.
+                // ":" => {
+                //     self.subs_tx.send(subs::Cmd::Call(key, val)).unwrap();
+                // }
+
+                // // A desubscription and a last message.
+                // "-" => {
+                //     if !val.is_empty() {
+                //         self.subs_tx
+                //             .send(subs::Cmd::Call(key.to_owned(), val))
+                //             .unwrap();
+                //     }
+
+                //     self.subs_tx.send(subs::Cmd::Del(key, conn.id)).unwrap();
+                // }
+                // _ => (),
             }
 
             println!("{}: {}", conn.addr, utf8.trim_end());

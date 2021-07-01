@@ -1,4 +1,6 @@
-use std::{io::Write, sync::mpsc::Sender};
+use std::io::Write;
+
+use crossbeam_channel::{unbounded, Receiver, Sender};
 
 use crate::{conn::Connection, ready, subs};
 
@@ -13,7 +15,11 @@ impl Writer {
     }
 
     pub fn handle(self, mut conn: Connection, key: String, value: String) {
-        let msg = format!("{} {}", key, value);
+        let msg = if key.is_empty() {
+            value
+        } else {
+            format!("{} {}", key, value)
+        };
 
         match conn.socket.write(msg.as_bytes()) {
             Ok(_) => {

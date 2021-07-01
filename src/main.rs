@@ -2,13 +2,15 @@ use std::{
     collections::HashMap,
     io,
     net::TcpListener,
-    sync::{mpsc::channel, Arc, Mutex},
+    sync::{Arc, Mutex},
     thread,
 };
 
+use crossbeam_channel::unbounded;
 use polling::{Event, Poller};
 
 mod conn;
+mod map;
 mod parse;
 mod pool;
 mod reader;
@@ -43,6 +45,10 @@ fn main() -> io::Result<()> {
     let write_map = HashMap::<usize, Connection>::new();
     let write_map = Arc::new(Mutex::new(write_map));
 
+    // Map
+    let map = map::Map::new();
+    let map_tx = map.tx.clone();
+
     // Thread that re-register the connection for more reading events, and to be
     // written again after the thread pool finished.
     let ready_poller = poller.clone();
@@ -54,7 +60,7 @@ fn main() -> io::Result<()> {
 
     // Channels to send work to the thread pool that handles reading and
     // writing.
-    let (work_tx, work_rx) = channel::<Work>();
+    let (work_tx, work_rx) = unbounded::<Work>();
     let work_rx = Arc::new(Mutex::new(work_rx));
 
     // Thread that handles subscriptions, sends writing jobs to the thread when
@@ -70,22 +76,34 @@ fn main() -> io::Result<()> {
     let mut work = ThreadPool::new(4);
 
     for _ in 0..work.size() {
+        let write_map = write_map.clone();
+        let map_tx = map_tx.clone();
+
         let work_tx = work_tx.clone();
         let work_rx = work_rx.clone();
         let subs_tx = subs_tx.clone();
         let ready_tx = ready_tx.clone();
 
         work.submit(move || loop {
+            let reader_write_map = write_map.clone();
+            let map_tx = map_tx.clone();
             let work_tx = work_tx.clone();
             let reader_subs_tx = subs_tx.clone();
             let reader_ready_tx = ready_tx.clone();
-            let reader = Reader::new(work_tx, reader_subs_tx, reader_ready_tx);
+            let reader = Reader::new(
+                reader_write_map,
+                map_tx,
+                work_tx,
+                reader_subs_tx,
+                reader_ready_tx,
+            );
 
             let writer_subs_tx = subs_tx.clone();
             let writer_ready_tx = ready_tx.clone();
             let writer = Writer::new(writer_subs_tx, writer_ready_tx);
 
-            match work_rx.lock().unwrap().recv().unwrap() {
+            let work = work_rx.lock().unwrap().recv().unwrap();
+            match work {
                 Work::Read(conn) => reader.handle(conn),
                 Work::Write(conn, key, value) => writer.handle(conn, key, value),
             }

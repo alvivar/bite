@@ -1,11 +1,9 @@
 use std::{
     collections::HashMap,
-    sync::{
-        mpsc::{channel, Receiver, Sender},
-        Arc, Mutex,
-    },
+    sync::{Arc, Mutex},
 };
 
+use crossbeam_channel::{unbounded, Receiver, Sender};
 use polling::{Event, Poller};
 
 use crate::conn::Connection;
@@ -17,8 +15,8 @@ pub enum Cmd {
 
 pub struct Ready {
     poller: Arc<Poller>,
-    reader_map: Arc<Mutex<HashMap<usize, Connection>>>,
-    writer_map: Arc<Mutex<HashMap<usize, Connection>>>,
+    read_map: Arc<Mutex<HashMap<usize, Connection>>>,
+    write_map: Arc<Mutex<HashMap<usize, Connection>>>,
     pub tx: Sender<Cmd>,
     rx: Receiver<Cmd>,
 }
@@ -26,15 +24,15 @@ pub struct Ready {
 impl Ready {
     pub fn new(
         poller: Arc<Poller>,
-        reader_map: Arc<Mutex<HashMap<usize, Connection>>>,
-        writer_map: Arc<Mutex<HashMap<usize, Connection>>>,
+        read_map: Arc<Mutex<HashMap<usize, Connection>>>,
+        write_map: Arc<Mutex<HashMap<usize, Connection>>>,
     ) -> Ready {
-        let (tx, rx) = channel::<Cmd>();
+        let (tx, rx) = unbounded::<Cmd>();
 
         Ready {
             poller,
-            reader_map,
-            writer_map,
+            read_map,
+            write_map,
             tx,
             rx,
         }
@@ -48,11 +46,11 @@ impl Ready {
                         .modify(&conn.socket, Event::readable(conn.id))
                         .unwrap();
 
-                    self.reader_map.lock().unwrap().insert(conn.id, conn);
+                    self.read_map.lock().unwrap().insert(conn.id, conn);
                 }
 
                 Cmd::Write(conn) => {
-                    self.writer_map.lock().unwrap().insert(conn.id, conn);
+                    self.write_map.lock().unwrap().insert(conn.id, conn);
                 }
             }
         }

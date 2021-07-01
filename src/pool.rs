@@ -14,23 +14,23 @@ enum Job {
 }
 
 pub struct ThreadPool {
-    sender: Sender<Job>,
+    tx: Sender<Job>,
     workers: Vec<Worker>,
 }
 
 impl ThreadPool {
     pub fn new(size: usize) -> ThreadPool {
-        let (sender, receiver) = channel();
-        let receiver = Arc::new(Mutex::new(receiver));
+        let (tx, rx) = channel();
+        let rx = Arc::new(Mutex::new(rx));
 
         let mut workers = Vec::with_capacity(size);
 
         for _ in 0..size {
-            let worker = Worker::new(Arc::clone(&receiver));
+            let worker = Worker::new(Arc::clone(&rx));
             workers.push(worker);
         }
 
-        ThreadPool { sender, workers }
+        ThreadPool { tx, workers }
     }
 
     pub fn submit<F>(&mut self, f: F)
@@ -38,7 +38,7 @@ impl ThreadPool {
         F: FnOnce() + Send + 'static,
     {
         let job = Job::Task(Box::new(f));
-        self.sender.send(job).unwrap();
+        self.tx.send(job).unwrap();
     }
 
     pub fn size(&self) -> usize {
@@ -49,7 +49,7 @@ impl ThreadPool {
 impl Drop for ThreadPool {
     fn drop(&mut self) {
         for _ in 0..self.workers.len() {
-            self.sender.send(Job::Stop).unwrap();
+            self.tx.send(Job::Stop).unwrap();
         }
 
         for worker in &mut self.workers {
@@ -70,7 +70,9 @@ impl Worker {
             let job = receiver.lock().unwrap().recv();
             match job {
                 Ok(Job::Task(f)) => f(),
+
                 Ok(Job::Stop) => break,
+
                 Err(_) => break,
             }
         });
