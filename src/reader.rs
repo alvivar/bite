@@ -10,7 +10,7 @@ use crossbeam_channel::{unbounded, Receiver, Sender};
 use crate::{
     conn::Connection,
     map,
-    parse::proc_from_string,
+    parse::{self, proc_from_string},
     ready,
     subs::{self},
     Work,
@@ -67,7 +67,7 @@ impl Reader {
             let val = proc.value;
 
             match instr {
-                crate::parse::Instr::Nop => {
+                parse::Instr::Nop => {
                     if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
                         self.work_tx
                             .send(Work::WriteVal(conn, NOP.to_owned()))
@@ -75,7 +75,7 @@ impl Reader {
                     }
                 }
 
-                crate::parse::Instr::Set => {
+                parse::Instr::Set => {
                     self.map_tx.send(map::Cmd::Set(key, val)).unwrap();
 
                     if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
@@ -85,7 +85,7 @@ impl Reader {
                     }
                 }
 
-                crate::parse::Instr::Get => {
+                parse::Instr::Get => {
                     if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
                         self.map_tx.send(map::Cmd::Get(key, self.tx)).unwrap();
 
@@ -95,7 +95,7 @@ impl Reader {
                     }
                 }
 
-                crate::parse::Instr::SetIfNone => {
+                parse::Instr::SetIfNone => {
                     self.map_tx.send(map::Cmd::SetIfNone(key, val)).unwrap();
 
                     if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
@@ -105,7 +105,7 @@ impl Reader {
                     }
                 }
 
-                crate::parse::Instr::Inc => {
+                parse::Instr::Inc => {
                     if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
                         self.map_tx.send(map::Cmd::Inc(key, self.tx)).unwrap();
 
@@ -115,7 +115,7 @@ impl Reader {
                     }
                 }
 
-                crate::parse::Instr::Delete => {
+                parse::Instr::Delete => {
                     self.map_tx.send(map::Cmd::Delete(key)).unwrap();
 
                     if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
@@ -125,7 +125,7 @@ impl Reader {
                     }
                 }
 
-                crate::parse::Instr::Append => {
+                parse::Instr::Append => {
                     if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
                         self.map_tx
                             .send(map::Cmd::Append(key, val, self.tx))
@@ -137,7 +137,7 @@ impl Reader {
                     }
                 }
 
-                crate::parse::Instr::Bite => {
+                parse::Instr::Bite => {
                     if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
                         self.map_tx.send(map::Cmd::Bite(key, self.tx)).unwrap();
 
@@ -147,7 +147,7 @@ impl Reader {
                     }
                 }
 
-                crate::parse::Instr::Jtrim => {
+                parse::Instr::Jtrim => {
                     if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
                         self.map_tx.send(map::Cmd::Jtrim(key, self.tx)).unwrap();
 
@@ -157,7 +157,7 @@ impl Reader {
                     }
                 }
 
-                crate::parse::Instr::Json => {
+                parse::Instr::Json => {
                     if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
                         self.map_tx.send(map::Cmd::Json(key, self.tx)).unwrap();
 
@@ -167,10 +167,10 @@ impl Reader {
                     }
                 }
 
-                crate::parse::Instr::SubJ => todo!(),
-                crate::parse::Instr::SubGet => todo!(),
-                crate::parse::Instr::SubBite => todo!(),
-                crate::parse::Instr::Signal => todo!(),
+                parse::Instr::SubJ => todo!(),
+                parse::Instr::SubGet => todo!(),
+                parse::Instr::SubBite => todo!(),
+                parse::Instr::Signal => todo!(),
                 // // A subscription and a first message.
                 // "+" => {
                 //     self.subs_tx
