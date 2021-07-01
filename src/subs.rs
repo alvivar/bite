@@ -59,7 +59,7 @@ impl Subs {
                         for id in subs {
                             if let Some(conn) = write_map.remove(id) {
                                 self.work_tx
-                                    .send(Work::Write(conn, key.to_owned(), value.to_owned()))
+                                    .send(Work::WriteKeyVal(conn, key.to_owned(), value.to_owned()))
                                     .unwrap();
                             }
                         }

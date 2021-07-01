@@ -16,6 +16,9 @@ use crate::{
     Work,
 };
 
+const OK: &str = "OK";
+const NOP: &str = "OK";
+
 pub struct Reader {
     write_map: Arc<Mutex<HashMap<usize, Connection>>>,
     map_tx: Sender<map::Cmd>,
@@ -67,7 +70,7 @@ impl Reader {
                 crate::parse::Instr::Nop => {
                     if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
                         self.work_tx
-                            .send(Work::Write(conn, "".to_owned(), "NOP".to_owned()))
+                            .send(Work::WriteVal(conn, NOP.to_owned()))
                             .unwrap();
                     }
                 }
@@ -77,7 +80,7 @@ impl Reader {
 
                     if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
                         self.work_tx
-                            .send(Work::Write(conn, "".to_owned(), "OK".to_owned()))
+                            .send(Work::WriteVal(conn, OK.to_owned()))
                             .unwrap();
                     }
                 }
@@ -87,20 +90,26 @@ impl Reader {
                         let tx = self.tx.clone();
                         self.map_tx.send(map::Cmd::Get(key, tx)).unwrap();
 
-                        let response = self.rx.recv().unwrap();
+                        let value = self.rx.recv().unwrap();
+                        self.work_tx.send(Work::WriteVal(conn, value)).unwrap();
+                    }
+                }
 
+                crate::parse::Instr::Delete => {
+                    self.map_tx.send(map::Cmd::Delete(key)).unwrap();
+
+                    if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
                         self.work_tx
-                            .send(Work::Write(conn, "".to_owned(), response))
+                            .send(Work::WriteVal(conn, OK.to_owned()))
                             .unwrap();
                     }
                 }
 
-                crate::parse::Instr::Delete => todo!(),
+                crate::parse::Instr::SetIfNone => todo!(),
 
                 crate::parse::Instr::Bite => todo!(),
                 crate::parse::Instr::Jtrim => todo!(),
                 crate::parse::Instr::Json => todo!(),
-                crate::parse::Instr::SetIfNone => todo!(),
                 crate::parse::Instr::Inc => todo!(),
                 crate::parse::Instr::Append => todo!(),
                 crate::parse::Instr::Signal => todo!(),

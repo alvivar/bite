@@ -29,7 +29,8 @@ use writer::Writer;
 
 pub enum Work {
     Read(Connection),
-    Write(Connection, String, String),
+    WriteKeyVal(Connection, String, String),
+    WriteVal(Connection, String),
 }
 
 fn main() -> io::Result<()> {
@@ -114,7 +115,8 @@ fn main() -> io::Result<()> {
             let work = work_rx.lock().unwrap().recv().unwrap();
             match work {
                 Work::Read(conn) => reader.handle(conn),
-                Work::Write(conn, key, value) => writer.handle(conn, key, value),
+                Work::WriteKeyVal(conn, key, value) => writer.handle_kv(conn, key, value),
+                Work::WriteVal(conn, value) => writer.handle_v(conn, value),
             }
         });
     }
