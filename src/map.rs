@@ -20,11 +20,11 @@ pub enum Cmd {
     Set(String, String),
     SetIfNone(String, String),
     Inc(String, Sender<String>),
+    Append(String, String, Sender<String>),
     Delete(String),
     Bite(String, Sender<Result>),
     Jtrim(String, Sender<Result>),
     Json(String, Sender<Result>),
-    // Append(String, String, Sender<Result>, Sender<subs::Command>),
 }
 
 pub struct Map {
@@ -88,11 +88,32 @@ impl Map {
                     db_modified.swap(true, Ordering::Relaxed);
                 }
 
-                Cmd::Delete(key) => {
+                Cmd::Append(key, val, tx) => {
                     let mut map = self.data.lock().unwrap();
-                    map.remove(&key);
-                    drop(&map);
 
+                    let mut append = String::new();
+
+                    match map.get_mut(&key) {
+                        Some(v) => {
+                            append.push_str(v.as_str());
+                            append.push_str(val.as_str());
+
+                            v.push_str(val.as_str());
+                        }
+
+                        None => {
+                            append = val;
+                            map.insert(key.to_owned(), append.to_owned());
+                        }
+                    };
+
+                    tx.send(append.to_owned()).unwrap();
+
+                    db_modified.swap(true, Ordering::Relaxed);
+                }
+
+                Cmd::Delete(key) => {
+                    self.data.lock().unwrap().remove(&key);
                     db_modified.swap(true, Ordering::Relaxed);
                 }
 
@@ -166,35 +187,7 @@ impl Map {
                     };
 
                     conn_sender.send(Result::Message(msg)).unwrap();
-                } // Command::Append(key, val, conn_sender, subs_sender) => {
-                  //     let mut map = self.data.lock().unwrap();
-
-                  //     let mut append = String::new();
-
-                  //     match map.get_mut(&key) {
-                  //         Some(v) => {
-                  //             append.push_str(v.as_str());
-                  //             append.push_str(val.as_str());
-
-                  //             v.push_str(val.as_str());
-                  //         }
-
-                  //         None => {
-                  //             append = val;
-                  //             map.insert(key.to_owned(), append.to_owned());
-                  //         }
-                  //     };
-
-                  //     drop(map);
-
-                  //     conn_sender
-                  //         .send(Result::Message(append.to_owned()))
-                  //         .unwrap();
-
-                  //     subs_sender.send(subs::Command::Call(key, append)).unwrap();
-
-                  //     db_modified.swap(true, Ordering::Relaxed);
-                  // }
+                }
             }
         }
     }

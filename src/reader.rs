@@ -121,11 +121,19 @@ impl Reader {
                     }
                 }
 
+                crate::parse::Instr::Append => {
+                    if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
+                        self.map_tx
+                            .send(map::Cmd::Append(key, val, self.tx))
+                            .unwrap();
+                        let val = self.rx.recv().unwrap();
+                        self.work_tx.send(Work::WriteVal(conn, val)).unwrap();
+                    }
+                }
+
                 crate::parse::Instr::Bite => todo!(),
                 crate::parse::Instr::Jtrim => todo!(),
                 crate::parse::Instr::Json => todo!(),
-
-                crate::parse::Instr::Append => todo!(),
                 crate::parse::Instr::Signal => todo!(),
                 crate::parse::Instr::SubJ => todo!(),
                 crate::parse::Instr::SubGet => todo!(),
