@@ -16,13 +16,13 @@ pub enum Result {
 }
 
 pub enum Cmd {
-    Get(String, Sender<String>),
     Set(String, String),
     SetIfNone(String, String),
     Inc(String, Sender<String>),
     Append(String, String, Sender<String>),
+    Get(String, Sender<String>),
+    Bite(String, Sender<String>),
     Delete(String),
-    Bite(String, Sender<Result>),
     Jtrim(String, Sender<Result>),
     Json(String, Sender<Result>),
 }
@@ -45,16 +45,6 @@ impl Map {
             let cmd = self.rx.recv().unwrap();
 
             match cmd {
-                Cmd::Get(key, tx) => {
-                    let map = self.data.lock().unwrap();
-                    let msg = match map.get(&key) {
-                        Some(val) => val,
-                        None => "",
-                    };
-
-                    tx.send(msg.to_owned()).unwrap();
-                }
-
                 Cmd::Set(key, val) => {
                     self.data.lock().unwrap().insert(key, val);
                     db_modified.swap(true, Ordering::Relaxed);
@@ -112,15 +102,19 @@ impl Map {
                     db_modified.swap(true, Ordering::Relaxed);
                 }
 
-                Cmd::Delete(key) => {
-                    self.data.lock().unwrap().remove(&key);
-                    db_modified.swap(true, Ordering::Relaxed);
+                Cmd::Get(key, tx) => {
+                    let map = self.data.lock().unwrap();
+                    let msg = match map.get(&key) {
+                        Some(val) => val,
+                        None => "",
+                    };
+
+                    tx.send(msg.to_owned()).unwrap();
                 }
 
-                Cmd::Bite(key, conn_sender) => {
+                Cmd::Bite(key, tx) => {
                     let map = self.data.lock().unwrap();
                     let range = map.range(key.to_owned()..);
-                    drop(&map);
 
                     let kv: Vec<(&str, &str)> = range
                         .take_while(|(k, _)| k.starts_with(&key))
@@ -134,7 +128,12 @@ impl Map {
                     }
                     let msg = msg.trim_end().to_owned(); // @todo What's happening here exactly?
 
-                    conn_sender.send(Result::Message(msg)).unwrap();
+                    tx.send(msg).unwrap();
+                }
+
+                Cmd::Delete(key) => {
+                    self.data.lock().unwrap().remove(&key);
+                    db_modified.swap(true, Ordering::Relaxed);
                 }
 
                 Cmd::Jtrim(key, conn_sender) => {
