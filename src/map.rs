@@ -16,7 +16,7 @@ pub enum Result {
 }
 
 pub enum Cmd {
-    Get(String, Sender<Result>),
+    Get(String, Sender<String>),
     Bite(String, Sender<Result>),
     Jtrim(String, Sender<Result>),
     Json(String, Sender<Result>),
@@ -42,18 +42,30 @@ impl Map {
 
     pub fn handle(&self, db_modified: Arc<AtomicBool>) {
         loop {
-            let msg = self.rx.recv().unwrap();
+            let cmd = self.rx.recv().unwrap();
 
-            match msg {
-                Cmd::Get(key, conn_sender) => {
+            match cmd {
+                Cmd::Set(key, val) => {
+                    self.data.lock().unwrap().insert(key, val);
+                    db_modified.swap(true, Ordering::Relaxed);
+                }
+
+                Cmd::Get(key, tx) => {
                     let map = self.data.lock().unwrap();
                     let msg = match map.get(&key) {
                         Some(val) => val,
                         None => "",
                     };
+
+                    tx.send(msg.to_owned()).unwrap();
+                }
+
+                Cmd::Delete(key) => {
+                    let mut map = self.data.lock().unwrap();
+                    map.remove(&key);
                     drop(&map);
 
-                    conn_sender.send(Result::Message(msg.to_owned())).unwrap();
+                    db_modified.swap(true, Ordering::Relaxed);
                 }
 
                 Cmd::Bite(key, conn_sender) => {
@@ -126,92 +138,75 @@ impl Map {
                     };
 
                     conn_sender.send(Result::Message(msg)).unwrap();
-                }
+                } // Command::SetIfNone(key, val, subs_sender) => {
+                  //     let mut map = self.data.lock().unwrap();
 
-                Cmd::Set(key, val) => {
-                    let mut map = self.data.lock().unwrap();
-                    map.insert(key, val);
-                    drop(&map);
+                  //     match map.get(&key) {
+                  //         Some(_) => {}
 
-                    db_modified.swap(true, Ordering::Relaxed);
-                }
+                  //         None => {
+                  //             map.insert(key.to_owned(), val.to_owned());
+                  //             drop(map);
 
-                // Command::SetIfNone(key, val, subs_sender) => {
-                //     let mut map = self.data.lock().unwrap();
+                  //             subs_sender.send(subs::Command::Call(key, val)).unwrap();
 
-                //     match map.get(&key) {
-                //         Some(_) => {}
+                  //             db_modified.swap(true, Ordering::Relaxed);
+                  //         }
+                  //     };
+                  // }
+                  // Command::Inc(key, conn_sender, subs_sender) => {
+                  //     let mut map = self.data.lock().unwrap();
 
-                //         None => {
-                //             map.insert(key.to_owned(), val.to_owned());
-                //             drop(map);
+                  //     let inc = match map.get(&key) {
+                  //         Some(val) => match val.parse::<u32>() {
+                  //             Ok(n) => n + 1,
 
-                //             subs_sender.send(subs::Command::Call(key, val)).unwrap();
+                  //             Err(_) => 0,
+                  //         },
 
-                //             db_modified.swap(true, Ordering::Relaxed);
-                //         }
-                //     };
-                // }
-                // Command::Inc(key, conn_sender, subs_sender) => {
-                //     let mut map = self.data.lock().unwrap();
+                  //         None => 0,
+                  //     };
 
-                //     let inc = match map.get(&key) {
-                //         Some(val) => match val.parse::<u32>() {
-                //             Ok(n) => n + 1,
+                  //     map.insert(key.to_owned(), inc.to_string());
+                  //     drop(map);
 
-                //             Err(_) => 0,
-                //         },
+                  //     conn_sender.send(Result::Message(inc.to_string())).unwrap();
 
-                //         None => 0,
-                //     };
+                  //     subs_sender
+                  //         .send(subs::Command::Call(key, inc.to_string()))
+                  //         .unwrap();
 
-                //     map.insert(key.to_owned(), inc.to_string());
-                //     drop(map);
+                  //     db_modified.swap(true, Ordering::Relaxed);
+                  // }
+                  // Command::Append(key, val, conn_sender, subs_sender) => {
+                  //     let mut map = self.data.lock().unwrap();
 
-                //     conn_sender.send(Result::Message(inc.to_string())).unwrap();
+                  //     let mut append = String::new();
 
-                //     subs_sender
-                //         .send(subs::Command::Call(key, inc.to_string()))
-                //         .unwrap();
+                  //     match map.get_mut(&key) {
+                  //         Some(v) => {
+                  //             append.push_str(v.as_str());
+                  //             append.push_str(val.as_str());
 
-                //     db_modified.swap(true, Ordering::Relaxed);
-                // }
-                // Command::Append(key, val, conn_sender, subs_sender) => {
-                //     let mut map = self.data.lock().unwrap();
+                  //             v.push_str(val.as_str());
+                  //         }
 
-                //     let mut append = String::new();
+                  //         None => {
+                  //             append = val;
+                  //             map.insert(key.to_owned(), append.to_owned());
+                  //         }
+                  //     };
 
-                //     match map.get_mut(&key) {
-                //         Some(v) => {
-                //             append.push_str(v.as_str());
-                //             append.push_str(val.as_str());
+                  //     drop(map);
 
-                //             v.push_str(val.as_str());
-                //         }
+                  //     conn_sender
+                  //         .send(Result::Message(append.to_owned()))
+                  //         .unwrap();
 
-                //         None => {
-                //             append = val;
-                //             map.insert(key.to_owned(), append.to_owned());
-                //         }
-                //     };
+                  //     subs_sender.send(subs::Command::Call(key, append)).unwrap();
 
-                //     drop(map);
-
-                //     conn_sender
-                //         .send(Result::Message(append.to_owned()))
-                //         .unwrap();
-
-                //     subs_sender.send(subs::Command::Call(key, append)).unwrap();
-
-                //     db_modified.swap(true, Ordering::Relaxed);
-                // }
-                Cmd::Delete(key) => {
-                    let mut map = self.data.lock().unwrap();
-                    map.remove(&key);
-                    drop(&map);
-
-                    db_modified.swap(true, Ordering::Relaxed);
-                }
+                  //     db_modified.swap(true, Ordering::Relaxed);
+                  // }
             }
         }
     }

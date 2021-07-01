@@ -10,6 +10,7 @@ use crossbeam_channel::unbounded;
 use polling::{Event, Poller};
 
 mod conn;
+mod db;
 mod map;
 mod parse;
 mod pool;
@@ -19,6 +20,7 @@ mod subs;
 mod writer;
 
 use conn::Connection;
+use db::DB;
 use pool::ThreadPool;
 use reader::Reader;
 use ready::Ready;
@@ -45,9 +47,16 @@ fn main() -> io::Result<()> {
     let write_map = HashMap::<usize, Connection>::new();
     let write_map = Arc::new(Mutex::new(write_map));
 
-    // Map
+    // Map, DB & threads
     let map = map::Map::new();
     let map_tx = map.tx.clone();
+
+    let mut db = DB::new(map.data.clone());
+    let db_modified = db.modified.clone();
+    db.load_from_file();
+
+    thread::spawn(move || map.handle(db_modified));
+    thread::spawn(move || db.handle(3));
 
     // Thread that re-register the connection for more reading events, and to be
     // written again after the thread pool finished.

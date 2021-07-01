@@ -22,6 +22,8 @@ pub struct Reader {
     work_tx: Sender<Work>,
     subs_tx: Sender<subs::Cmd>,
     ready_tx: Sender<ready::Cmd>,
+    tx: Sender<String>,
+    rx: Receiver<String>,
 }
 
 impl Reader {
@@ -32,12 +34,16 @@ impl Reader {
         subs_tx: Sender<subs::Cmd>,
         ready_tx: Sender<ready::Cmd>,
     ) -> Reader {
+        let (tx, rx) = unbounded::<String>();
+
         Reader {
             write_map,
             map_tx,
             work_tx,
             subs_tx,
             ready_tx,
+            tx,
+            rx,
         }
     }
 
@@ -76,7 +82,20 @@ impl Reader {
                     }
                 }
 
-                crate::parse::Instr::Get => todo!(),
+                crate::parse::Instr::Get => {
+                    if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
+                        let tx = self.tx.clone();
+                        self.map_tx.send(map::Cmd::Get(key, tx)).unwrap();
+
+                        let response = self.rx.recv().unwrap();
+
+                        self.work_tx
+                            .send(Work::Write(conn, "".to_owned(), response))
+                            .unwrap();
+                    }
+                }
+
+                crate::parse::Instr::Delete => todo!(),
 
                 crate::parse::Instr::Bite => todo!(),
                 crate::parse::Instr::Jtrim => todo!(),
@@ -84,7 +103,6 @@ impl Reader {
                 crate::parse::Instr::SetIfNone => todo!(),
                 crate::parse::Instr::Inc => todo!(),
                 crate::parse::Instr::Append => todo!(),
-                crate::parse::Instr::Delete => todo!(),
                 crate::parse::Instr::Signal => todo!(),
                 crate::parse::Instr::SubJ => todo!(),
                 crate::parse::Instr::SubGet => todo!(),
