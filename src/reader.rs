@@ -103,6 +103,14 @@ impl Reader {
                     }
                 }
 
+                crate::parse::Instr::Inc => {
+                    if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
+                        self.map_tx.send(map::Cmd::Inc(key, self.tx)).unwrap();
+                        let val = self.rx.recv().unwrap();
+                        self.work_tx.send(Work::WriteVal(conn, val)).unwrap();
+                    }
+                }
+
                 crate::parse::Instr::Delete => {
                     self.map_tx.send(map::Cmd::Delete(key)).unwrap();
 
@@ -116,7 +124,7 @@ impl Reader {
                 crate::parse::Instr::Bite => todo!(),
                 crate::parse::Instr::Jtrim => todo!(),
                 crate::parse::Instr::Json => todo!(),
-                crate::parse::Instr::Inc => todo!(),
+
                 crate::parse::Instr::Append => todo!(),
                 crate::parse::Instr::Signal => todo!(),
                 crate::parse::Instr::SubJ => todo!(),
