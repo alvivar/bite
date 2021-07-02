@@ -10,7 +10,7 @@ use crossbeam_channel::{unbounded, Receiver, Sender};
 use crate::{
     conn::Connection,
     map,
-    parse::{self, proc_from_string},
+    parse::{self, proc_from_string, Instr},
     ready,
     subs::{self},
     Work,
@@ -67,7 +67,7 @@ impl Reader {
             let val = proc.value;
 
             match instr {
-                parse::Instr::Nop => {
+                Instr::Nop => {
                     if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
                         self.work_tx
                             .send(Work::WriteVal(conn, NOP.to_owned()))
@@ -75,17 +75,21 @@ impl Reader {
                     }
                 }
 
-                parse::Instr::Set => {
+                Instr::Set => {
+                    self.subs_tx
+                        .send(subs::Cmd::Call(key.to_owned(), val.to_owned()))
+                        .unwrap();
+
                     self.map_tx.send(map::Cmd::Set(key, val)).unwrap();
 
-                    if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
-                        self.work_tx
-                            .send(Work::WriteVal(conn, OK.to_owned()))
-                            .unwrap();
-                    }
+                    // if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
+                    //     self.work_tx
+                    //         .send(Work::WriteVal(conn, OK.to_owned()))
+                    //         .unwrap();
+                    // }
                 }
 
-                parse::Instr::Get => {
+                Instr::Get => {
                     if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
                         self.map_tx.send(map::Cmd::Get(key, self.tx)).unwrap();
 
@@ -95,7 +99,11 @@ impl Reader {
                     }
                 }
 
-                parse::Instr::SetIfNone => {
+                Instr::SetIfNone => {
+                    self.subs_tx
+                        .send(subs::Cmd::Call(key.to_owned(), val.to_owned()))
+                        .unwrap();
+
                     self.map_tx.send(map::Cmd::SetIfNone(key, val)).unwrap();
 
                     if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
@@ -105,7 +113,7 @@ impl Reader {
                     }
                 }
 
-                parse::Instr::Inc => {
+                Instr::Inc => {
                     if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
                         self.map_tx.send(map::Cmd::Inc(key, self.tx)).unwrap();
 
@@ -115,7 +123,7 @@ impl Reader {
                     }
                 }
 
-                parse::Instr::Delete => {
+                Instr::Delete => {
                     self.map_tx.send(map::Cmd::Delete(key)).unwrap();
 
                     if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
@@ -125,7 +133,7 @@ impl Reader {
                     }
                 }
 
-                parse::Instr::Append => {
+                Instr::Append => {
                     if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
                         self.map_tx
                             .send(map::Cmd::Append(key, val, self.tx))
@@ -137,7 +145,7 @@ impl Reader {
                     }
                 }
 
-                parse::Instr::Bite => {
+                Instr::Bite => {
                     if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
                         self.map_tx.send(map::Cmd::Bite(key, self.tx)).unwrap();
 
@@ -147,7 +155,7 @@ impl Reader {
                     }
                 }
 
-                parse::Instr::Jtrim => {
+                Instr::Jtrim => {
                     if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
                         self.map_tx.send(map::Cmd::Jtrim(key, self.tx)).unwrap();
 
@@ -157,7 +165,7 @@ impl Reader {
                     }
                 }
 
-                parse::Instr::Json => {
+                Instr::Json => {
                     if let Some(conn) = self.write_map.lock().unwrap().remove(&conn.id) {
                         self.map_tx.send(map::Cmd::Json(key, self.tx)).unwrap();
 
@@ -167,37 +175,19 @@ impl Reader {
                     }
                 }
 
-                parse::Instr::SubJ => todo!(),
-                parse::Instr::SubGet => todo!(),
-                parse::Instr::SubBite => todo!(),
-                parse::Instr::Signal => todo!(),
-                // // A subscription and a first message.
-                // "+" => {
-                //     self.subs_tx
-                //         .send(subs::Cmd::Add(key.to_owned(), conn.id))
-                //         .unwrap();
+                Instr::SubJ | Instr::SubGet | Instr::SubBite => {
+                    self.subs_tx
+                        .send(subs::Cmd::Add(key.to_owned(), conn.id, instr))
+                        .unwrap();
 
-                //     if !val.is_empty() {
-                //         self.subs_tx.send(subs::Cmd::Call(key, val)).unwrap()
-                //     }
-                // }
+                    if !val.is_empty() {
+                        self.subs_tx.send(subs::Cmd::Call(key, val)).unwrap()
+                    }
+                }
 
-                // // A message to subscriptions.
-                // ":" => {
-                //     self.subs_tx.send(subs::Cmd::Call(key, val)).unwrap();
-                // }
-
-                // // A desubscription and a last message.
-                // "-" => {
-                //     if !val.is_empty() {
-                //         self.subs_tx
-                //             .send(subs::Cmd::Call(key.to_owned(), val))
-                //             .unwrap();
-                //     }
-
-                //     self.subs_tx.send(subs::Cmd::Del(key, conn.id)).unwrap();
-                // }
-                // _ => (),
+                Instr::Signal => {
+                    self.subs_tx.send(subs::Cmd::Call(key, val)).unwrap();
+                }
             }
 
             println!("{}: {}", conn.addr, utf8.trim_end());
