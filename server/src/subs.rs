@@ -1,177 +1,77 @@
-use crossbeam_channel::{unbounded, Receiver, Sender};
-use serde_json::json;
-
 use std::{
-    collections::BTreeMap,
-    sync::{Arc, Mutex},
-    time::Instant,
-    u32, u64, usize,
+    collections::HashMap,
+    sync::{
+        mpsc::{channel, Receiver, Sender},
+        Arc, Mutex,
+    },
 };
 
-use crate::parse::Instr;
+use polling::{Event, Poller};
 
-pub enum Result {
-    Message(String),
-    Ping,
-}
+use crate::conn::Connection;
 
-pub enum Command {
-    New(Sender<Result>, String, Instr),
+pub enum Cmd {
+    Add(String, usize),
+    Del(String, usize),
     Call(String, String),
-    Clean(u64),
-}
-
-pub struct Sub {
-    sender: Sender<Result>,
-    instr: Instr,
-    last_time: Instant,
 }
 
 pub struct Subs {
-    pub subs: Arc<Mutex<BTreeMap<String, Vec<Sub>>>>,
-    pub sender: Sender<Command>,
-    receiver: Receiver<Command>,
+    registry: HashMap<String, Vec<usize>>,
+    writers: Arc<Mutex<HashMap<usize, Connection>>>,
+    poller: Arc<Poller>,
+    pub tx: Sender<Cmd>,
+    rx: Receiver<Cmd>,
 }
 
 impl Subs {
-    pub fn new() -> Subs {
-        let subs = Arc::new(Mutex::new(BTreeMap::<String, Vec<Sub>>::new()));
-
-        let (sender, receiver) = unbounded();
+    pub fn new(writers: Arc<Mutex<HashMap<usize, Connection>>>, poller: Arc<Poller>) -> Subs {
+        let registry = HashMap::<String, Vec<usize>>::new();
+        let (tx, rx) = channel::<Cmd>();
 
         Subs {
-            subs,
-            sender,
-            receiver,
+            registry,
+            writers,
+            poller,
+            tx,
+            rx,
         }
     }
 
-    pub fn handle(&self) {
+    pub fn handle(&mut self) {
         loop {
-            let message = self.receiver.recv().unwrap();
+            match self.rx.recv() {
+                Ok(Cmd::Add(key, id)) => {
+                    let subs = self.registry.entry(key).or_insert_with(Vec::new);
 
-            match message {
-                Command::New(sender, key, instr) => {
-                    let last_time = Instant::now();
+                    if subs.iter().any(|x| x == &id) {
+                        continue;
+                    }
 
-                    let mut subs = self.subs.lock().unwrap();
-                    let senders = subs.entry(key).or_insert_with(Vec::new);
-
-                    senders.push(Sub {
-                        sender,
-                        instr,
-                        last_time,
-                    });
+                    subs.push(id)
                 }
 
-                Command::Call(key, val) => {
-                    let mut subs = self.subs.lock().unwrap();
+                Ok(Cmd::Del(key, id)) => {
+                    let subs = self.registry.entry(key).or_insert_with(Vec::new);
+                    subs.retain(|x| x != &id);
+                }
 
-                    for alt_key in get_key_combinations(key.as_str()) {
-                        let sub_vec = match subs.get_mut(&alt_key) {
-                            Some(val) => val,
-
-                            None => continue,
-                        };
-
-                        let mut bad_senders = Vec::<usize>::new();
-
-                        for (i, sub) in sub_vec.iter_mut().enumerate() {
-                            let instr = &sub.instr;
-                            let sender = sub.sender.clone();
-
-                            let msg = match instr {
-                                Instr::SubJ => {
-                                    let last = key.split(".").last().unwrap();
-
-                                    json!({ last: val }).to_string()
-                                }
-
-                                Instr::SubGet => {
-                                    // This makes the subscription precise, on
-                                    // the exact subscribed key, instead of any
-                                    // children modified.
-
-                                    // if alt_key != key {
-                                    //     continue;
-                                    // }
-
-                                    val.to_owned()
-                                }
-
-                                Instr::SubBite => {
-                                    let last = key.split(".").last().unwrap();
-
-                                    format!("{} {}", last, val)
-                                }
-
-                                _ => {
-                                    println!("Unknown instruction calling subscribers");
-                                    continue;
-                                }
-                            };
-
-                            if let Err(_) = sender.send(Result::Message(msg)) {
-                                bad_senders.push(i);
-                            } else {
-                                sub.last_time = Instant::now();
+                Ok(Cmd::Call(key, value)) => {
+                    if let Some(subs) = self.registry.get(&key) {
+                        let mut writers = self.writers.lock().unwrap();
+                        for id in subs {
+                            if let Some(conn) = writers.get_mut(id) {
+                                conn.data = format!("{} {}", key, value).into();
+                                self.poller
+                                    .modify(&conn.socket, Event::writable(conn.id))
+                                    .unwrap();
                             }
                         }
-
-                        for &i in bad_senders.iter().rev() {
-                            sub_vec.swap_remove(i);
-                        }
-
-                        let count = bad_senders.len();
-                        if count > 0 {
-                            println!("Removing {} orphan subscriptions related to {}", count, key);
-                        }
                     }
                 }
 
-                Command::Clean(secs) => {
-                    let mut subs = self.subs.lock().unwrap();
-
-                    let mut count: u32 = 0;
-
-                    for (_, subs_vec) in subs.iter_mut() {
-                        let mut orphans = Vec::<usize>::new();
-
-                        for (i, sub) in subs_vec.iter().enumerate() {
-                            if sub.last_time.elapsed().as_secs() > secs {
-                                if let Err(_) = sub.sender.send(Result::Ping) {
-                                    orphans.push(i);
-                                }
-                            }
-                        }
-
-                        for &i in orphans.iter().rev() {
-                            subs_vec.swap_remove(i);
-                            count += 1;
-                        }
-                    }
-
-                    if count > 0 {
-                        println!("Removing {} orphan subscriptions", count);
-                    }
-                }
+                Err(err) => panic!("The subs channel failed: {}", err),
             }
         }
     }
-}
-
-/// "data.inner.value" -> ["data.inner.value", "data.inner", "data"]
-fn get_key_combinations(key: &str) -> Vec<String> {
-    let mut parent_keys = Vec::<String>::new();
-
-    let keys: Vec<&str> = key.split(".").collect();
-    let len = keys.len();
-
-    for i in 0..len {
-        let end = len - i;
-        let str = keys[..end].join(".");
-        parent_keys.push(str);
-    }
-
-    parent_keys
 }

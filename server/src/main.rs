@@ -1,330 +1,204 @@
-use crossbeam_channel::{unbounded, Receiver, Sender};
-
 use std::{
-    io::{BufRead, BufReader, Write},
-    net::{TcpListener, TcpStream},
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
-    thread::{self, sleep},
-    time::Duration,
+    collections::HashMap,
+    io::{self, Read, Write},
+    net::TcpListener,
+    str::from_utf8,
+    sync::{Arc, Mutex},
+    thread,
 };
 
-mod db;
-mod heartbeat;
-mod map;
-mod parse;
+use polling::{Event, Poller};
+
+mod conn;
+mod msg;
 mod subs;
 
-use db::DB;
-use parse::{AsyncInstr, Instr};
+use conn::Connection;
+use msg::parse;
+use subs::Subs;
 
-fn main() {
-    println!("\nBIT:E");
+fn main() -> io::Result<()> {
+    // The server and the smol Poller.
+    let server = TcpListener::bind("0.0.0.0:1984")?;
+    server.set_nonblocking(true)?;
 
-    // Map
-    let map = map::Map::new();
-    let map_sender = map.sender.clone();
+    let poller = Poller::new()?;
+    poller.add(&server, Event::readable(0))?;
+    let poller = Arc::new(poller);
 
-    // DB
-    let mut db = DB::new(map.data.clone());
-    db.load_from_file();
+    let mut readers = HashMap::<usize, Connection>::new();
+    let writers = HashMap::<usize, Connection>::new();
+    let writers = Arc::new(Mutex::new(writers));
 
-    // Subscriptions
-    let subs = subs::Subs::new();
-    let subs_sender = subs.sender.clone();
-    let subs_sender_clean = subs_sender.clone();
-
-    // Channels
-    let db_modified = db.modified.clone();
-
-    thread::spawn(move || map.handle(db_modified));
-    thread::spawn(move || db.handle(3));
+    // Subs
+    let mut subs = Subs::new(writers.clone(), poller.clone());
+    let subs_tx = subs.tx.clone();
     thread::spawn(move || subs.handle());
 
-    // Cleaning lost connections & subscriptions
-    let heartbeat = heartbeat::Heartbeat::new();
-    let heartbeat_sender = heartbeat.sender.clone();
-    let heartbeat_sender_clean = heartbeat.sender.clone();
-
-    thread::spawn(move || heartbeat.handle());
-
-    const TICK: u64 = 30;
-    thread::spawn(move || loop {
-        sleep(Duration::new(TICK + 1, 0));
-
-        subs_sender_clean.send(subs::Command::Clean(TICK)).unwrap();
-
-        heartbeat_sender_clean
-            .send(heartbeat::Command::Clean(TICK))
-            .unwrap();
-    });
-
-    // New job on incoming connections
-    let thread_count = Arc::new(AtomicUsize::new(0));
-    let server = TcpListener::bind("0.0.0.0:1984").unwrap(); // Asumming Docker.
-
-    for stream in server.incoming() {
-        let stream = stream.unwrap();
-        let map_sender = map_sender.clone();
-        let subs_sender = subs_sender.clone();
-        let heartbeat_sender = heartbeat_sender.clone();
-        let (conn_sndr, conn_recv) = unbounded::<map::Result>();
-
-        // Hearbeat registry
-        let addr = stream.peer_addr().unwrap().to_string();
-        let stream_clone = stream.try_clone().unwrap();
-
-        heartbeat_sender
-            .send(heartbeat::Command::New(addr.to_owned(), stream_clone))
-            .unwrap();
-
-        // Handling the connection
-        let thread_count_clone = thread_count.clone();
-
-        thread::spawn(move || {
-            let id = thread_count_clone.fetch_add(1, Ordering::Relaxed);
-
-            println!("Client {} connected, thread #{} spawned", addr, id);
-
-            handle_conn(
-                stream,
-                map_sender,
-                subs_sender,
-                heartbeat_sender,
-                conn_sndr,
-                conn_recv,
-            );
-
-            println!("Thread #{} terminated", id);
-
-            thread_count_clone.fetch_sub(1, Ordering::Relaxed);
-        });
-    }
-
-    // @todo Thread waiting for CTRL+C (character?).
-    println!("Shutting down");
-}
-
-fn handle_conn(
-    stream: TcpStream,
-    map_sender: Sender<map::Command>,
-    subs_sender: Sender<subs::Command>,
-    heartbeat_sender: Sender<heartbeat::Command>,
-    conn_sndr: Sender<map::Result>,
-    conn_recv: Receiver<map::Result>,
-) {
-    let mut reader = BufReader::new(stream.try_clone().unwrap());
+    // Connections and events via smol Poller.
+    let mut id: usize = 1;
+    let mut events = Vec::new();
 
     loop {
-        // Get the message
-        let addr = stream.peer_addr().unwrap().to_string();
+        events.clear();
+        poller.wait(&mut events, None)?;
 
-        let mut message = String::new();
+        for ev in &events {
+            match ev.key {
+                0 => {
+                    let (read_socket, addr) = server.accept()?;
+                    read_socket.set_nonblocking(true)?;
+                    let write_socket = read_socket.try_clone().unwrap();
 
-        if let Err(e) = reader.read_line(&mut message) {
-            println!("Client {} disconnected: {}", addr, e);
-            break;
-        }
+                    println!("Connection #{} from {}", id, addr);
 
-        if message.len() > 0 {
-            println!("> {}", message.trim());
-        } else {
-            println!("Client {} disconnected: 0 bytes read", addr);
-            break;
-        }
+                    // Register the reading socket for events.
+                    poller.add(&read_socket, Event::readable(id))?;
+                    readers.insert(id, Connection::new(id, read_socket, addr));
 
-        // Parse the message
-        let proc = parse::proc_from_string(message.as_str());
-        let instr = proc.instr;
-        let key = proc.key;
-        let val = proc.value;
+                    // Register the writing socket for events.
+                    poller.add(&write_socket, Event::none(id))?;
+                    writers
+                        .lock()
+                        .unwrap()
+                        .insert(id, Connection::new(id, write_socket, addr));
 
-        let conn_sender = conn_sndr.clone();
+                    // One more.
+                    id += 1;
 
-        let async_instr = match instr {
-            Instr::Nop => AsyncInstr::No("NOP".to_owned()),
-
-            Instr::Get => {
-                if key.len() < 1 {
-                    AsyncInstr::No("KEY?".to_owned())
-                } else {
-                    map_sender
-                        .send(map::Command::Get(key, conn_sender))
-                        .unwrap();
-
-                    AsyncInstr::Yes
+                    // The server continues listening for more clients, always 0.
+                    poller.modify(&server, Event::readable(0))?;
                 }
-            }
 
-            Instr::Bite => {
-                map_sender
-                    .send(map::Command::Bite(key, conn_sender))
-                    .unwrap();
+                id if ev.readable => {
+                    if let Some(conn) = readers.get_mut(&id) {
+                        handle_reading(conn);
+                        poller.modify(&conn.socket, Event::readable(id))?;
 
-                AsyncInstr::Yes
-            }
+                        // Parse the message.
+                        if let Ok(utf8) = from_utf8(&conn.data) {
+                            let msg = parse(utf8);
+                            let op = msg.op.as_str();
+                            let key = msg.key;
+                            let val = msg.value;
 
-            Instr::Jtrim => {
-                map_sender
-                    .send(map::Command::Jtrim(key, conn_sender))
-                    .unwrap();
+                            match op {
+                                // A subscription and a first message.
+                                "+" => {
+                                    subs_tx
+                                        .send(subs::Cmd::Add(key.to_owned(), conn.id))
+                                        .unwrap();
 
-                AsyncInstr::Yes
-            }
+                                    if !val.is_empty() {
+                                        subs_tx.send(subs::Cmd::Call(key, val)).unwrap()
+                                    }
+                                }
 
-            Instr::Json => {
-                map_sender
-                    .send(map::Command::Json(key, conn_sender))
-                    .unwrap();
+                                // A message to subscriptions.
+                                ":" => {
+                                    subs_tx.send(subs::Cmd::Call(key, val)).unwrap();
+                                }
 
-                AsyncInstr::Yes
-            }
+                                // A desubscription and a last message.
+                                "-" => {
+                                    if !val.is_empty() {
+                                        subs_tx.send(subs::Cmd::Call(key.to_owned(), val)).unwrap();
+                                    }
 
-            Instr::Set => {
-                if key.len() < 1 {
-                    AsyncInstr::No("KEY?".to_owned())
-                } else {
-                    map_sender
-                        .send(map::Command::Set(key.to_owned(), val.to_owned()))
-                        .unwrap();
+                                    subs_tx.send(subs::Cmd::Del(key, conn.id)).unwrap();
+                                }
 
-                    subs_sender.send(subs::Command::Call(key, val)).unwrap();
-
-                    AsyncInstr::No("OK".to_owned())
-                }
-            }
-
-            Instr::SetIfNone => {
-                if key.len() < 1 {
-                    AsyncInstr::No("KEY?".to_owned())
-                } else {
-                    map_sender
-                        .send(map::Command::SetIfNone(
-                            key.to_owned(),
-                            val.to_owned(),
-                            subs_sender.clone(),
-                        ))
-                        .unwrap();
-
-                    // ^ Subscription resolves after map operation.
-
-                    AsyncInstr::No("OK".to_owned())
-                }
-            }
-
-            Instr::Inc => {
-                if key.len() < 1 {
-                    AsyncInstr::No("KEY?".to_owned())
-                } else {
-                    map_sender
-                        .send(map::Command::Inc(key, conn_sender, subs_sender.clone()))
-                        .unwrap();
-
-                    // ^ Subscription resolves after map operation.
-
-                    AsyncInstr::Yes
-                }
-            }
-
-            Instr::Append => {
-                if key.len() < 1 {
-                    AsyncInstr::No("KEY?".to_owned())
-                } else {
-                    map_sender
-                        .send(map::Command::Append(
-                            key,
-                            val,
-                            conn_sender,
-                            subs_sender.clone(),
-                        ))
-                        .unwrap();
-
-                    // ^ Subscription resolves after the map operation.
-
-                    AsyncInstr::Yes
-                }
-            }
-
-            Instr::Delete => {
-                if key.len() < 1 {
-                    AsyncInstr::No("KEY?".to_owned())
-                } else {
-                    map_sender.send(map::Command::Delete(key)).unwrap();
-
-                    AsyncInstr::No("OK".to_owned())
-                }
-            }
-
-            Instr::Signal => {
-                if key.len() < 1 {
-                    AsyncInstr::No("KEY?".to_owned())
-                } else {
-                    subs_sender.send(subs::Command::Call(key, val)).unwrap();
-
-                    AsyncInstr::No("OK".to_owned())
-                }
-            }
-
-            Instr::SubJ | Instr::SubGet | Instr::SubBite => {
-                let stream = stream.try_clone().unwrap();
-                let (sub_sender, sub_receiver) = unbounded::<subs::Result>();
-
-                subs_sender
-                    .send(subs::Command::New(sub_sender, key, instr))
-                    .unwrap();
-
-                loop {
-                    let message = match sub_receiver.recv().unwrap() {
-                        subs::Result::Message(msg) => msg,
-
-                        subs::Result::Ping => {
-                            if let Err(e) = heartbeat::beat(&stream) {
-                                println!("Client {} subscription ping error: {}", addr, e);
-                                break;
+                                _ => (),
                             }
 
-                            continue;
+                            println!("{}: {}", conn.addr, utf8.trim_end());
                         }
-                    };
 
-                    if let Err(e) = stream_write(&stream, message.as_str()) {
-                        println!("Client {} disconnected: {}", addr, e);
-                        break;
-                    } else {
-                        heartbeat_sender
-                            .send(heartbeat::Command::Touch(addr.to_owned()))
-                            .unwrap();
+                        // Forget it, it died.
+                        if conn.closed {
+                            poller.delete(&conn.socket)?;
+                            readers.remove(&id);
+                        }
                     }
                 }
 
-                return;
+                id if ev.writable => {
+                    let mut write_map = writers.lock().unwrap();
+                    if let Some(conn) = write_map.get_mut(&id) {
+                        handle_writing(conn);
+
+                        // Forget it, it died.
+                        if conn.closed {
+                            poller.delete(&conn.socket)?;
+                            write_map.remove(&id);
+                        }
+                    }
+                }
+
+                // Events that I don't care. Probably Event::none?
+                _ => (),
             }
-        };
-
-        let message = match async_instr {
-            AsyncInstr::Yes => match conn_recv.recv().unwrap() {
-                map::Result::Message(msg) => msg,
-            },
-
-            AsyncInstr::No(msg) => msg,
-        };
-
-        // Response
-
-        stream_write(&stream, message.as_str()).unwrap();
-
-        heartbeat_sender
-            .send(heartbeat::Command::Touch(addr))
-            .unwrap();
+        }
     }
 }
 
-fn stream_write(mut stream: &TcpStream, message: &str) -> std::io::Result<()> {
-    stream.write(message.as_bytes())?;
-    stream.write(&[0xA])?; // New line
-    stream.flush()?;
+fn handle_reading(conn: &mut Connection) {
+    conn.data = match read(conn) {
+        Ok(data) => data,
+        Err(err) => {
+            println!("Connection #{} broken, read failed: {}", conn.id, err);
+            conn.closed = true;
+            return;
+        }
+    };
+}
 
-    Ok(())
+fn handle_writing(conn: &mut Connection) {
+    if let Err(err) = conn.socket.write(&conn.data) {
+        println!("Connection #{} broken, write failed: {}", conn.id, err);
+        conn.closed = true;
+    }
+}
+
+fn read(conn: &mut Connection) -> io::Result<Vec<u8>> {
+    let mut received = vec![0; 1024 * 4];
+    let mut bytes_read = 0;
+
+    loop {
+        match conn.socket.read(&mut received[bytes_read..]) {
+            Ok(0) => {
+                // Reading 0 bytes means the other side has closed the
+                // connection or is done writing, then so are we.
+                return Err(io::Error::new(io::ErrorKind::BrokenPipe, "0 bytes read"));
+            }
+            Ok(n) => {
+                bytes_read += n;
+                if bytes_read == received.len() {
+                    received.resize(received.len() + 1024, 0);
+                }
+            }
+            // Would block "errors" are the OS's way of saying that the
+            // connection is not actually ready to perform this I/O operation.
+            // @todo Wondering if this should be a panic instead.
+            Err(ref err) if would_block(err) => break,
+            Err(ref err) if interrupted(err) => continue,
+            // Other errors we'll consider fatal.
+            Err(err) => return Err(err),
+        }
+    }
+
+    // let received_data = &received_data[..bytes_read]; // @doubt Using this
+    // slice thing and returning with into() versus using the resize? Hm.
+
+    received.resize(bytes_read, 0);
+
+    Ok(received)
+}
+
+fn would_block(err: &io::Error) -> bool {
+    err.kind() == io::ErrorKind::WouldBlock
+}
+
+fn interrupted(err: &io::Error) -> bool {
+    err.kind() == io::ErrorKind::Interrupted
 }
