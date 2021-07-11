@@ -2,7 +2,7 @@ version: '3.3'
 services:
   bite:
     container_name: bt
-    build: ./server/
+    build: ./
     ports:
       - '1984:1984'
     volumes:
