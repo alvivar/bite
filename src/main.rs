@@ -7,11 +7,14 @@ use std::{
     thread,
 };
 
+use data::Data;
 use polling::{Event, Poller};
 
 mod conn;
+mod data;
 mod msg;
 mod subs;
+mod writer;
 
 use conn::Connection;
 use msg::parse;
@@ -29,6 +32,13 @@ fn main() -> io::Result<()> {
     let mut readers = HashMap::<usize, Connection>::new();
     let writers = HashMap::<usize, Connection>::new();
     let writers = Arc::new(Mutex::new(writers));
+
+    // The writer
+    let writer = Writer::new(writers.clone(), poller.clone());
+
+    // Data
+    // let data = Data::new(poller.clone());
+    // let data_tx = data.tx.clone();
 
     // Subs
     let mut subs = Subs::new(writers.clone(), poller.clone());
@@ -83,6 +93,11 @@ fn main() -> io::Result<()> {
                             let val = msg.value;
 
                             match op {
+                                // Get from the map.
+                                "g" => {
+                                    // data_tx.send(data::Cmd::Get(key)).unwrap();
+                                }
+
                                 // A subscription and a first message.
                                 "+" => {
                                     subs_tx
