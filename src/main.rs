@@ -19,6 +19,7 @@ mod writer;
 use conn::Connection;
 use msg::parse;
 use subs::Subs;
+use writer::Writer;
 
 fn main() -> io::Result<()> {
     // The server and the smol Poller.
@@ -35,13 +36,17 @@ fn main() -> io::Result<()> {
 
     // The writer
     let writer = Writer::new(writers.clone(), poller.clone());
+    let writer_tx = writer.tx.clone();
+    let poll_writer_tx = writer.tx.clone();
+    thread::spawn(move || writer.handle());
 
     // Data
-    // let data = Data::new(poller.clone());
-    // let data_tx = data.tx.clone();
+    let data = Data::new();
+    let data_tx = data.tx.clone();
+    thread::spawn(move || data.handle());
 
     // Subs
-    let mut subs = Subs::new(writers.clone(), poller.clone());
+    let mut subs = Subs::new(writer_tx);
     let subs_tx = subs.tx.clone();
     thread::spawn(move || subs.handle());
 
@@ -93,9 +98,17 @@ fn main() -> io::Result<()> {
                             let val = msg.value;
 
                             match op {
+                                "s" => {
+                                    data_tx.send(data::Cmd::Set(key, val)).unwrap();
+
+                                    poll_writer_tx
+                                        .send(writer::Cmd::Write(conn.id, "OK\n".to_owned()))
+                                        .unwrap();
+                                }
+
                                 // Get from the map.
                                 "g" => {
-                                    // data_tx.send(data::Cmd::Get(key)).unwrap();
+                                    data_tx.send(data::Cmd::Get(key, conn.id)).unwrap();
                                 }
 
                                 // A subscription and a first message.

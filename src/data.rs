@@ -13,7 +13,7 @@ use std::{
 use crate::{parse, subs};
 
 pub enum Cmd {
-    Get(String, Sender<String>),
+    Get(String, usize),
     Bite(String, Sender<String>),
     Jtrim(String, Sender<String>),
     Json(String, Sender<String>),
@@ -26,38 +26,29 @@ pub enum Cmd {
 
 pub struct Data {
     data: Arc<Mutex<BTreeMap<String, String>>>,
-    poller: Arc<Poller>,
     pub tx: Sender<Cmd>,
     rx: Receiver<Cmd>,
 }
 
 impl Data {
-    pub fn new(poller: Arc<Poller>) -> Data {
+    pub fn new() -> Data {
         let data = Arc::new(Mutex::new(BTreeMap::<String, String>::new()));
-
         let (tx, rx) = unbounded();
 
-        Data {
-            data,
-            poller,
-            tx,
-            rx,
-        }
+        Data { data, tx, rx }
     }
 
-    pub fn handle(&self, db_modified: Arc<AtomicBool>) {
+    pub fn handle(&self) {
         loop {
             let msg = self.rx.recv().unwrap();
 
             match msg {
-                Cmd::Get(key, conn_sender) => {
+                Cmd::Get(key, id) => {
                     let map = self.data.lock().unwrap();
                     let msg = match map.get(&key) {
                         Some(val) => val,
                         None => "",
                     };
-
-                    conn_sender.send(msg.to_owned()).unwrap();
                 }
 
                 Cmd::Bite(key, conn_sender) => {
@@ -132,8 +123,6 @@ impl Data {
                 Cmd::Set(key, val) => {
                     let mut map = self.data.lock().unwrap();
                     map.insert(key, val);
-
-                    db_modified.swap(true, Ordering::Relaxed);
                 }
 
                 Cmd::SetIfNone(key, val) => {
@@ -143,8 +132,6 @@ impl Data {
                         Some(_) => {}
                         None => {
                             map.insert(key.to_owned(), val.to_owned());
-
-                            db_modified.swap(true, Ordering::Relaxed);
                         }
                     };
                 }
@@ -164,8 +151,6 @@ impl Data {
                     map.insert(key.to_owned(), inc.to_string());
 
                     conn_sender.send(inc.to_string()).unwrap();
-
-                    db_modified.swap(true, Ordering::Relaxed);
                 }
 
                 Cmd::Append(key, val, conn_sender) => {
@@ -188,15 +173,11 @@ impl Data {
                     };
 
                     conn_sender.send(append.to_owned()).unwrap();
-
-                    db_modified.swap(true, Ordering::Relaxed);
                 }
 
                 Cmd::Delete(key) => {
                     let mut map = self.data.lock().unwrap();
                     map.remove(&key);
-
-                    db_modified.swap(true, Ordering::Relaxed);
                 }
             }
         }

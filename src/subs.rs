@@ -8,7 +8,7 @@ use std::{
 
 use polling::{Event, Poller};
 
-use crate::conn::Connection;
+use crate::{conn::Connection, writer};
 
 pub enum Cmd {
     Add(String, usize),
@@ -18,21 +18,19 @@ pub enum Cmd {
 
 pub struct Subs {
     registry: HashMap<String, Vec<usize>>,
-    writers: Arc<Mutex<HashMap<usize, Connection>>>,
-    poller: Arc<Poller>,
+    writer_tx: Sender<writer::Cmd>,
     pub tx: Sender<Cmd>,
     rx: Receiver<Cmd>,
 }
 
 impl Subs {
-    pub fn new(writers: Arc<Mutex<HashMap<usize, Connection>>>, poller: Arc<Poller>) -> Subs {
+    pub fn new(writer_tx: Sender<writer::Cmd>) -> Subs {
         let registry = HashMap::<String, Vec<usize>>::new();
         let (tx, rx) = channel::<Cmd>();
 
         Subs {
             registry,
-            writers,
-            poller,
+            writer_tx,
             tx,
             rx,
         }
@@ -57,16 +55,11 @@ impl Subs {
                 }
 
                 Ok(Cmd::Call(key, value)) => {
+                    let msg = format!("{} {}", key, value);
                     if let Some(subs) = self.registry.get(&key) {
-                        let mut writers = self.writers.lock().unwrap();
-                        for id in subs {
-                            if let Some(conn) = writers.get_mut(id) {
-                                conn.data = format!("{} {}", key, value).into();
-                                self.poller
-                                    .modify(&conn.socket, Event::writable(conn.id))
-                                    .unwrap();
-                            }
-                        }
+                        self.writer_tx
+                            .send(writer::Cmd::WriteAll(subs.clone(), msg))
+                            .unwrap();
                     }
                 }
 

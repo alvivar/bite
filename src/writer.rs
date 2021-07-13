@@ -48,7 +48,19 @@ impl Writer {
                     }
                 }
 
-                Cmd::WriteAll(_, _) => todo!(),
+                Cmd::WriteAll(ids, msg) => {
+                    let mut writers = self.writers.lock().unwrap();
+
+                    for id in ids {
+                        if let Some(conn) = writers.get_mut(&id) {
+                            conn.data = msg.to_owned().into();
+
+                            self.poller
+                                .modify(&conn.socket, Event::writable(conn.id))
+                                .unwrap();
+                        }
+                    }
+                }
             }
         }
     }
