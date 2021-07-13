@@ -36,7 +36,7 @@ fn main() -> io::Result<()> {
 
     // The writer
     let writer = Writer::new(writers.clone(), poller.clone());
-    let writer_tx = writer.tx.clone();
+    let subs_writer_tx = writer.tx.clone();
     let poll_writer_tx = writer.tx.clone();
     thread::spawn(move || writer.handle());
 
@@ -46,7 +46,7 @@ fn main() -> io::Result<()> {
     thread::spawn(move || data.handle());
 
     // Subs
-    let mut subs = Subs::new(writer_tx);
+    let mut subs = Subs::new(subs_writer_tx);
     let subs_tx = subs.tx.clone();
     thread::spawn(move || subs.handle());
 
