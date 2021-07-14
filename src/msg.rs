@@ -31,10 +31,6 @@ pub fn parse(text: &str) -> Msg {
             _ => match next {
                 0 => {
                     op.push(c);
-
-                    // The firts non-space found is the (op)erator. Separated or
-                    // not by space.
-                    next = 1;
                 }
 
                 1 => {

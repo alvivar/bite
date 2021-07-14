@@ -1,4 +1,3 @@
-use crossbeam_channel::{unbounded, Receiver, Sender};
 use polling::Poller;
 use serde_json::{self, json, Value};
 
@@ -6,36 +5,43 @@ use std::{
     collections::BTreeMap,
     sync::{
         atomic::{AtomicBool, Ordering},
+        mpsc::{channel, Receiver, Sender},
         Arc, Mutex,
     },
 };
 
-use crate::{parse, subs};
+use crate::{parse, subs, writer};
 
 pub enum Cmd {
     Get(String, usize),
-    Bite(String, Sender<String>),
-    Jtrim(String, Sender<String>),
-    Json(String, Sender<String>),
+    Bite(String, usize),
+    Jtrim(String, usize),
+    Json(String, usize),
     Set(String, String),
     SetIfNone(String, String),
-    Inc(String, Sender<String>),
-    Append(String, String, Sender<String>),
+    Inc(String, usize),
+    Append(String, String, usize),
     Delete(String),
 }
 
 pub struct Data {
     data: Arc<Mutex<BTreeMap<String, String>>>,
+    writer_tx: Sender<writer::Cmd>,
     pub tx: Sender<Cmd>,
     rx: Receiver<Cmd>,
 }
 
 impl Data {
-    pub fn new() -> Data {
+    pub fn new(writer_tx: Sender<writer::Cmd>) -> Data {
         let data = Arc::new(Mutex::new(BTreeMap::<String, String>::new()));
-        let (tx, rx) = unbounded();
+        let (tx, rx) = channel::<Cmd>();
 
-        Data { data, tx, rx }
+        Data {
+            data,
+            writer_tx,
+            tx,
+            rx,
+        }
     }
 
     pub fn handle(&self) {
@@ -43,15 +49,74 @@ impl Data {
             let msg = self.rx.recv().unwrap();
 
             match msg {
+                Cmd::Set(key, val) => {
+                    let mut map = self.data.lock().unwrap();
+                    map.insert(key, val);
+                }
+
+                Cmd::SetIfNone(key, val) => {
+                    let mut map = self.data.lock().unwrap();
+
+                    match map.get(&key) {
+                        Some(_) => {}
+                        None => {
+                            map.insert(key, val);
+                        }
+                    };
+                }
+
+                Cmd::Inc(key, id) => {
+                    let mut map = self.data.lock().unwrap();
+
+                    let inc = match map.get(&key) {
+                        Some(val) => match val.parse::<u32>() {
+                            Ok(n) => n + 1,
+                            Err(_) => 0,
+                        },
+
+                        None => 0,
+                    };
+
+                    map.insert(key, inc.to_string());
+
+                    self.writer_tx
+                        .send(writer::Cmd::Write(id, inc.to_string()))
+                        .unwrap();
+                }
+
+                Cmd::Append(key, val, id) => {
+                    let mut map = self.data.lock().unwrap();
+
+                    let mut append = String::new();
+
+                    match map.get_mut(&key) {
+                        Some(v) => {
+                            append.push_str(v);
+                            append.push_str(&val);
+                        }
+
+                        None => {
+                            append = val;
+                            map.insert(key, append.to_owned());
+                        }
+                    };
+
+                    self.writer_tx.send(writer::Cmd::Write(id, append)).unwrap();
+                }
+
                 Cmd::Get(key, id) => {
                     let map = self.data.lock().unwrap();
                     let msg = match map.get(&key) {
                         Some(val) => val,
                         None => "",
                     };
+
+                    self.writer_tx
+                        .send(writer::Cmd::Write(id, msg.into()))
+                        .unwrap();
                 }
 
-                Cmd::Bite(key, conn_sender) => {
+                Cmd::Bite(key, id) => {
                     let map = self.data.lock().unwrap();
                     let range = map.range(key.to_owned()..);
 
@@ -67,10 +132,10 @@ impl Data {
                     }
                     let msg = msg.trim_end().to_owned(); // @todo What's happening here exactly?
 
-                    conn_sender.send(msg).unwrap();
+                    self.writer_tx.send(writer::Cmd::Write(id, msg)).unwrap();
                 }
 
-                Cmd::Jtrim(key, conn_sender) => {
+                Cmd::Jtrim(key, id) => {
                     let map = self.data.lock().unwrap();
                     let range = map.range(key.to_owned()..);
 
@@ -92,10 +157,10 @@ impl Data {
                         }
                     };
 
-                    conn_sender.send(msg).unwrap();
+                    self.writer_tx.send(writer::Cmd::Write(id, msg)).unwrap();
                 }
 
-                Cmd::Json(key, conn_sender) => {
+                Cmd::Json(key, id) => {
                     let map = self.data.lock().unwrap();
                     let range = map.range(key.to_owned()..);
 
@@ -117,62 +182,7 @@ impl Data {
                         }
                     };
 
-                    conn_sender.send(msg).unwrap();
-                }
-
-                Cmd::Set(key, val) => {
-                    let mut map = self.data.lock().unwrap();
-                    map.insert(key, val);
-                }
-
-                Cmd::SetIfNone(key, val) => {
-                    let mut map = self.data.lock().unwrap();
-
-                    match map.get(&key) {
-                        Some(_) => {}
-                        None => {
-                            map.insert(key.to_owned(), val.to_owned());
-                        }
-                    };
-                }
-
-                Cmd::Inc(key, conn_sender) => {
-                    let mut map = self.data.lock().unwrap();
-
-                    let inc = match map.get(&key) {
-                        Some(val) => match val.parse::<u32>() {
-                            Ok(n) => n + 1,
-                            Err(_) => 0,
-                        },
-
-                        None => 0,
-                    };
-
-                    map.insert(key.to_owned(), inc.to_string());
-
-                    conn_sender.send(inc.to_string()).unwrap();
-                }
-
-                Cmd::Append(key, val, conn_sender) => {
-                    let mut map = self.data.lock().unwrap();
-
-                    let mut append = String::new();
-
-                    match map.get_mut(&key) {
-                        Some(v) => {
-                            append.push_str(v.as_str());
-                            append.push_str(val.as_str());
-
-                            v.push_str(val.as_str());
-                        }
-
-                        None => {
-                            append = val;
-                            map.insert(key.to_owned(), append.to_owned());
-                        }
-                    };
-
-                    conn_sender.send(append.to_owned()).unwrap();
+                    self.writer_tx.send(writer::Cmd::Write(id, msg)).unwrap();
                 }
 
                 Cmd::Delete(key) => {

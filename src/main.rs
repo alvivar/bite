@@ -21,6 +21,9 @@ use msg::parse;
 use subs::Subs;
 use writer::Writer;
 
+const OK: &str = "OK";
+const NOP: &str = "NOP";
+
 fn main() -> io::Result<()> {
     // The server and the smol Poller.
     let server = TcpListener::bind("0.0.0.0:1984")?;
@@ -36,12 +39,13 @@ fn main() -> io::Result<()> {
 
     // The writer
     let writer = Writer::new(writers.clone(), poller.clone());
+    let data_writer_tx = writer.tx.clone();
     let subs_writer_tx = writer.tx.clone();
     let poll_writer_tx = writer.tx.clone();
     thread::spawn(move || writer.handle());
 
     // Data
-    let data = Data::new();
+    let data = Data::new(data_writer_tx);
     let data_tx = data.tx.clone();
     thread::spawn(move || data.handle());
 
@@ -95,42 +99,83 @@ fn main() -> io::Result<()> {
                             let msg = parse(utf8);
                             let op = msg.op.as_str();
                             let key = msg.key;
-                            let val = msg.value;
+                            let value = msg.value;
 
+                            // @todo Instead of strings, use an enum.
                             match op {
+                                // Set
                                 "s" => {
-                                    data_tx.send(data::Cmd::Set(key, val)).unwrap();
+                                    data_tx.send(data::Cmd::Set(key, value)).unwrap();
 
                                     poll_writer_tx
-                                        .send(writer::Cmd::Write(conn.id, "OK\n".to_owned()))
+                                        .send(writer::Cmd::Write(conn.id, OK.into()))
                                         .unwrap();
                                 }
 
-                                // Get from the map.
+                                // Set only if the key doesn't exists.
+                                "s?" => {
+                                    data_tx.send(data::Cmd::SetIfNone(key, value)).unwrap();
+
+                                    poll_writer_tx
+                                        .send(writer::Cmd::Write(conn.id, OK.into()))
+                                        .unwrap();
+                                }
+
+                                // Makes the value an integer and increase it in 1.
+                                "+1" => {
+                                    data_tx.send(data::Cmd::Inc(key, conn.id)).unwrap();
+                                }
+
+                                // Appends the value.
+                                "+" => {
+                                    data_tx
+                                        .send(data::Cmd::Append(key, value, conn.id))
+                                        .unwrap();
+                                }
+
+                                // Get
                                 "g" => {
                                     data_tx.send(data::Cmd::Get(key, conn.id)).unwrap();
                                 }
 
-                                // A subscription and a first message.
-                                "+" => {
+                                // "Bite" query, 0x0 separated key value enumeration: key value'\0x0'key2 value2
+                                "b" => {
+                                    data_tx.send(data::Cmd::Bite(key, conn.id)).unwrap();
+                                }
+
+                                // Trimmed Json (just the data).
+                                "j" => {
+                                    data_tx.send(data::Cmd::Jtrim(key, conn.id)).unwrap();
+                                }
+
+                                // Json (full path).
+                                "js" => {
+                                    data_tx.send(data::Cmd::Json(key, conn.id)).unwrap();
+                                }
+
+                                // A generic "bite" subscription. Subscribers also receive their key: "key value"
+                                // Also a first message if value is available.
+                                "#" => {
                                     subs_tx
                                         .send(subs::Cmd::Add(key.to_owned(), conn.id))
                                         .unwrap();
 
-                                    if !val.is_empty() {
-                                        subs_tx.send(subs::Cmd::Call(key, val)).unwrap()
+                                    if !value.is_empty() {
+                                        subs_tx.send(subs::Cmd::Call(key, value)).unwrap()
                                     }
                                 }
 
-                                // A message to subscriptions.
-                                ":" => {
-                                    subs_tx.send(subs::Cmd::Call(key, val)).unwrap();
+                                // Calls key subscribers with the new value without data modifications.
+                                "!" => {
+                                    subs_tx.send(subs::Cmd::Call(key, value)).unwrap();
                                 }
 
-                                // A desubscription and a last message.
-                                "-" => {
-                                    if !val.is_empty() {
-                                        subs_tx.send(subs::Cmd::Call(key.to_owned(), val)).unwrap();
+                                // A "bite" desubscription and a last message if value is available.
+                                "-#" => {
+                                    if !value.is_empty() {
+                                        subs_tx
+                                            .send(subs::Cmd::Call(key.to_owned(), value))
+                                            .unwrap();
                                     }
 
                                     subs_tx.send(subs::Cmd::Del(key, conn.id)).unwrap();

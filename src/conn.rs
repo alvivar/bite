@@ -4,7 +4,7 @@ pub struct Connection {
     pub id: usize,
     pub socket: TcpStream,
     pub addr: SocketAddr,
-    pub data: Vec<u8>,
+    pub data: Vec<u8>, // @todo This should be probably a list of Vecs because of concurrency.
     pub closed: bool,
 }
 

@@ -11,7 +11,7 @@ use polling::{Event, Poller};
 use crate::conn::Connection;
 
 pub enum Cmd {
-    Write(usize, String),
+    Write(usize, String), // @todo Wondering if Vec<u8> would be better than String.
     WriteAll(Vec<usize>, String),
 }
 
@@ -40,6 +40,8 @@ impl Writer {
             match cmd {
                 Cmd::Write(id, msg) => {
                     if let Some(conn) = self.writers.lock().unwrap().get_mut(&id) {
+                        let mut msg = msg.trim_end().to_owned();
+                        msg.push('\n');
                         conn.data = msg.into();
 
                         self.poller
@@ -53,7 +55,9 @@ impl Writer {
 
                     for id in ids {
                         if let Some(conn) = writers.get_mut(&id) {
-                            conn.data = msg.to_owned().into();
+                            let mut msg = msg.trim_end().to_owned();
+                            msg.push('\n');
+                            conn.data = msg.into();
 
                             self.poller
                                 .modify(&conn.socket, Event::writable(conn.id))
