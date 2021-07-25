@@ -1,15 +1,13 @@
 
-    2021.05.10
-    x Revise Key length
-    x Revise NOP responses
-    x Heartbeat fixed by using a simple protocol that clients need to deal with
-    x Why the subs cleaner and the heartbeat cleaner can't be solved with just one thing?
+    2021.07.25
+    x It should be possible to have multiple subscriptions
+    x You should be able to send multiple subscriptions messages without blocking the thread (right now subscriptions block)
+    x Delete op
 
-    Maybe you should be able to subscribe to all the content when you don't specify the key
+
+    Maybe you should be able to subscribe to all the content when you don't specify the key?
 
     Consider one channel for messages, other to receive subscriptions
-    It should be possible to have multiple subscriptions
-    You should be able to send multiple subscriptions messages without blocking the thread (right now subscriptions block)
 
     Update the docs with the new commands
     Auth by password
@@ -24,7 +22,6 @@
     Document questions for the mentor
     @mentor Does dropping the lock helps somehow?
 
-    Delete op
     Update key op
 
     Command to get all the keys, gk, jk
@@ -50,6 +47,12 @@
     Push # value should insert into a list, transform normal values
     Pop # should return and delete a value
 
+
+    2021.05.10
+    x Revise Key length
+    x Revise NOP responses
+    x Heartbeat fixed by using a simple protocol that clients need to deal with
+    x Why the subs cleaner and the heartbeat cleaner can't be solved with just one thing?
 
     2021.04.20
     x Delete instruction "d"
