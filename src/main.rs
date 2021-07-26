@@ -108,6 +108,10 @@ fn main() -> io::Result<()> {
 
                                 // Set
                                 msg::Instr::Set => {
+                                    subs_tx
+                                        .send(subs::Cmd::Call(key.to_owned(), value.to_owned()))
+                                        .unwrap();
+
                                     data_tx.send(data::Cmd::Set(key, value)).unwrap();
 
                                     poll_writer_tx
