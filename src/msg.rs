@@ -6,19 +6,19 @@ pub struct Msg {
 
 pub enum Instr {
     Nop,
-    Get,
-    Bite,
-    Jtrim,
-    Json,
     Set,
     SetIfNone,
     Inc,
     Append,
+    Get,
+    Bite,
+    Jtrim,
+    Json,
     Delete,
-    Signal,
     SubJ,
     SubGet,
     SubBite,
+    Signal,
     Unsub,
 }
 
@@ -65,19 +65,19 @@ pub fn parse(text: &str) -> Msg {
     }
 
     let instr = match op.trim().to_lowercase().as_str() {
-        "g" => Instr::Get,
-        "b" => Instr::Bite,
-        "j" => Instr::Jtrim,
-        "js" => Instr::Json,
         "s" => Instr::Set,
         "s?" => Instr::SetIfNone,
         "+1" => Instr::Inc,
         "+" => Instr::Append,
+        "g" => Instr::Get,
+        "b" => Instr::Bite,
+        "j" => Instr::Jtrim,
+        "js" => Instr::Json,
         "d" => Instr::Delete,
-        "!" => Instr::Signal,
         "#j" => Instr::SubJ,
         "#g" => Instr::SubGet,
         "#b" => Instr::SubBite,
+        "!" => Instr::Signal,
         "-#" => Instr::Unsub,
         _ => Instr::Nop,
     };

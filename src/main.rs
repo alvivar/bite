@@ -160,7 +160,7 @@ fn main() -> io::Result<()> {
                                 // Also a first message if value is available.
                                 msg::Instr::SubJ | msg::Instr::SubGet | msg::Instr::SubBite => {
                                     subs_tx
-                                        .send(subs::Cmd::Add(key.to_owned(), conn.id))
+                                        .send(subs::Cmd::Add(key.to_owned(), conn.id, instr))
                                         .unwrap();
 
                                     if !value.is_empty() {
@@ -173,7 +173,7 @@ fn main() -> io::Result<()> {
                                     subs_tx.send(subs::Cmd::Call(key, value)).unwrap();
                                 }
 
-                                // A "bite" desubscription and a last message if value is available.
+                                // A desubscription and a last message if value is available.
                                 msg::Instr::Unsub => {
                                     if !value.is_empty() {
                                         subs_tx
@@ -184,7 +184,10 @@ fn main() -> io::Result<()> {
                                     subs_tx.send(subs::Cmd::Del(key, conn.id)).unwrap();
                                 }
 
-                                msg::Instr::Delete => todo!(),
+                                // Delete!
+                                msg::Instr::Delete => {
+                                    data_tx.send(data::Cmd::Delete(key)).unwrap();
+                                }
                             }
 
                             println!("{}: {}", conn.addr, utf8.trim_end());
