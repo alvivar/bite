@@ -61,21 +61,26 @@ impl Subs {
                 }
 
                 Ok(Cmd::Call(key, value)) => {
-                    if let Some(subs) = self.registry.get(&key) {
-                        for sub in subs {
-                            let msg = match sub.instr {
-                                Instr::SubGet => value.to_owned(),
-                                Instr::SubBite => format!("{} {}", key, value),
-                                Instr::SubJ => {
-                                    let key = key.split(".").last().unwrap();
-                                    json!({ key: value }).to_string()
-                                }
-                                _ => unreachable!(),
-                            };
+                    for alt_key in get_key_combinations(key.as_str()) {
+                        if let Some(subs) = self.registry.get(&alt_key) {
+                            for sub in subs {
+                                let msg = match sub.instr {
+                                    Instr::SubGet => value.to_owned(),
+                                    Instr::SubBite => {
+                                        let key = key.split(".").last().unwrap();
+                                        format!("{} {}", key, value)
+                                    }
+                                    Instr::SubJ => {
+                                        let key = key.split(".").last().unwrap();
+                                        json!({ key: value }).to_string()
+                                    }
+                                    _ => unreachable!(),
+                                };
 
-                            self.writer_tx
-                                .send(writer::Cmd::Write(sub.id, msg))
-                                .unwrap();
+                                self.writer_tx
+                                    .send(writer::Cmd::Write(sub.id, msg))
+                                    .unwrap();
+                            }
                         }
                     }
                 }
@@ -84,4 +89,20 @@ impl Subs {
             }
         }
     }
+}
+
+/// "data.inner.value" -> ["data.inner.value", "data.inner", "data"]
+fn get_key_combinations(key: &str) -> Vec<String> {
+    let mut parent_keys = Vec::<String>::new();
+
+    let keys: Vec<&str> = key.split(".").collect();
+    let len = keys.len();
+
+    for i in 0..len {
+        let end = len - i;
+        let str = keys[..end].join(".");
+        parent_keys.push(str);
+    }
+
+    parent_keys
 }

@@ -101,7 +101,6 @@ fn main() -> io::Result<()> {
                             let key = msg.key;
                             let value = msg.value;
 
-                            // @todo Instead of strings, use an enum.
                             match instr {
                                 // Nop
                                 msg::Instr::Nop => todo!(),
@@ -160,6 +159,11 @@ fn main() -> io::Result<()> {
                                     data_tx.send(data::Cmd::Json(key, conn.id)).unwrap();
                                 }
 
+                                // Delete!
+                                msg::Instr::Delete => {
+                                    data_tx.send(data::Cmd::Delete(key)).unwrap();
+                                }
+
                                 // A generic "bite" subscription. Subscribers also receive their key: "key value"
                                 // Also a first message if value is available.
                                 msg::Instr::SubJ | msg::Instr::SubGet | msg::Instr::SubBite => {
@@ -186,11 +190,6 @@ fn main() -> io::Result<()> {
                                     }
 
                                     subs_tx.send(subs::Cmd::Del(key, conn.id)).unwrap();
-                                }
-
-                                // Delete!
-                                msg::Instr::Delete => {
-                                    data_tx.send(data::Cmd::Delete(key)).unwrap();
                                 }
                             }
 
