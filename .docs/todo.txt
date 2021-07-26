@@ -1,9 +1,15 @@
 
     2021.07.25
+    x Instead of string, the command on the reading should be an enum
     x It should be possible to have multiple subscriptions
     x You should be able to send multiple subscriptions messages without blocking the thread (right now subscriptions block)
     x Delete op
 
+
+    Support the old subscriptions
+    Connect data with the subscriptions things
+    Call subscriptions
+    Writing data on the socket should be a queue
 
     Maybe you should be able to subscribe to all the content when you don't specify the key?
 

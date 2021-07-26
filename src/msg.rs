@@ -1,14 +1,32 @@
 pub struct Msg {
-    pub op: String,
+    pub instr: Instr,
     pub key: String,
     pub value: String,
 }
 
-/// Returns a Msg with the first character found as op, the next word as key,
-/// and the rest as value.
+pub enum Instr {
+    Nop,
+    Get,
+    Bite,
+    Jtrim,
+    Json,
+    Set,
+    SetIfNone,
+    Inc,
+    Append,
+    Delete,
+    Signal,
+    SubJ,
+    SubGet,
+    SubBite,
+    Unsub,
+}
+
+/// Returns a Msg with the first character found as instruction, the next word
+/// as key, and the rest as value.
 
 /// This text: +hello world is a pretty old meme
-/// Returns: Msg { "+", "hello", "world is a pretty old meme" }
+/// Returns: Msg { Instr::Append, "hello", "world is a pretty old meme" }
 
 pub fn parse(text: &str) -> Msg {
     let mut op = String::new();
@@ -38,16 +56,33 @@ pub fn parse(text: &str) -> Msg {
                 }
 
                 _ => {
-                    // @doubt There may be a way to push the rest of the
-                    // iterator instead of one by one.
+                    // @todo There may be a way to push the rest of the iterator
+                    // instead of one by one.
                     value.push(c);
                 }
             },
         }
     }
 
-    let op = op.trim().to_owned();
+    let instr = match op.trim().to_lowercase().as_str() {
+        "g" => Instr::Get,
+        "b" => Instr::Bite,
+        "j" => Instr::Jtrim,
+        "js" => Instr::Json,
+        "s" => Instr::Set,
+        "s?" => Instr::SetIfNone,
+        "+1" => Instr::Inc,
+        "+" => Instr::Append,
+        "d" => Instr::Delete,
+        "!" => Instr::Signal,
+        "#j" => Instr::SubJ,
+        "#g" => Instr::SubGet,
+        "#b" => Instr::SubBite,
+        "-#" => Instr::Unsub,
+        _ => Instr::Nop,
+    };
+
     let key = key.trim().to_owned();
 
-    Msg { op, key, value }
+    Msg { instr, key, value }
 }
