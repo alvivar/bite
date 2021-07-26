@@ -66,14 +66,17 @@ impl Subs {
                             for sub in subs {
                                 let msg = match sub.instr {
                                     Instr::SubGet => value.to_owned(),
+
                                     Instr::SubBite => {
                                         let key = key.split(".").last().unwrap();
                                         format!("{} {}", key, value)
                                     }
+
                                     Instr::SubJ => {
                                         let key = key.split(".").last().unwrap();
                                         json!({ key: value }).to_string()
                                     }
+
                                     _ => unreachable!(),
                                 };
 
