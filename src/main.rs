@@ -103,7 +103,7 @@ fn main() -> io::Result<()> {
 
                             match instr {
                                 // Nop
-                                msg::Instr::Nop => todo!(),
+                                msg::Instr::Nop => (),
 
                                 // Set
                                 msg::Instr::Set => {
