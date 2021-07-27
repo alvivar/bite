@@ -12,6 +12,7 @@ use polling::{Event, Poller};
 
 mod conn;
 mod data;
+mod db;
 mod msg;
 mod subs;
 mod writer;
