@@ -1,5 +1,6 @@
 
-    Sometimes it writes the last message one last time
+    Save into the DB.json
+    Sometimes it writes the last message one last time?
     Maybe unsubscriptions for each subscription
 
     Maybe you should be able to subscribe to all the content when you don't specify the key?
