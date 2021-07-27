@@ -27,18 +27,20 @@ pub enum Cmd {
 pub struct Data {
     data: Arc<Mutex<BTreeMap<String, String>>>,
     writer_tx: Sender<writer::Cmd>,
+    subs_tx: Sender<subs::Cmd>,
     pub tx: Sender<Cmd>,
     rx: Receiver<Cmd>,
 }
 
 impl Data {
-    pub fn new(writer_tx: Sender<writer::Cmd>) -> Data {
+    pub fn new(writer_tx: Sender<writer::Cmd>, subs_tx: Sender<subs::Cmd>) -> Data {
         let data = Arc::new(Mutex::new(BTreeMap::<String, String>::new()));
         let (tx, rx) = channel::<Cmd>();
 
         Data {
             data,
             writer_tx,
+            subs_tx,
             tx,
             rx,
         }
@@ -58,8 +60,16 @@ impl Data {
                     let mut map = self.data.lock().unwrap();
 
                     match map.get(&key) {
-                        Some(_) => {}
+                        Some(val) => {
+                            self.subs_tx
+                                .send(subs::Cmd::Call(key, val.to_owned()))
+                                .unwrap();
+                        }
                         None => {
+                            self.subs_tx
+                                .send(subs::Cmd::Call(key.to_owned(), val.to_owned()))
+                                .unwrap();
+
                             map.insert(key, val);
                         }
                     };
@@ -77,11 +87,15 @@ impl Data {
                         None => 0,
                     };
 
-                    map.insert(key, inc.to_string());
+                    self.subs_tx
+                        .send(subs::Cmd::Call(key.to_owned(), inc.to_string()))
+                        .unwrap();
 
                     self.writer_tx
                         .send(writer::Cmd::Write(id, inc.to_string()))
                         .unwrap();
+
+                    map.insert(key, inc.to_string());
                 }
 
                 Cmd::Append(key, val, id) => {
@@ -97,9 +111,13 @@ impl Data {
 
                         None => {
                             append = val;
-                            map.insert(key, append.to_owned());
+                            map.insert(key.to_owned(), append.to_owned());
                         }
                     };
+
+                    self.subs_tx
+                        .send(subs::Cmd::Call(key, append.to_owned()))
+                        .unwrap();
 
                     self.writer_tx.send(writer::Cmd::Write(id, append)).unwrap();
                 }

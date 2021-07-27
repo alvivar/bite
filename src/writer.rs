@@ -42,7 +42,7 @@ impl Writer {
                     if let Some(conn) = self.writers.lock().unwrap().get_mut(&id) {
                         let mut msg = msg.trim_end().to_owned();
                         msg.push('\n');
-                        conn.data = msg.into();
+                        conn.to_write.push(msg.into());
 
                         self.poller
                             .modify(&conn.socket, Event::writable(conn.id))
@@ -57,7 +57,7 @@ impl Writer {
                         if let Some(conn) = writers.get_mut(&id) {
                             let mut msg = msg.trim_end().to_owned();
                             msg.push('\n');
-                            conn.data = msg.into();
+                            conn.to_write.push(msg.into());
 
                             self.poller
                                 .modify(&conn.socket, Event::writable(conn.id))

@@ -1,11 +1,8 @@
 
-    Connect data with the subscriptions things
-    Call subscriptions
-    Writing data on the socket should be a queue
+    Sometimes it writes the last message one last time
+    Maybe unsubscriptions for each subscription
 
     Maybe you should be able to subscribe to all the content when you don't specify the key?
-
-    Consider one channel for messages, other to receive subscriptions
 
     Update the docs with the new commands
     Auth by password
@@ -16,7 +13,6 @@
     tungstenite to support websockets?
     Handle casting, int, float, bool?
 
-    Could smol make the application faster?
     Document questions for the mentor
     @mentor Does dropping the lock helps somehow?
 
@@ -27,7 +23,6 @@
 
     Extract kv range into his own function
     Gracefully shutdown on Docker, Ctrl + C
-    I'm using the Cargo.toml dependencies correctly?
 
     Use a decent log system instead of println?
     DB file name by environment
@@ -45,6 +40,14 @@
     Push # value should insert into a list, transform normal values
     Pop # should return and delete a value
 
+
+    2021.07.27
+    x Connect data with the subscriptions things
+    x Writing data on the socket should be a queue
+    x Call subscriptions
+    x Consider one channel for messages, other to receive subscriptions
+    x Could smol make the application faster?
+    x I'm using the Cargo.toml dependencies correctly?
 
     2021.07.25
     x Support the old subscriptions

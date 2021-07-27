@@ -48,7 +48,7 @@ impl Subs {
                 Ok(Cmd::Add(key, id, instr)) => {
                     let subs = self.registry.entry(key).or_insert_with(Vec::new);
 
-                    if subs.iter().any(|x| x.id == id) {
+                    if subs.iter().any(|x| x.id == id && x.instr == instr) {
                         continue;
                     }
 

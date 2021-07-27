@@ -4,6 +4,7 @@ pub struct Msg {
     pub value: String,
 }
 
+#[derive(PartialEq)]
 pub enum Instr {
     Nop,
     Set,
