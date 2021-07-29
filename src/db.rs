@@ -1,5 +1,3 @@
-use serde_json::{self};
-
 use std::{
     collections::BTreeMap,
     fs::{self, OpenOptions},
@@ -11,6 +9,8 @@ use std::{
     thread::sleep,
     time::Duration,
 };
+
+use serde_json::{self};
 
 const DB_PATH: &str = "./data";
 const DB_FILE: &str = "./data/DB.json";
@@ -72,8 +72,6 @@ impl DB {
             .open(DB_FILE);
 
         let json = serde_json::to_string_pretty(&*map).unwrap();
-        drop(map);
-
         file.unwrap().write_all(json.as_bytes()).unwrap();
     }
 }

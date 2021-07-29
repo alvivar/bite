@@ -7,7 +7,6 @@ use std::{
     thread,
 };
 
-use data::Data;
 use polling::{Event, Poller};
 
 mod conn;
@@ -18,6 +17,8 @@ mod subs;
 mod writer;
 
 use conn::Connection;
+use data::Data;
+use db::DB;
 use msg::parse;
 use subs::Subs;
 use writer::Writer;
@@ -51,10 +52,17 @@ fn main() -> io::Result<()> {
     let data_subs_tx = subs.tx.clone();
     thread::spawn(move || subs.handle());
 
-    // Data
+    // Data & DB
     let data = Data::new(data_writer_tx, data_subs_tx);
+    let data_map = data.map.clone();
     let data_tx = data.tx.clone();
-    thread::spawn(move || data.handle());
+
+    let mut db = DB::new(data_map);
+    let db_modified = db.modified.clone();
+    db.load_from_file();
+
+    thread::spawn(move || db.handle(3));
+    thread::spawn(move || data.handle(db_modified));
 
     // Connections and events via smol Poller.
     let mut id: usize = 1;

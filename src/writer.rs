@@ -10,9 +10,14 @@ use polling::{Event, Poller};
 
 use crate::conn::Connection;
 
+pub struct Msg {
+    pub id: usize,
+    pub msg: String,
+}
+
 pub enum Cmd {
     Write(usize, String), // @todo Wondering if Vec<u8> would be better than String.
-    WriteAll(Vec<usize>, String),
+    WriteAll(Vec<Msg>),
 }
 
 pub struct Writer {
@@ -50,12 +55,12 @@ impl Writer {
                     }
                 }
 
-                Cmd::WriteAll(ids, msg) => {
+                Cmd::WriteAll(msgs) => {
                     let mut writers = self.writers.lock().unwrap();
 
-                    for id in ids {
-                        if let Some(conn) = writers.get_mut(&id) {
-                            let mut msg = msg.trim_end().to_owned();
+                    for msg in msgs {
+                        if let Some(conn) = writers.get_mut(&msg.id) {
+                            let mut msg = msg.msg.trim_end().to_owned();
                             msg.push('\n');
                             conn.to_write.push(msg.into());
 

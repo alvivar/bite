@@ -1,6 +1,3 @@
-use polling::Poller;
-use serde_json::{self, json, Value};
-
 use std::{
     collections::BTreeMap,
     sync::{
@@ -10,7 +7,9 @@ use std::{
     },
 };
 
-use crate::{parse, subs, writer};
+use serde_json::{self, json, Value};
+
+use crate::{subs, writer};
 
 pub enum Cmd {
     Get(String, usize),
@@ -25,7 +24,7 @@ pub enum Cmd {
 }
 
 pub struct Data {
-    data: Arc<Mutex<BTreeMap<String, String>>>,
+    pub map: Arc<Mutex<BTreeMap<String, String>>>,
     writer_tx: Sender<writer::Cmd>,
     subs_tx: Sender<subs::Cmd>,
     pub tx: Sender<Cmd>,
@@ -34,11 +33,11 @@ pub struct Data {
 
 impl Data {
     pub fn new(writer_tx: Sender<writer::Cmd>, subs_tx: Sender<subs::Cmd>) -> Data {
-        let data = Arc::new(Mutex::new(BTreeMap::<String, String>::new()));
+        let map = Arc::new(Mutex::new(BTreeMap::<String, String>::new()));
         let (tx, rx) = channel::<Cmd>();
 
         Data {
-            data,
+            map,
             writer_tx,
             subs_tx,
             tx,
@@ -46,18 +45,21 @@ impl Data {
         }
     }
 
-    pub fn handle(&self) {
+    pub fn handle(&self, modified: Arc<AtomicBool>) {
         loop {
             let msg = self.rx.recv().unwrap();
 
             match msg {
                 Cmd::Set(key, val) => {
-                    let mut map = self.data.lock().unwrap();
+                    let mut map = self.map.lock().unwrap();
+
                     map.insert(key, val);
+
+                    modified.swap(true, Ordering::Relaxed);
                 }
 
                 Cmd::SetIfNone(key, val) => {
-                    let mut map = self.data.lock().unwrap();
+                    let mut map = self.map.lock().unwrap();
 
                     match map.get(&key) {
                         Some(val) => {
@@ -71,12 +73,14 @@ impl Data {
                                 .unwrap();
 
                             map.insert(key, val);
+
+                            modified.swap(true, Ordering::Relaxed);
                         }
                     };
                 }
 
                 Cmd::Inc(key, id) => {
-                    let mut map = self.data.lock().unwrap();
+                    let mut map = self.map.lock().unwrap();
 
                     let inc = match map.get(&key) {
                         Some(val) => match val.parse::<u32>() {
@@ -96,10 +100,12 @@ impl Data {
                         .unwrap();
 
                     map.insert(key, inc.to_string());
+
+                    modified.swap(true, Ordering::Relaxed);
                 }
 
                 Cmd::Append(key, val, id) => {
-                    let mut map = self.data.lock().unwrap();
+                    let mut map = self.map.lock().unwrap();
 
                     let mut append = String::new();
 
@@ -111,19 +117,24 @@ impl Data {
 
                         None => {
                             append = val;
-                            map.insert(key.to_owned(), append.to_owned());
                         }
                     };
 
                     self.subs_tx
-                        .send(subs::Cmd::Call(key, append.to_owned()))
+                        .send(subs::Cmd::Call(key.to_owned(), append.to_owned()))
                         .unwrap();
 
-                    self.writer_tx.send(writer::Cmd::Write(id, append)).unwrap();
+                    self.writer_tx
+                        .send(writer::Cmd::Write(id, append.to_owned()))
+                        .unwrap();
+
+                    map.insert(key, append);
+
+                    modified.swap(true, Ordering::Relaxed);
                 }
 
                 Cmd::Get(key, id) => {
-                    let map = self.data.lock().unwrap();
+                    let map = self.map.lock().unwrap();
                     let msg = match map.get(&key) {
                         Some(val) => val,
                         None => "",
@@ -135,7 +146,7 @@ impl Data {
                 }
 
                 Cmd::Bite(key, id) => {
-                    let map = self.data.lock().unwrap();
+                    let map = self.map.lock().unwrap();
                     let range = map.range(key.to_owned()..);
 
                     let kv: Vec<(&str, &str)> = range
@@ -154,7 +165,7 @@ impl Data {
                 }
 
                 Cmd::Jtrim(key, id) => {
-                    let map = self.data.lock().unwrap();
+                    let map = self.map.lock().unwrap();
                     let range = map.range(key.to_owned()..);
 
                     let kv: Vec<(&str, &str)> = range
@@ -179,7 +190,7 @@ impl Data {
                 }
 
                 Cmd::Json(key, id) => {
-                    let map = self.data.lock().unwrap();
+                    let map = self.map.lock().unwrap();
                     let range = map.range(key.to_owned()..);
 
                     let kv: Vec<(&str, &str)> = range
@@ -204,7 +215,7 @@ impl Data {
                 }
 
                 Cmd::Delete(key) => {
-                    let mut map = self.data.lock().unwrap();
+                    let mut map = self.map.lock().unwrap();
                     map.remove(&key);
                 }
             }

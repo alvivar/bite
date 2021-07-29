@@ -1,15 +1,11 @@
 use std::{
     collections::HashMap,
-    sync::{
-        mpsc::{channel, Receiver, Sender},
-        Arc, Mutex,
-    },
+    sync::mpsc::{channel, Receiver, Sender},
 };
 
-use polling::{Event, Poller};
 use serde_json::json;
 
-use crate::{conn::Connection, msg::Instr, writer};
+use crate::{msg::Instr, writer};
 
 pub enum Cmd {
     Add(String, usize, Instr),
@@ -61,6 +57,8 @@ impl Subs {
                 }
 
                 Ok(Cmd::Call(key, value)) => {
+                    let mut msgs = Vec::<writer::Msg>::new();
+
                     for alt_key in get_key_combinations(key.as_str()) {
                         if let Some(subs) = self.registry.get(&alt_key) {
                             for sub in subs {
@@ -80,11 +78,13 @@ impl Subs {
                                     _ => unreachable!(),
                                 };
 
-                                self.writer_tx
-                                    .send(writer::Cmd::Write(sub.id, msg))
-                                    .unwrap();
+                                msgs.push(writer::Msg { id: sub.id, msg });
                             }
                         }
+                    }
+
+                    if msgs.len() > 0 {
+                        self.writer_tx.send(writer::Cmd::WriteAll(msgs)).unwrap();
                     }
                 }
 
