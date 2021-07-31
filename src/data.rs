@@ -47,9 +47,7 @@ impl Data {
 
     pub fn handle(&self, db_modified: Arc<AtomicBool>) {
         loop {
-            let msg = self.rx.recv().unwrap();
-
-            match msg {
+            match self.rx.recv().unwrap() {
                 Cmd::Set(key, val) => {
                     let mut map = self.map.lock().unwrap();
 
@@ -101,7 +99,6 @@ impl Data {
                     let mut map = self.map.lock().unwrap();
 
                     let mut append = String::new();
-
                     match map.get_mut(&key) {
                         Some(v) => {
                             append.push_str(v);
