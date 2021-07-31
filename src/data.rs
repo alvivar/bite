@@ -45,7 +45,7 @@ impl Data {
         }
     }
 
-    pub fn handle(&self, modified: Arc<AtomicBool>) {
+    pub fn handle(&self, db_modified: Arc<AtomicBool>) {
         loop {
             let msg = self.rx.recv().unwrap();
 
@@ -55,28 +55,21 @@ impl Data {
 
                     map.insert(key, val);
 
-                    modified.swap(true, Ordering::Relaxed);
+                    db_modified.swap(true, Ordering::Relaxed);
                 }
 
                 Cmd::SetIfNone(key, val) => {
                     let mut map = self.map.lock().unwrap();
 
-                    match map.get(&key) {
-                        Some(val) => {
-                            self.subs_tx
-                                .send(subs::Cmd::Call(key, val.to_owned()))
-                                .unwrap();
-                        }
-                        None => {
-                            self.subs_tx
-                                .send(subs::Cmd::Call(key.to_owned(), val.to_owned()))
-                                .unwrap();
+                    if let None = map.get(&key) {
+                        self.subs_tx
+                            .send(subs::Cmd::Call(key.to_owned(), val.to_owned()))
+                            .unwrap();
 
-                            map.insert(key, val);
+                        map.insert(key, val);
 
-                            modified.swap(true, Ordering::Relaxed);
-                        }
-                    };
+                        db_modified.swap(true, Ordering::Relaxed);
+                    }
                 }
 
                 Cmd::Inc(key, id) => {
@@ -101,7 +94,7 @@ impl Data {
 
                     map.insert(key, inc.to_string());
 
-                    modified.swap(true, Ordering::Relaxed);
+                    db_modified.swap(true, Ordering::Relaxed);
                 }
 
                 Cmd::Append(key, val, id) => {
@@ -130,7 +123,7 @@ impl Data {
 
                     map.insert(key, append);
 
-                    modified.swap(true, Ordering::Relaxed);
+                    db_modified.swap(true, Ordering::Relaxed);
                 }
 
                 Cmd::Get(key, id) => {
@@ -217,6 +210,8 @@ impl Data {
                 Cmd::Delete(key) => {
                     let mut map = self.map.lock().unwrap();
                     map.remove(&key);
+
+                    db_modified.swap(true, Ordering::Relaxed);
                 }
             }
         }
