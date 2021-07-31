@@ -1,15 +1,12 @@
 
-    Save into the DB.json
-    Sometimes it writes the last message one last time?
-    Maybe unsubscriptions for each subscription
-
-    Maybe you should be able to subscribe to all the content when you don't specify the key?
-
     Update the docs with the new commands
+    Maybe unsubscriptions for each subscription
     Auth by password
 
+    Maybe you should be able to subscribe to all the content when you don't specify the key?
+    Extract kv range into his own function
+
     Send multiple commands, batch-like (Multiple sets, to receive multiple results)
-    Optimize subscriptions calling by grouping connections by instructions when calling the map?
 
     tungstenite to support websockets?
     Handle casting, int, float, bool?
@@ -17,19 +14,18 @@
     Document questions for the mentor
     @mentor Does dropping the lock helps somehow?
 
-    Update key op
-
-    Command to get all the keys, gk, jk
     Trim '.' at the end to avoid weird formats?
 
-    Extract kv range into his own function
+    Update key op?
+    Command to get all the keys, gk, jk?
+
     Gracefully shutdown on Docker, Ctrl + C
 
     Use a decent log system instead of println?
+    Use Error as results instead of unwrap
     DB file name by environment
     IP and port by environment
 
-    Use Error as results instead of unwrap
     Heroku script
 
     Thread waiting for q! in the input to quit.
@@ -41,6 +37,11 @@
     Push # value should insert into a list, transform normal values
     Pop # should return and delete a value
 
+
+    2021.07.31
+    x Optimize subscriptions calling by grouping connections by instructions when calling the map?
+    x Save into the DB.json
+    x Sometimes it writes the last message one last time?
 
     2021.07.27
     x Connect data with the subscriptions things
