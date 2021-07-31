@@ -27,6 +27,8 @@ const OK: &str = "OK";
 const NOP: &str = "NOP";
 
 fn main() -> io::Result<()> {
+    println!("\nbit:e\n");
+
     // The server and the smol Poller.
     let server = TcpListener::bind("0.0.0.0:1984")?;
     server.set_nonblocking(true)?;
