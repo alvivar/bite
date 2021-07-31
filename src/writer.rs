@@ -41,8 +41,7 @@ impl Writer {
 
     pub fn handle(self) {
         loop {
-            let cmd = self.rx.recv().unwrap();
-            match cmd {
+            match self.rx.recv().unwrap() {
                 Cmd::Write(id, msg) => {
                     if let Some(conn) = self.writers.lock().unwrap().get_mut(&id) {
                         let mut msg = msg.trim_end().to_owned();
