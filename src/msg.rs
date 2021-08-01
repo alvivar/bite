@@ -83,7 +83,7 @@ pub fn parse(text: &str) -> Msg {
         _ => Instr::Nop,
     };
 
-    let key = key.trim().trim_end();
+    let key = key.trim_end().to_owned();
     let value = value.trim_end().to_owned();
 
     Msg { instr, key, value }
