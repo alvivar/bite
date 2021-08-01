@@ -44,8 +44,8 @@ impl Writer {
             match self.rx.recv().unwrap() {
                 Cmd::Write(id, msg) => {
                     if let Some(conn) = self.writers.lock().unwrap().get_mut(&id) {
-                        let mut msg = msg.trim_end().to_owned();
-                        msg.push('\n');
+                        let msg = msg.trim_end().to_owned();
+                        // msg.push('\n');
                         conn.to_write.push(msg.into());
 
                         self.poller
@@ -59,8 +59,8 @@ impl Writer {
 
                     for msg in msgs {
                         if let Some(conn) = writers.get_mut(&msg.id) {
-                            let mut msg = msg.msg.trim_end().to_owned();
-                            msg.push('\n');
+                            let msg = msg.msg.trim_end().to_owned();
+                            // msg.push('\n');
                             conn.to_write.push(msg.into());
 
                             self.poller
