@@ -284,7 +284,7 @@ fn handle_writing(conn: &mut Connection) {
     let data = conn.to_write.remove(0);
 
     println!();
-    println!("Writing: {} ", data.to_string());
+    println!("Writing: {} ", from_utf8(&data).unwrap());
     println!();
 
     if let Err(err) = conn.socket.write(&data) {
