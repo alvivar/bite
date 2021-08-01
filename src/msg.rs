@@ -34,20 +34,20 @@ pub fn parse(text: &str) -> Msg {
     let mut key = String::new();
     let mut value = String::new();
 
-    let mut next = 0;
+    let mut word = 0;
     for c in text.chars() {
         match c {
-            ' ' => {
+            _ if c.is_whitespace() => {
                 if !value.is_empty() {
                     value.push(' ');
                 } else if !key.is_empty() {
-                    next = 2;
+                    word = 2;
                 } else if !op.is_empty() {
-                    next = 1;
+                    word = 1;
                 }
             }
 
-            _ => match next {
+            _ => match word {
                 0 => {
                     op.push(c);
                 }
@@ -65,7 +65,7 @@ pub fn parse(text: &str) -> Msg {
         }
     }
 
-    let instr = match op.trim().to_lowercase().as_str() {
+    let instr = match op.trim_end().to_lowercase().as_str() {
         "s" => Instr::Set,
         "s?" => Instr::SetIfNone,
         "+1" => Instr::Inc,
@@ -83,7 +83,8 @@ pub fn parse(text: &str) -> Msg {
         _ => Instr::Nop,
     };
 
-    let key = key.trim().to_owned();
+    let key = key.trim().trim_end();
+    let value = value.trim_end().to_owned();
 
     Msg { instr, key, value }
 }
