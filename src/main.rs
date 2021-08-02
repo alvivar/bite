@@ -298,10 +298,6 @@ fn handle_reading(conn: &mut Connection) {
 fn handle_writing(conn: &mut Connection) {
     let data = conn.to_write.remove(0);
 
-    println!();
-    println!("Writing to {}: {} ", conn.addr, from_utf8(&data).unwrap());
-    println!();
-
     if let Err(err) = conn.socket.write(&data) {
         println!("Connection #{} broken, write failed: {}", conn.id, err);
         conn.closed = true;
