@@ -1,9 +1,3 @@
-pub struct Msg {
-    pub instr: Instr,
-    pub key: String,
-    pub value: String,
-}
-
 #[derive(PartialEq)]
 pub enum Instr {
     Nop,
@@ -16,11 +10,17 @@ pub enum Instr {
     Bite,
     Jtrim,
     Json,
-    SubJ,
     SubGet,
     SubBite,
+    SubJ,
     Unsub,
     Signal,
+}
+
+pub struct Msg {
+    pub instr: Instr,
+    pub key: String,
+    pub value: String,
 }
 
 /// Returns a Msg with the first character found as instruction, the next word
@@ -75,9 +75,9 @@ pub fn parse(text: &str) -> Msg {
         "b" => Instr::Bite,
         "j" => Instr::Jtrim,
         "js" => Instr::Json,
-        "#j" => Instr::SubJ,
         "#g" => Instr::SubGet,
         "#b" => Instr::SubBite,
+        "#j" => Instr::SubJ,
         "-#" => Instr::Unsub,
         "!" => Instr::Signal,
         _ => Instr::Nop,
@@ -87,4 +87,22 @@ pub fn parse(text: &str) -> Msg {
     let value = value.trim_end().to_owned();
 
     Msg { instr, key, value }
+}
+
+pub fn needs_key(instr: &Instr) -> bool {
+    match instr {
+        Instr::Nop | Instr::Bite | Instr::Jtrim | Instr::Json => false,
+
+        Instr::Set
+        | Instr::SetIfNone
+        | Instr::Inc
+        | Instr::Append
+        | Instr::Delete
+        | Instr::Get
+        | Instr::SubGet
+        | Instr::SubBite
+        | Instr::SubJ
+        | Instr::Unsub
+        | Instr::Signal => true,
+    }
 }

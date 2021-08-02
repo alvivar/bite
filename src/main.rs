@@ -19,12 +19,13 @@ mod writer;
 use conn::Connection;
 use data::Data;
 use db::DB;
-use msg::parse;
+use msg::{parse, Instr};
 use subs::Subs;
 use writer::Writer;
 
 const OK: &str = "OK";
 const NOP: &str = "NOP";
+const KEY: &str = "KEY?";
 
 fn main() -> io::Result<()> {
     println!("\nbit:e\n");
@@ -108,7 +109,7 @@ fn main() -> io::Result<()> {
                         poller.modify(&conn.socket, Event::readable(id))?;
 
                         // One at the time.
-                        if conn.received.len() > 0 {
+                        if !conn.received.is_empty() {
                             let received = conn.received.remove(0);
 
                             // Instructions should be string.
@@ -123,15 +124,22 @@ fn main() -> io::Result<()> {
                                     let value = msg.value;
 
                                     match instr {
+                                        // Instructions that doesn't make sense without key.
+                                        _ if msg::needs_key(&instr) => {
+                                            poll_writer_tx
+                                                .send(writer::Cmd::Write(conn.id, KEY.into()))
+                                                .unwrap();
+                                        }
+
                                         // Nop
-                                        msg::Instr::Nop => {
+                                        Instr::Nop => {
                                             poll_writer_tx
                                                 .send(writer::Cmd::Write(conn.id, NOP.into()))
                                                 .unwrap();
                                         }
 
                                         // Set
-                                        msg::Instr::Set => {
+                                        Instr::Set => {
                                             subs_tx
                                                 .send(subs::Cmd::Call(
                                                     key.to_owned(),
@@ -147,7 +155,7 @@ fn main() -> io::Result<()> {
                                         }
 
                                         // Set only if the key doesn't exists.
-                                        msg::Instr::SetIfNone => {
+                                        Instr::SetIfNone => {
                                             data_tx.send(data::Cmd::SetIfNone(key, value)).unwrap();
 
                                             poll_writer_tx
@@ -156,19 +164,19 @@ fn main() -> io::Result<()> {
                                         }
 
                                         // Makes the value an integer and increase it in 1.
-                                        msg::Instr::Inc => {
+                                        Instr::Inc => {
                                             data_tx.send(data::Cmd::Inc(key, conn.id)).unwrap();
                                         }
 
                                         // Appends the value.
-                                        msg::Instr::Append => {
+                                        Instr::Append => {
                                             data_tx
                                                 .send(data::Cmd::Append(key, value, conn.id))
                                                 .unwrap();
                                         }
 
                                         // Delete!
-                                        msg::Instr::Delete => {
+                                        Instr::Delete => {
                                             data_tx.send(data::Cmd::Delete(key)).unwrap();
 
                                             poll_writer_tx
@@ -177,30 +185,28 @@ fn main() -> io::Result<()> {
                                         }
 
                                         // Get
-                                        msg::Instr::Get => {
+                                        Instr::Get => {
                                             data_tx.send(data::Cmd::Get(key, conn.id)).unwrap();
                                         }
 
                                         // "Bite" query, 0x0 separated key value enumeration: key value'\0x0'key2 value2
-                                        msg::Instr::Bite => {
+                                        Instr::Bite => {
                                             data_tx.send(data::Cmd::Bite(key, conn.id)).unwrap();
                                         }
 
                                         // Trimmed Json (just the data).
-                                        msg::Instr::Jtrim => {
+                                        Instr::Jtrim => {
                                             data_tx.send(data::Cmd::Jtrim(key, conn.id)).unwrap();
                                         }
 
                                         // Json (full path).
-                                        msg::Instr::Json => {
+                                        Instr::Json => {
                                             data_tx.send(data::Cmd::Json(key, conn.id)).unwrap();
                                         }
 
                                         // A generic "bite" subscription. Subscribers also receive their key: "key value"
                                         // Also a first message if value is available.
-                                        msg::Instr::SubJ
-                                        | msg::Instr::SubGet
-                                        | msg::Instr::SubBite => {
+                                        Instr::SubGet | Instr::SubBite | Instr::SubJ => {
                                             subs_tx
                                                 .send(subs::Cmd::Add(
                                                     key.to_owned(),
@@ -218,17 +224,8 @@ fn main() -> io::Result<()> {
                                                 .unwrap();
                                         }
 
-                                        // Calls key subscribers with the new value without data modifications.
-                                        msg::Instr::Signal => {
-                                            subs_tx.send(subs::Cmd::Call(key, value)).unwrap();
-
-                                            poll_writer_tx
-                                                .send(writer::Cmd::Write(conn.id, OK.into()))
-                                                .unwrap();
-                                        }
-
                                         // A desubscription and a last message if value is available.
-                                        msg::Instr::Unsub => {
+                                        Instr::Unsub => {
                                             if !value.is_empty() {
                                                 subs_tx
                                                     .send(subs::Cmd::Call(key.to_owned(), value))
@@ -236,6 +233,15 @@ fn main() -> io::Result<()> {
                                             }
 
                                             subs_tx.send(subs::Cmd::Del(key, conn.id)).unwrap();
+
+                                            poll_writer_tx
+                                                .send(writer::Cmd::Write(conn.id, OK.into()))
+                                                .unwrap();
+                                        }
+
+                                        // Calls key subscribers with the new value without data modifications.
+                                        Instr::Signal => {
+                                            subs_tx.send(subs::Cmd::Call(key, value)).unwrap();
 
                                             poll_writer_tx
                                                 .send(writer::Cmd::Write(conn.id, OK.into()))
