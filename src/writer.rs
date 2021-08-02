@@ -16,7 +16,7 @@ pub struct Msg {
 }
 
 pub enum Cmd {
-    Write(usize, String), // @todo Wondering if Vec<u8> would be better than String.
+    Write(usize, String), // @todo Maybe Vec<u8> would be better than String.
     WriteAll(Vec<Msg>),
 }
 

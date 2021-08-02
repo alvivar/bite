@@ -1,4 +1,6 @@
 
+    When reading handle the value as bytes, use utf8 to parse the instructions and the key
+
     Update the docs with the new commands
     Maybe unsubscriptions for each subscription
     Auth by password
