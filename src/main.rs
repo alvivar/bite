@@ -113,8 +113,10 @@ fn main() -> io::Result<()> {
 
                             if let Ok(utf8) = from_utf8(&received) {
                                 // We assume multiple instructions separated with newlines.
-                                for batched in utf8.split('\n') {
-                                    let msg = parse(batched.trim());
+                                for batched in utf8.trim().split('\n') {
+                                    let batched = batched.trim();
+
+                                    let msg = parse(batched);
                                     let instr = msg.instr;
                                     let key = msg.key;
                                     let value = msg.value;
@@ -239,9 +241,9 @@ fn main() -> io::Result<()> {
                                                 .unwrap();
                                         }
                                     }
-                                }
 
-                                println!("{}: {}", conn.addr, utf8.trim_end());
+                                    println!("{}: {}", conn.addr, batched);
+                                }
                             }
                         }
 
