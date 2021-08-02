@@ -269,7 +269,7 @@ fn main() -> io::Result<()> {
                         handle_writing(conn);
 
                         // We need to send more.
-                        if conn.to_write.len() > 0 {
+                        if !conn.to_write.is_empty() {
                             poller
                                 .modify(&conn.socket, Event::writable(conn.id))
                                 .unwrap();

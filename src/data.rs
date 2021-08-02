@@ -59,7 +59,7 @@ impl Data {
                 Cmd::SetIfNone(key, val) => {
                     let mut map = self.map.lock().unwrap();
 
-                    if let None = map.get(&key) {
+                    if map.get(&key).is_none() {
                         self.subs_tx
                             .send(subs::Cmd::Call(key.to_owned(), val.to_owned()))
                             .unwrap();
@@ -153,7 +153,7 @@ impl Data {
 
                     let mut msg = String::new();
                     for (k, v) in kv {
-                        let k = k.split(".").last().unwrap();
+                        let k = k.split('.').last().unwrap();
                         msg.push_str(format!("{} {}\0", k, v).as_str());
                     }
                     let msg = msg.trim_end().to_owned(); // @todo What's happening here exactly?
@@ -225,7 +225,7 @@ pub fn kv_to_json(kv: &[(&str, &str)]) -> Value {
         insert(&mut merged_json, k, json!(v));
     }
 
-    return merged_json;
+    merged_json
 }
 
 fn insert(mut json: &mut Value, key: &str, val: Value) {
@@ -237,7 +237,7 @@ fn insert(mut json: &mut Value, key: &str, val: Value) {
             .or_insert_with(|| json!({}));
     }
 
-    if **&json == json!({}) {
+    if json == &json!({}) {
         *json = val;
     }
 }

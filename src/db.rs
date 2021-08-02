@@ -54,7 +54,7 @@ impl DB {
         let mut contents = String::new();
         file.read_to_string(&mut contents).unwrap();
 
-        if contents.len() > 0 {
+        if !contents.is_empty() {
             let c = self.data.clone();
             let mut map = c.lock().unwrap();
             *map = serde_json::from_str(&contents).unwrap();

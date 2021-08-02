@@ -66,12 +66,12 @@ impl Subs {
                                     Instr::SubGet => value.to_owned(),
 
                                     Instr::SubBite => {
-                                        let key = key.split(".").last().unwrap();
+                                        let key = key.split('.').last().unwrap();
                                         format!("{} {}", key, value)
                                     }
 
                                     Instr::SubJ => {
-                                        let key = key.split(".").last().unwrap();
+                                        let key = key.split('.').last().unwrap();
                                         json!({ key: value }).to_string()
                                     }
 
@@ -83,7 +83,7 @@ impl Subs {
                         }
                     }
 
-                    if msgs.len() > 0 {
+                    if !msgs.is_empty() {
                         self.writer_tx.send(writer::Cmd::WriteAll(msgs)).unwrap();
                     }
                 }
@@ -98,7 +98,7 @@ impl Subs {
 fn get_key_combinations(key: &str) -> Vec<String> {
     let mut parent_keys = Vec::<String>::new();
 
-    let keys: Vec<&str> = key.split(".").collect();
+    let keys: Vec<&str> = key.split('.').collect();
     let len = keys.len();
 
     for i in 0..len {
