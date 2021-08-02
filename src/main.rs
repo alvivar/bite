@@ -19,7 +19,7 @@ mod writer;
 use conn::Connection;
 use data::Data;
 use db::DB;
-use msg::{parse, Instr};
+use msg::{needs_key, parse, Instr};
 use subs::Subs;
 use writer::Writer;
 
@@ -125,7 +125,7 @@ fn main() -> io::Result<()> {
 
                                     match instr {
                                         // Instructions that doesn't make sense without key.
-                                        _ if msg::needs_key(&instr) => {
+                                        _ if key.is_empty() && needs_key(&instr) => {
                                             poll_writer_tx
                                                 .send(writer::Cmd::Write(conn.id, KEY.into()))
                                                 .unwrap();
