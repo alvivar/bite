@@ -111,6 +111,7 @@ fn main() -> io::Result<()> {
                         if conn.received.len() > 0 {
                             let received = conn.received.remove(0);
 
+                            // Instructions should be string.
                             if let Ok(utf8) = from_utf8(&received) {
                                 // We assume multiple instructions separated with newlines.
                                 for batched in utf8.trim().split('\n') {
@@ -166,6 +167,15 @@ fn main() -> io::Result<()> {
                                                 .unwrap();
                                         }
 
+                                        // Delete!
+                                        msg::Instr::Delete => {
+                                            data_tx.send(data::Cmd::Delete(key)).unwrap();
+
+                                            poll_writer_tx
+                                                .send(writer::Cmd::Write(conn.id, OK.into()))
+                                                .unwrap();
+                                        }
+
                                         // Get
                                         msg::Instr::Get => {
                                             data_tx.send(data::Cmd::Get(key, conn.id)).unwrap();
@@ -184,15 +194,6 @@ fn main() -> io::Result<()> {
                                         // Json (full path).
                                         msg::Instr::Json => {
                                             data_tx.send(data::Cmd::Json(key, conn.id)).unwrap();
-                                        }
-
-                                        // Delete!
-                                        msg::Instr::Delete => {
-                                            data_tx.send(data::Cmd::Delete(key)).unwrap();
-
-                                            poll_writer_tx
-                                                .send(writer::Cmd::Write(conn.id, OK.into()))
-                                                .unwrap();
                                         }
 
                                         // A generic "bite" subscription. Subscribers also receive their key: "key value"
@@ -257,6 +258,7 @@ fn main() -> io::Result<()> {
 
                 id if ev.writable => {
                     let mut writers = writers.lock().unwrap();
+
                     if let Some(conn) = writers.get_mut(&id) {
                         handle_writing(conn);
 

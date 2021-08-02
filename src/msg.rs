@@ -11,16 +11,16 @@ pub enum Instr {
     SetIfNone,
     Inc,
     Append,
+    Delete,
     Get,
     Bite,
     Jtrim,
     Json,
-    Delete,
     SubJ,
     SubGet,
     SubBite,
-    Signal,
     Unsub,
+    Signal,
 }
 
 /// Returns a Msg with the first character found as instruction, the next word
@@ -70,16 +70,16 @@ pub fn parse(text: &str) -> Msg {
         "s?" => Instr::SetIfNone,
         "+1" => Instr::Inc,
         "+" => Instr::Append,
+        "d" => Instr::Delete,
         "g" => Instr::Get,
         "b" => Instr::Bite,
         "j" => Instr::Jtrim,
         "js" => Instr::Json,
-        "d" => Instr::Delete,
         "#j" => Instr::SubJ,
         "#g" => Instr::SubGet,
         "#b" => Instr::SubBite,
-        "!" => Instr::Signal,
         "-#" => Instr::Unsub,
+        "!" => Instr::Signal,
         _ => Instr::Nop,
     };
 

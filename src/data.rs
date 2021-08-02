@@ -12,15 +12,15 @@ use serde_json::{self, json, Value};
 use crate::{subs, writer};
 
 pub enum Cmd {
-    Get(String, usize),
-    Bite(String, usize),
-    Jtrim(String, usize),
-    Json(String, usize),
     Set(String, String),
     SetIfNone(String, String),
     Inc(String, usize),
     Append(String, String, usize),
     Delete(String),
+    Get(String, usize),
+    Bite(String, usize),
+    Jtrim(String, usize),
+    Json(String, usize),
 }
 
 pub struct Data {
@@ -123,6 +123,13 @@ impl Data {
                     db_modified.swap(true, Ordering::Relaxed);
                 }
 
+                Cmd::Delete(key) => {
+                    let mut map = self.map.lock().unwrap();
+                    map.remove(&key);
+
+                    db_modified.swap(true, Ordering::Relaxed);
+                }
+
                 Cmd::Get(key, id) => {
                     let map = self.map.lock().unwrap();
                     let msg = match map.get(&key) {
@@ -202,13 +209,6 @@ impl Data {
                     };
 
                     self.writer_tx.send(writer::Cmd::Write(id, msg)).unwrap();
-                }
-
-                Cmd::Delete(key) => {
-                    let mut map = self.map.lock().unwrap();
-                    map.remove(&key);
-
-                    db_modified.swap(true, Ordering::Relaxed);
                 }
             }
         }
