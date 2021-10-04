@@ -8,5 +8,5 @@ edition = "2018"
 
 [dependencies]
 polling = "2.1.0"
-serde_json = "1.0.64"
+serde_json = "1.0.66"
 crossbeam-channel = "0.5.1"
