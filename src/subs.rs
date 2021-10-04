@@ -10,6 +10,7 @@ use crate::{msg::Instr, writer};
 pub enum Cmd {
     Add(String, usize, Instr),
     Del(String, usize),
+    DelAll(Vec<String>, usize),
     Call(String, String),
 }
 
@@ -54,6 +55,13 @@ impl Subs {
                 Ok(Cmd::Del(key, id)) => {
                     let subs = self.registry.entry(key).or_insert_with(Vec::new);
                     subs.retain(|x| x.id != id);
+                }
+
+                Ok(Cmd::DelAll(keys, id)) => {
+                    for key in keys {
+                        let subs = self.registry.entry(key).or_insert_with(Vec::new);
+                        subs.retain(|x| x.id != id);
+                    }
                 }
 
                 Ok(Cmd::Call(key, value)) => {

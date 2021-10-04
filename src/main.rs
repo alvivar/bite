@@ -207,6 +207,10 @@ fn main() -> io::Result<()> {
                                         // A generic "bite" subscription. Subscribers also receive their key: "key value"
                                         // Also a first message if value is available.
                                         Instr::SubGet | Instr::SubBite | Instr::SubJ => {
+                                            if !conn.keys.contains(&key) {
+                                                conn.keys.push(key.to_owned());
+                                            }
+
                                             subs_tx
                                                 .send(subs::Cmd::Add(
                                                     key.to_owned(),
@@ -257,7 +261,11 @@ fn main() -> io::Result<()> {
                         // Forget it, it died.
                         if conn.closed {
                             poller.delete(&conn.socket)?;
-                            readers.remove(&id);
+
+                            let conn = readers.remove(&id).unwrap();
+                            subs_tx.send(subs::Cmd::DelAll(conn.keys, id)).unwrap();
+
+                            writers.lock().unwrap().remove(&id);
                         }
                     }
                 }
@@ -278,12 +286,16 @@ fn main() -> io::Result<()> {
                         // Forget it, it died.
                         if conn.closed {
                             poller.delete(&conn.socket)?;
+
+                            let conn = readers.remove(&id).unwrap();
+                            subs_tx.send(subs::Cmd::DelAll(conn.keys, id)).unwrap();
+
                             writers.remove(&id);
                         }
                     }
                 }
 
-                // Events that I don't care. Probably Event::none?
+                // Events that I don't care. @doubt Does it include Event::none?
                 _ => (),
             }
         }
@@ -339,8 +351,9 @@ fn read(conn: &mut Connection) -> io::Result<Vec<u8>> {
         }
     }
 
-    // let received_data = &received_data[..bytes_read]; // @doubt Using this
-    // slice thing and returning with into() versus using the resize? Hm.
+    // let received_data = &received_data[..bytes_read];
+    // @doubt Using this slice thing and returning with into() versus using the
+    // resize? Hm.
 
     received.resize(bytes_read, 0);
 
