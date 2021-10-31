@@ -14,7 +14,7 @@ pub enum Instr {
     SubBite,
     SubJ,
     Unsub,
-    Signal,
+    SubCall,
 }
 
 pub struct Msg {
@@ -79,7 +79,7 @@ pub fn parse(text: &str) -> Msg {
         "#b" => Instr::SubBite,
         "#j" => Instr::SubJ,
         "-#" => Instr::Unsub,
-        "!" => Instr::Signal,
+        "!" => Instr::SubCall,
         _ => Instr::Nop,
     };
 
@@ -103,6 +103,6 @@ pub fn needs_key(instr: &Instr) -> bool {
         | Instr::SubBite
         | Instr::SubJ
         | Instr::Unsub
-        | Instr::Signal => true,
+        | Instr::SubCall => true,
     }
 }

@@ -244,7 +244,7 @@ fn main() -> io::Result<()> {
                                         }
 
                                         // Calls key subscribers with the new value without data modifications.
-                                        Instr::Signal => {
+                                        Instr::SubCall => {
                                             subs_tx.send(subs::Cmd::Call(key, value)).unwrap();
 
                                             poll_writer_tx
