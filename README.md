@@ -47,8 +47,9 @@ To get a value, use **g**.
     g keywithoutvalue
     >
 
-A cool thing about **bite**, is that can make a query to get multiple values, as
-long as you use a **dot** to connect the keys.
+A cool thing about **bite**, is that can make a query to get multiple values
+from different keys, as long as you use the **dot** notation to connect the
+keys as parent/children.
 
     s data.name Bite
     s data.why Simplest database ever
@@ -56,15 +57,12 @@ long as you use a **dot** to connect the keys.
     s data.author.twitter matnesis
 
 This way you can use **b** to get a list of keys and values from the children of
-a particular key.
+a particular key, separated by the byte 0.
 
     b data.author
     > name Andrés Villalobostwitter matnesis
 
-You may think that there is nothing separating each key value, but **b** uses
-the byte 0 as separator.
-
-A more classic behaviour, is that you can construct JSON with **js**.
+A more classic behavior, is that you can construct JSON with **js**.
 
     js data
     >
@@ -167,7 +165,7 @@ Uses [Google Container
 Tools](https://github.com/GoogleContainerTools/distroless/blob/master/examples/rust/Dockerfile)
 to run the binary on **Docker**.
 
-## Priorities
+## Things that I would like to add
 
 - Auth.
 - The BTree on disk, serialized correctly instead of json.
