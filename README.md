@@ -1,12 +1,12 @@
 # Bite
 
-Key-Value Server.
+Multi-Thread Key-Value Server database with real time subscriptions.
 
 ## Tutorial
 
 To set a value, use **s**.
 
-    s somekeyname Some string as a value I guess
+    s somekeyname Some string as a value
     > OK
 
 To set a value, but only if the key doesn't exist, use **s?**.
@@ -14,7 +14,8 @@ To set a value, but only if the key doesn't exist, use **s?**.
     s? somekeyname Update if the key doesn't exists
     > OK
 
-To increase a value by 1, use **+1**. The value become 0 if it isn't a number, or doesn't exist.
+To increase a value by 1, use **+1**. The value become 0 if it isn't a number or
+doesn't exist, it returns the result.
 
     s numberkey 9
     > OK
@@ -22,22 +23,48 @@ To increase a value by 1, use **+1**. The value become 0 if it isn't a number, o
     +1 numberkey
     > 10
 
+To append a value, use **+**.
+
+    + somelist one
+    > one
+
+    + somelist , two
+    > one, two
+
+To delete a key and his value, use **d**.
+
+    d somelist
+    > OK
+
 To get a value, use **g**.
 
-    g somekeyname
-    > Some string as a value I guess
+    s somekey Some string as a value
+    > OK
+
+    g somekey
+    > Some string as a value
 
     g keywithoutvalue
     >
 
-For JSON use the dot notation on keys.
+A cool thing about **bite**, is that can make a query to get multiple values, as
+long as you use a **dot** to connect the keys.
 
     s data.name Bite
     s data.why Simplest database ever
     s data.author.name Andrés Villalobos
     s data.author.twitter matnesis
 
-So you can construct JSON with **js**.
+This way you can use **b** to get a list of keys and values from the children of
+a particular key.
+
+    b data.author
+    > name Andrés Villalobostwitter matnesis
+
+You may think that there is nothing separating each key value, but **b** uses
+the byte 0 as separator.
+
+A more classic behaviour, is that you can construct JSON with **js**.
 
     js data
     >
@@ -143,8 +170,8 @@ to run the binary on **Docker**.
 ## Priorities
 
 - Auth.
-- Support ints, floats and bools, everything is a string at the moment.
 - The BTree on disk, serialized correctly instead of json.
 - "Only on memory" should be an option.
-- You should be able to send several instructions at the same time, and receive responses accordinly. (?)
-- Maybe Lists. (?)
+- You should be able to send several instructions at the same time, and receive responses accordinly?
+- Maybe some kind of lists?
+- Support ints, floats and bools, everything is a string at the moment.
