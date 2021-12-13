@@ -1,8 +1,4 @@
 
-    2021.10.04
-    x Lost connections cleans the connections in readers, writers and subscriptions
-
-
     When reading handle the value as bytes, use utf8 to parse the instructions and the key
 
     Update the docs with the new commands
@@ -43,6 +39,13 @@
     Push # value should insert into a list, transform normal values
     Pop # should return and delete a value
 
+
+    2021.12.12
+    x Real license
+    x Delete modifies the DB only if modified.
+
+    2021.10.04
+    x Lost connections cleans the connections in readers, writers and subscriptions
 
     2021.07.31
     x Optimize subscriptions calling by grouping connections by instructions when calling the map?
