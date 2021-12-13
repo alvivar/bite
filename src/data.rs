@@ -125,9 +125,10 @@ impl Data {
 
                 Cmd::Delete(key) => {
                     let mut map = self.map.lock().unwrap();
-                    map.remove(&key);
 
-                    db_modified.swap(true, Ordering::Relaxed);
+                    if let Some(_) = map.remove(&key) {
+                        db_modified.swap(true, Ordering::Relaxed);
+                    }
                 }
 
                 Cmd::Get(key, id) => {
