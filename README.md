@@ -1,6 +1,6 @@
 # Bite
 
-Multi-Thread Key-Value Server database with real time subscriptions.
+Key-Value Server database with real time subscriptions.
 
 ## Tutorial
 
@@ -48,8 +48,8 @@ To get a value, use **g**.
     >
 
 A cool thing about **bite**, is that can make a query to get multiple values
-from different keys, as long as you use the **dot** notation to connect the
-keys as parent/children.
+from different keys, as long as you use the **dot** notation to connect the keys
+as parent/children.
 
     s data.name Bite
     s data.why Simplest database ever
@@ -142,8 +142,8 @@ Ready to run on **127.0.0.1:1984**.
 
 ## Rust
 
-The server runs on **0.0.0.0:1984**, you can send/receive messages with any
-TCP connection, just send complete lines (0xA) before flush.
+The server runs on **0.0.0.0:1984**, you can send/receive messages with any TCP
+connection, just send complete lines (0xA) before flush.
 
     cargo run --release --p server
 
@@ -158,8 +158,8 @@ You could use the first argument to specify a different address.
 
 ## Tech
 
-**Rust** multi-thread **TcpListeners** storing on a **BTreeMap** serialized into a
-json file with **Serde**.
+**Rust** multi-thread **TcpListeners** storing on a **BTreeMap** serialized into
+a json file with **Serde**.
 
 Uses [Google Container
 Tools](https://github.com/GoogleContainerTools/distroless/blob/master/examples/rust/Dockerfile)
@@ -167,9 +167,9 @@ to run the binary on **Docker**.
 
 ## Things that I would like to add
 
-- Auth.
-- The BTree on disk, serialized correctly instead of json.
-- "Only on memory" should be an option.
+- Auth
+- The BTree on disk, serialized correctly instead of json
+- "Only on memory" should be an option
 - You should be able to send several instructions at the same time, and receive responses accordinly?
 - Maybe some kind of lists?
-- Support ints, floats and bools, everything is a string at the moment.
+- Support ints, floats and bools, everything is a string at the moment
