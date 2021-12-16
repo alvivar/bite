@@ -1,6 +1,6 @@
 # Bite
 
-Key-Value Server database with real time subscriptions.
+Key-Value server with real time subscriptions.
 
 ## Tutorial
 
