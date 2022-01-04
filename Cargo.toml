@@ -7,6 +7,6 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-polling = "2.1.0"
-serde_json = "1.0.66"
-crossbeam-channel = "0.5.1"
+polling = "2.2.0"
+serde_json = "1.0.74"
+# crossbeam-channel = "0.5.1" # A simple optimization for later.
