@@ -126,7 +126,7 @@ impl Data {
                 Cmd::Delete(key) => {
                     let mut map = self.map.lock().unwrap();
 
-                    if let Some(_) = map.remove(&key) {
+                    if map.remove(&key).is_some() {
                         db_modified.swap(true, Ordering::Relaxed);
                     }
                 }
