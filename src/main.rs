@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    io::{self, Read, Write},
+    io::{self},
     net::TcpListener,
     str::from_utf8,
     sync::{Arc, Mutex},
@@ -104,7 +104,7 @@ fn main() -> io::Result<()> {
 
                 id if ev.readable => {
                     if let Some(conn) = readers.get_mut(&id) {
-                        handle_reading(conn);
+                        conn.try_read();
 
                         poller.modify(&conn.socket, Event::readable(id))?;
 
@@ -274,7 +274,7 @@ fn main() -> io::Result<()> {
                     let mut writers = writers.lock().unwrap();
 
                     if let Some(conn) = writers.get_mut(&id) {
-                        handle_writing(conn);
+                        conn.try_write();
 
                         // We need to send more.
                         if !conn.to_write.is_empty() {
@@ -300,70 +300,4 @@ fn main() -> io::Result<()> {
             }
         }
     }
-}
-
-fn handle_reading(conn: &mut Connection) {
-    let data = match read(conn) {
-        Ok(data) => data,
-        Err(err) => {
-            println!("Connection #{} broken, read failed: {}", conn.id, err);
-            conn.closed = true;
-            return;
-        }
-    };
-
-    conn.received.push(data);
-}
-
-fn handle_writing(conn: &mut Connection) {
-    let data = conn.to_write.remove(0);
-
-    if let Err(err) = conn.socket.write(&data) {
-        println!("Connection #{} broken, write failed: {}", conn.id, err);
-        conn.closed = true;
-    }
-}
-
-fn read(conn: &mut Connection) -> io::Result<Vec<u8>> {
-    let mut received = vec![0; 1024 * 4];
-    let mut bytes_read = 0;
-
-    loop {
-        match conn.socket.read(&mut received[bytes_read..]) {
-            Ok(0) => {
-                // Reading 0 bytes means the other side has closed the
-                // connection or is done writing, then so are we.
-                return Err(io::Error::new(io::ErrorKind::BrokenPipe, "0 bytes read"));
-            }
-            Ok(n) => {
-                bytes_read += n;
-                if bytes_read == received.len() {
-                    received.resize(received.len() + 1024, 0);
-                }
-            }
-            // Would block "errors" are the OS's way of saying that the
-            // connection is not actually ready to perform this I/O operation.
-            // @todo Wondering if this should be a panic instead.
-            Err(ref err) if would_block(err) => break,
-            Err(ref err) if interrupted(err) => continue,
-            // Other errors we'll consider fatal.
-            Err(err) => return Err(err),
-        }
-    }
-
-    // let received_data = &received_data[..bytes_read];
-    // @doubt Using this slice thing and returning with into() versus using the
-    // resize? Hm.
-
-    received.resize(bytes_read, 0);
-
-    Ok(received)
-}
-
-fn would_block(err: &io::Error) -> bool {
-    err.kind() == io::ErrorKind::WouldBlock
-}
-
-fn interrupted(err: &io::Error) -> bool {
-    err.kind() == io::ErrorKind::Interrupted
 }
