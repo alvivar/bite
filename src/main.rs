@@ -106,8 +106,6 @@ fn main() -> io::Result<()> {
                     if let Some(conn) = readers.get_mut(&id) {
                         conn.try_read();
 
-                        poller.modify(&conn.socket, Event::readable(id))?;
-
                         // One at the time.
                         if !conn.received.is_empty() {
                             let received = conn.received.remove(0);
@@ -258,7 +256,6 @@ fn main() -> io::Result<()> {
                             }
                         }
 
-                        // Forget it, it died.
                         if conn.closed {
                             poller.delete(&conn.socket)?;
 
@@ -266,6 +263,8 @@ fn main() -> io::Result<()> {
                             subs_tx.send(subs::Cmd::DelAll(conn.keys, id)).unwrap();
 
                             writers.lock().unwrap().remove(&id);
+                        } else {
+                            poller.modify(&conn.socket, Event::readable(id))?;
                         }
                     }
                 }
@@ -276,14 +275,6 @@ fn main() -> io::Result<()> {
                     if let Some(conn) = writers.get_mut(&id) {
                         conn.try_write();
 
-                        // We need to send more.
-                        if !conn.to_write.is_empty() {
-                            poller
-                                .modify(&conn.socket, Event::writable(conn.id))
-                                .unwrap();
-                        }
-
-                        // Forget it, it died.
                         if conn.closed {
                             poller.delete(&conn.socket)?;
 
@@ -291,12 +282,15 @@ fn main() -> io::Result<()> {
                             subs_tx.send(subs::Cmd::DelAll(conn.keys, id)).unwrap();
 
                             writers.remove(&id);
+                        } else if !conn.to_write.is_empty() {
+                            poller
+                                .modify(&conn.socket, Event::writable(conn.id))
+                                .unwrap();
                         }
                     }
                 }
 
-                // Events that I don't care. @doubt Does it include Event::none?
-                _ => (),
+                _ => unreachable!(),
             }
         }
     }
