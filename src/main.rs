@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    io::{self},
+    io,
     net::TcpListener,
     str::from_utf8,
     sync::{Arc, Mutex},
