@@ -28,7 +28,7 @@ const NOP: &str = "NOP";
 const KEY: &str = "KEY?";
 
 fn main() -> io::Result<()> {
-    println!("\nbite\n");
+    println!("\nBIT:E\n");
 
     // The server and the smol Poller.
     let server = TcpListener::bind("0.0.0.0:1984")?;
