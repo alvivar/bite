@@ -1,5 +1,5 @@
 [package]
-name = "server"
+name = "bite"
 version = "0.1.0"
 authors = ["Andrés Villalobos <andresalvivar@gmail.com>"]
 edition = "2018"
