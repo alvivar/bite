@@ -16,7 +16,6 @@ pub struct Msg {
 }
 
 pub enum Cmd {
-    Write(usize, String), // @todo Maybe Vec<u8> would be better than String.
     WriteAll(Vec<Msg>),
 }
 
@@ -48,10 +47,6 @@ impl Writer {
     pub fn handle(&self, subs_tx: Sender<subs::Cmd>) {
         loop {
             match self.rx.recv().unwrap() {
-                Cmd::Write(id, msg) => {
-                    self.tx.send(Cmd::WriteAll(vec![Msg { id, msg }])).unwrap();
-                }
-
                 Cmd::WriteAll(msgs) => {
                     let mut closed = Vec::<usize>::new();
                     let mut writers = self.writers.lock().unwrap();

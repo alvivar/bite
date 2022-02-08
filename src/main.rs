@@ -21,7 +21,7 @@ use data::Data;
 use db::DB;
 use msg::{needs_key, parse, Instr};
 use subs::Subs;
-use writer::Writer;
+use writer::{Cmd::WriteAll, Msg, Writer};
 
 const OK: &str = "OK";
 const NOP: &str = "NOP";
@@ -45,9 +45,9 @@ fn main() -> io::Result<()> {
 
     // The writer
     let writer = Writer::new(poller.clone(), writers.clone(), readers.clone());
-    let data_writer_tx = writer.tx.clone();
+    let writer_tx = writer.tx.clone();
     let subs_writer_tx = writer.tx.clone();
-    let poll_writer_tx = writer.tx.clone();
+    let data_writer_tx = writer.tx.clone();
 
     // Subs
     let mut subs = Subs::new(subs_writer_tx);
@@ -132,15 +132,21 @@ fn main() -> io::Result<()> {
                                     match instr {
                                         // Instructions that doesn't make sense without key.
                                         _ if key.is_empty() && needs_key(&instr) => {
-                                            poll_writer_tx
-                                                .send(writer::Cmd::Write(conn.id, KEY.into()))
+                                            writer_tx
+                                                .send(WriteAll(vec![Msg {
+                                                    id: conn.id,
+                                                    msg: KEY.into(),
+                                                }]))
                                                 .unwrap();
                                         }
 
                                         // Nop
                                         Instr::Nop => {
-                                            poll_writer_tx
-                                                .send(writer::Cmd::Write(conn.id, NOP.into()))
+                                            writer_tx
+                                                .send(WriteAll(vec![Msg {
+                                                    id: conn.id,
+                                                    msg: NOP.into(),
+                                                }]))
                                                 .unwrap();
                                         }
 
@@ -155,8 +161,11 @@ fn main() -> io::Result<()> {
 
                                             data_tx.send(data::Cmd::Set(key, value)).unwrap();
 
-                                            poll_writer_tx
-                                                .send(writer::Cmd::Write(conn.id, OK.into()))
+                                            writer_tx
+                                                .send(WriteAll(vec![Msg {
+                                                    id: conn.id,
+                                                    msg: OK.into(),
+                                                }]))
                                                 .unwrap();
                                         }
 
@@ -164,8 +173,11 @@ fn main() -> io::Result<()> {
                                         Instr::SetIfNone => {
                                             data_tx.send(data::Cmd::SetIfNone(key, value)).unwrap();
 
-                                            poll_writer_tx
-                                                .send(writer::Cmd::Write(conn.id, OK.into()))
+                                            writer_tx
+                                                .send(WriteAll(vec![Msg {
+                                                    id: conn.id,
+                                                    msg: OK.into(),
+                                                }]))
                                                 .unwrap();
                                         }
 
@@ -185,8 +197,11 @@ fn main() -> io::Result<()> {
                                         Instr::Delete => {
                                             data_tx.send(data::Cmd::Delete(key)).unwrap();
 
-                                            poll_writer_tx
-                                                .send(writer::Cmd::Write(conn.id, OK.into()))
+                                            writer_tx
+                                                .send(WriteAll(vec![Msg {
+                                                    id: conn.id,
+                                                    msg: OK.into(),
+                                                }]))
                                                 .unwrap();
                                         }
 
@@ -229,8 +244,11 @@ fn main() -> io::Result<()> {
                                                 subs_tx.send(subs::Cmd::Call(key, value)).unwrap()
                                             }
 
-                                            poll_writer_tx
-                                                .send(writer::Cmd::Write(conn.id, OK.into()))
+                                            writer_tx
+                                                .send(WriteAll(vec![Msg {
+                                                    id: conn.id,
+                                                    msg: OK.into(),
+                                                }]))
                                                 .unwrap();
                                         }
 
@@ -244,8 +262,11 @@ fn main() -> io::Result<()> {
 
                                             subs_tx.send(subs::Cmd::Del(key, conn.id)).unwrap();
 
-                                            poll_writer_tx
-                                                .send(writer::Cmd::Write(conn.id, OK.into()))
+                                            writer_tx
+                                                .send(WriteAll(vec![Msg {
+                                                    id: conn.id,
+                                                    msg: OK.into(),
+                                                }]))
                                                 .unwrap();
                                         }
 
@@ -253,8 +274,11 @@ fn main() -> io::Result<()> {
                                         Instr::SubCall => {
                                             subs_tx.send(subs::Cmd::Call(key, value)).unwrap();
 
-                                            poll_writer_tx
-                                                .send(writer::Cmd::Write(conn.id, OK.into()))
+                                            writer_tx
+                                                .send(WriteAll(vec![Msg {
+                                                    id: conn.id,
+                                                    msg: OK.into(),
+                                                }]))
                                                 .unwrap();
                                         }
                                     }
