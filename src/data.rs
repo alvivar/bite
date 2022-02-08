@@ -9,10 +9,7 @@ use std::{
 
 use serde_json::{self, json, Value};
 
-use crate::{
-    subs,
-    writer::{self, Cmd::WriteAll, Msg},
-};
+use crate::{subs, writer};
 
 pub enum Cmd {
     Set(String, String),
@@ -90,10 +87,7 @@ impl Data {
                         .unwrap();
 
                     self.writer_tx
-                        .send(WriteAll(vec![Msg {
-                            id,
-                            msg: inc.to_string(),
-                        }]))
+                        .send(writer::Cmd::Write(id, inc.to_string()))
                         .unwrap();
 
                     map.insert(key, inc.to_string());
@@ -121,10 +115,7 @@ impl Data {
                         .unwrap();
 
                     self.writer_tx
-                        .send(WriteAll(vec![Msg {
-                            id,
-                            msg: append.to_owned(),
-                        }]))
+                        .send(writer::Cmd::Write(id, append.to_owned()))
                         .unwrap();
 
                     map.insert(key, append);
@@ -148,10 +139,7 @@ impl Data {
                     };
 
                     self.writer_tx
-                        .send(WriteAll(vec![Msg {
-                            id,
-                            msg: msg.into(),
-                        }]))
+                        .send(writer::Cmd::Write(id, msg.into()))
                         .unwrap();
                 }
 
@@ -171,9 +159,7 @@ impl Data {
                     }
                     let msg = msg.trim_end().to_owned(); // @todo What's happening here exactly?
 
-                    self.writer_tx
-                        .send(WriteAll(vec![Msg { id, msg }]))
-                        .unwrap();
+                    self.writer_tx.send(writer::Cmd::Write(id, msg)).unwrap();
                 }
 
                 Cmd::Jtrim(key, id) => {
@@ -198,9 +184,7 @@ impl Data {
                         }
                     };
 
-                    self.writer_tx
-                        .send(WriteAll(vec![Msg { id, msg }]))
-                        .unwrap();
+                    self.writer_tx.send(writer::Cmd::Write(id, msg)).unwrap();
                 }
 
                 Cmd::Json(key, id) => {
@@ -225,9 +209,7 @@ impl Data {
                         }
                     };
 
-                    self.writer_tx
-                        .send(WriteAll(vec![Msg { id, msg }]))
-                        .unwrap();
+                    self.writer_tx.send(writer::Cmd::Write(id, msg)).unwrap();
                 }
             }
         }
