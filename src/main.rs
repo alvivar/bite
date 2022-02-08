@@ -45,15 +45,15 @@ fn main() -> io::Result<()> {
 
     // The writer
     let writer = Writer::new(poller.clone(), writers.clone(), readers.clone());
-    let data_writer_tx = writer.tx.clone();
     let subs_writer_tx = writer.tx.clone();
-    let poll_writer_tx = writer.tx.clone();
+    let data_writer_tx = writer.tx.clone();
+    let reader_writer_tx = writer.tx.clone();
 
     // Subs
     let mut subs = Subs::new(subs_writer_tx);
-    let subs_tx = subs.tx.clone();
     let writer_subs_tx = subs.tx.clone();
     let data_subs_tx = subs.tx.clone();
+    let reader_subs_tx = subs.tx.clone();
 
     thread::spawn(move || writer.handle(writer_subs_tx));
     thread::spawn(move || subs.handle());
@@ -132,21 +132,21 @@ fn main() -> io::Result<()> {
                                     match instr {
                                         // Instructions that doesn't make sense without key.
                                         _ if key.is_empty() && needs_key(&instr) => {
-                                            poll_writer_tx
+                                            reader_writer_tx
                                                 .send(writer::Cmd::Write(conn.id, KEY.into()))
                                                 .unwrap();
                                         }
 
                                         // Nop
                                         Instr::Nop => {
-                                            poll_writer_tx
+                                            reader_writer_tx
                                                 .send(writer::Cmd::Write(conn.id, NOP.into()))
                                                 .unwrap();
                                         }
 
                                         // Set
                                         Instr::Set => {
-                                            subs_tx
+                                            reader_subs_tx
                                                 .send(subs::Cmd::Call(
                                                     key.to_owned(),
                                                     value.to_owned(),
@@ -155,7 +155,7 @@ fn main() -> io::Result<()> {
 
                                             data_tx.send(data::Cmd::Set(key, value)).unwrap();
 
-                                            poll_writer_tx
+                                            reader_writer_tx
                                                 .send(writer::Cmd::Write(conn.id, OK.into()))
                                                 .unwrap();
                                         }
@@ -164,7 +164,7 @@ fn main() -> io::Result<()> {
                                         Instr::SetIfNone => {
                                             data_tx.send(data::Cmd::SetIfNone(key, value)).unwrap();
 
-                                            poll_writer_tx
+                                            reader_writer_tx
                                                 .send(writer::Cmd::Write(conn.id, OK.into()))
                                                 .unwrap();
                                         }
@@ -185,7 +185,7 @@ fn main() -> io::Result<()> {
                                         Instr::Delete => {
                                             data_tx.send(data::Cmd::Delete(key)).unwrap();
 
-                                            poll_writer_tx
+                                            reader_writer_tx
                                                 .send(writer::Cmd::Write(conn.id, OK.into()))
                                                 .unwrap();
                                         }
@@ -217,7 +217,7 @@ fn main() -> io::Result<()> {
                                                 conn.keys.push(key.to_owned());
                                             }
 
-                                            subs_tx
+                                            reader_subs_tx
                                                 .send(subs::Cmd::Add(
                                                     key.to_owned(),
                                                     conn.id,
@@ -226,10 +226,12 @@ fn main() -> io::Result<()> {
                                                 .unwrap();
 
                                             if !value.is_empty() {
-                                                subs_tx.send(subs::Cmd::Call(key, value)).unwrap()
+                                                reader_subs_tx
+                                                    .send(subs::Cmd::Call(key, value))
+                                                    .unwrap()
                                             }
 
-                                            poll_writer_tx
+                                            reader_writer_tx
                                                 .send(writer::Cmd::Write(conn.id, OK.into()))
                                                 .unwrap();
                                         }
@@ -237,23 +239,27 @@ fn main() -> io::Result<()> {
                                         // A desubscription and a last message if value is available.
                                         Instr::Unsub => {
                                             if !value.is_empty() {
-                                                subs_tx
+                                                reader_subs_tx
                                                     .send(subs::Cmd::Call(key.to_owned(), value))
                                                     .unwrap();
                                             }
 
-                                            subs_tx.send(subs::Cmd::Del(key, conn.id)).unwrap();
+                                            reader_subs_tx
+                                                .send(subs::Cmd::Del(key, conn.id))
+                                                .unwrap();
 
-                                            poll_writer_tx
+                                            reader_writer_tx
                                                 .send(writer::Cmd::Write(conn.id, OK.into()))
                                                 .unwrap();
                                         }
 
                                         // Calls key subscribers with the new value without data modifications.
                                         Instr::SubCall => {
-                                            subs_tx.send(subs::Cmd::Call(key, value)).unwrap();
+                                            reader_subs_tx
+                                                .send(subs::Cmd::Call(key, value))
+                                                .unwrap();
 
-                                            poll_writer_tx
+                                            reader_writer_tx
                                                 .send(writer::Cmd::Write(conn.id, OK.into()))
                                                 .unwrap();
                                         }
@@ -276,11 +282,13 @@ fn main() -> io::Result<()> {
                         let wconn = writers.lock().unwrap().remove(&id).unwrap();
                         poller.delete(&rconn.socket)?;
                         poller.delete(&wconn.socket)?;
-                        subs_tx.send(subs::Cmd::DelAll(rconn.keys, id)).unwrap();
+                        reader_subs_tx
+                            .send(subs::Cmd::DelAll(rconn.keys, id))
+                            .unwrap();
                     }
                 }
 
-                // id if ev.writable => { // This may not be needed. }
+                // id if ev.writable => {}
                 _ => unreachable!(),
             }
         }
