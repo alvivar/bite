@@ -49,26 +49,7 @@ impl Writer {
         loop {
             match self.rx.recv().unwrap() {
                 Cmd::Write(id, msg) => {
-                    let mut closed = Vec::<usize>::new();
-
-                    if let Some(conn) = self.writers.lock().unwrap().get_mut(&id) {
-                        let mut msg = msg.trim_end().to_owned();
-                        msg.push('\n');
-
-                        conn.try_write(msg.into());
-
-                        if conn.closed {
-                            closed.push(conn.id);
-                        }
-                    }
-
-                    for id in closed {
-                        let rconn = self.readers.lock().unwrap().remove(&id).unwrap();
-                        let wconn = self.writers.lock().unwrap().remove(&id).unwrap();
-                        self.poller.delete(&rconn.socket).unwrap();
-                        self.poller.delete(&wconn.socket).unwrap();
-                        subs_tx.send(subs::Cmd::DelAll(rconn.keys, id)).unwrap();
-                    }
+                    self.tx.send(Cmd::WriteAll(vec![Msg { id, msg }])).unwrap();
                 }
 
                 Cmd::WriteAll(msgs) => {
