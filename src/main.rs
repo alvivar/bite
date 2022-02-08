@@ -38,21 +38,24 @@ fn main() -> io::Result<()> {
     poller.add(&server, Event::readable(0))?;
     let poller = Arc::new(poller);
 
-    let mut readers = HashMap::<usize, Connection>::new();
+    let readers = HashMap::<usize, Connection>::new();
+    let readers = Arc::new(Mutex::new(readers));
     let writers = HashMap::<usize, Connection>::new();
     let writers = Arc::new(Mutex::new(writers));
 
     // The writer
-    let writer = Writer::new(writers.clone(), poller.clone());
+    let writer = Writer::new(poller.clone(), writers.clone(), readers.clone());
     let data_writer_tx = writer.tx.clone();
     let subs_writer_tx = writer.tx.clone();
     let poll_writer_tx = writer.tx.clone();
-    thread::spawn(move || writer.handle());
 
     // Subs
     let mut subs = Subs::new(subs_writer_tx);
     let subs_tx = subs.tx.clone();
+    let writer_subs_tx = subs.tx.clone();
     let data_subs_tx = subs.tx.clone();
+
+    thread::spawn(move || writer.handle(writer_subs_tx));
     thread::spawn(move || subs.handle());
 
     // Data & DB
@@ -86,7 +89,10 @@ fn main() -> io::Result<()> {
 
                     // Register the reading socket for events.
                     poller.add(&read_socket, Event::readable(id))?;
-                    readers.insert(id, Connection::new(id, read_socket, addr));
+                    readers
+                        .lock()
+                        .unwrap()
+                        .insert(id, Connection::new(id, read_socket, addr));
 
                     // Register the writing socket for events.
                     poller.add(&write_socket, Event::none(id))?;
@@ -103,7 +109,9 @@ fn main() -> io::Result<()> {
                 }
 
                 id if ev.readable => {
-                    if let Some(conn) = readers.get_mut(&id) {
+                    let mut closed = Vec::<usize>::new();
+
+                    if let Some(conn) = readers.lock().unwrap().get_mut(&id) {
                         conn.try_read();
 
                         // One at the time.
@@ -257,39 +265,22 @@ fn main() -> io::Result<()> {
                         }
 
                         if conn.closed {
-                            poller.delete(&conn.socket)?;
-
-                            let conn = readers.remove(&id).unwrap();
-                            subs_tx.send(subs::Cmd::DelAll(conn.keys, id)).unwrap();
-
-                            writers.lock().unwrap().remove(&id);
+                            closed.push(conn.id);
                         } else {
                             poller.modify(&conn.socket, Event::readable(id))?;
                         }
                     }
-                }
 
-                id if ev.writable => {
-                    let mut writers = writers.lock().unwrap();
-
-                    if let Some(conn) = writers.get_mut(&id) {
-                        conn.try_write();
-
-                        if conn.closed {
-                            poller.delete(&conn.socket)?;
-
-                            let conn = readers.remove(&id).unwrap();
-                            subs_tx.send(subs::Cmd::DelAll(conn.keys, id)).unwrap();
-
-                            writers.remove(&id);
-                        } else if !conn.to_write.is_empty() {
-                            poller
-                                .modify(&conn.socket, Event::writable(conn.id))
-                                .unwrap();
-                        }
+                    for id in closed {
+                        let rconn = readers.lock().unwrap().remove(&id).unwrap();
+                        let wconn = writers.lock().unwrap().remove(&id).unwrap();
+                        poller.delete(&rconn.socket)?;
+                        poller.delete(&wconn.socket)?;
+                        subs_tx.send(subs::Cmd::DelAll(rconn.keys, id)).unwrap();
                     }
                 }
 
+                // id if ev.writable => { // This may not be needed. }
                 _ => unreachable!(),
             }
         }

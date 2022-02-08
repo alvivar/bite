@@ -6,9 +6,9 @@ use std::{
     },
 };
 
-use polling::{Event, Poller};
+use polling::Poller;
 
-use crate::conn::Connection;
+use crate::{conn::Connection, subs};
 
 pub struct Msg {
     pub id: usize,
@@ -22,51 +22,78 @@ pub enum Cmd {
 
 pub struct Writer {
     writers: Arc<Mutex<HashMap<usize, Connection>>>,
+    readers: Arc<Mutex<HashMap<usize, Connection>>>,
     poller: Arc<Poller>,
     pub tx: Sender<Cmd>,
     rx: Receiver<Cmd>,
 }
 
 impl Writer {
-    pub fn new(writers: Arc<Mutex<HashMap<usize, Connection>>>, poller: Arc<Poller>) -> Writer {
+    pub fn new(
+        poller: Arc<Poller>,
+        writers: Arc<Mutex<HashMap<usize, Connection>>>,
+        readers: Arc<Mutex<HashMap<usize, Connection>>>,
+    ) -> Writer {
         let (tx, rx) = channel::<Cmd>();
 
         Writer {
             writers,
+            readers,
             poller,
             tx,
             rx,
         }
     }
 
-    pub fn handle(self) {
+    pub fn handle(&self, subs_tx: Sender<subs::Cmd>) {
         loop {
             match self.rx.recv().unwrap() {
                 Cmd::Write(id, msg) => {
+                    let mut closed = Vec::<usize>::new();
+
                     if let Some(conn) = self.writers.lock().unwrap().get_mut(&id) {
                         let mut msg = msg.trim_end().to_owned();
                         msg.push('\n');
-                        conn.to_write.push(msg.into());
 
-                        self.poller
-                            .modify(&conn.socket, Event::writable(conn.id))
-                            .unwrap();
+                        conn.try_write(msg.into());
+
+                        if conn.closed {
+                            closed.push(conn.id);
+                        }
+                    }
+
+                    for id in closed {
+                        let rconn = self.readers.lock().unwrap().remove(&id).unwrap();
+                        let wconn = self.writers.lock().unwrap().remove(&id).unwrap();
+                        self.poller.delete(&rconn.socket).unwrap();
+                        self.poller.delete(&wconn.socket).unwrap();
+                        subs_tx.send(subs::Cmd::DelAll(rconn.keys, id)).unwrap();
                     }
                 }
 
                 Cmd::WriteAll(msgs) => {
+                    let mut closed = Vec::<usize>::new();
                     let mut writers = self.writers.lock().unwrap();
 
                     for msg in msgs {
                         if let Some(conn) = writers.get_mut(&msg.id) {
                             let mut msg = msg.msg.trim_end().to_owned();
                             msg.push('\n');
-                            conn.to_write.push(msg.into());
 
-                            self.poller
-                                .modify(&conn.socket, Event::writable(conn.id))
-                                .unwrap();
+                            conn.try_write(msg.into());
+
+                            if conn.closed {
+                                closed.push(conn.id);
+                            }
                         }
+                    }
+
+                    for id in closed {
+                        let rconn = self.readers.lock().unwrap().remove(&id).unwrap();
+                        let wconn = self.writers.lock().unwrap().remove(&id).unwrap();
+                        self.poller.delete(&rconn.socket).unwrap();
+                        self.poller.delete(&wconn.socket).unwrap();
+                        subs_tx.send(subs::Cmd::DelAll(rconn.keys, id)).unwrap();
                     }
                 }
             }

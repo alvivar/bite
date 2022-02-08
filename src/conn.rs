@@ -13,7 +13,6 @@ pub struct Connection {
     pub addr: SocketAddr,
     pub keys: Vec<String>, // Only Readers know the keys in the current algorithm.
     pub received: Vec<Vec<u8>>,
-    pub to_write: Vec<Vec<u8>>,
     pub closed: bool,
 }
 
@@ -21,7 +20,6 @@ impl Connection {
     pub fn new(id: usize, socket: TcpStream, addr: SocketAddr) -> Connection {
         let keys = Vec::<String>::new();
         let received = Vec::<Vec<u8>>::new();
-        let to_write = Vec::<Vec<u8>>::new();
 
         Connection {
             id,
@@ -29,7 +27,6 @@ impl Connection {
             addr,
             keys,
             received,
-            to_write,
             closed: false,
         }
     }
@@ -47,9 +44,7 @@ impl Connection {
         self.received.push(data);
     }
 
-    pub fn try_write(&mut self) {
-        let data = self.to_write.remove(0);
-
+    pub fn try_write(&mut self, data: Vec<u8>) {
         if let Err(err) = self.socket.write(&data) {
             println!("Connection #{} broken, write failed: {}", self.id, err);
             self.closed = true;

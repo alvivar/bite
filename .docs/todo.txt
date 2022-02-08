@@ -42,6 +42,10 @@
     Pop # should return and delete a value
 
 
+    2022.02.08
+    x Writing is directly, no longer with a queue
+    x Writer have his own thread
+
     2021.12.12
     x Real license
     x Delete modifies the DB only if modified.
