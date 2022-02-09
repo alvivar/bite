@@ -1,6 +1,4 @@
 
-    Refactor so that the main thread only handles connections
-
     When reading handle the value as bytes, use utf8 to parse the instructions and the key
 
     Update the docs with the new commands
@@ -41,6 +39,10 @@
     Push # value should insert into a list, transform normal values
     Pop # should return and delete a value
 
+
+    2022.02.08
+    x Refactor so that the main thread only handles connections
+    x Reading is his own thread
 
     2022.02.08
     x Writing is directly, no longer with a queue

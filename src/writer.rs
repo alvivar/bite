@@ -21,9 +21,9 @@ pub enum Cmd {
 }
 
 pub struct Writer {
-    writers: Arc<Mutex<HashMap<usize, Connection>>>,
-    readers: Arc<Mutex<HashMap<usize, Connection>>>,
     poller: Arc<Poller>,
+    readers: Arc<Mutex<HashMap<usize, Connection>>>,
+    writers: Arc<Mutex<HashMap<usize, Connection>>>,
     pub tx: Sender<Cmd>,
     rx: Receiver<Cmd>,
 }
@@ -31,15 +31,15 @@ pub struct Writer {
 impl Writer {
     pub fn new(
         poller: Arc<Poller>,
-        writers: Arc<Mutex<HashMap<usize, Connection>>>,
         readers: Arc<Mutex<HashMap<usize, Connection>>>,
+        writers: Arc<Mutex<HashMap<usize, Connection>>>,
     ) -> Writer {
         let (tx, rx) = channel::<Cmd>();
 
         Writer {
+            poller,
             writers,
             readers,
-            poller,
             tx,
             rx,
         }

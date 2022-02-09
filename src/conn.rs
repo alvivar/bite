@@ -12,36 +12,33 @@ pub struct Connection {
     pub socket: TcpStream,
     pub addr: SocketAddr,
     pub keys: Vec<String>, // Only Readers know the keys in the current algorithm.
-    pub received: Vec<Vec<u8>>,
     pub closed: bool,
 }
 
 impl Connection {
     pub fn new(id: usize, socket: TcpStream, addr: SocketAddr) -> Connection {
         let keys = Vec::<String>::new();
-        let received = Vec::<Vec<u8>>::new();
 
         Connection {
             id,
             socket,
             addr,
             keys,
-            received,
             closed: false,
         }
     }
 
-    pub fn try_read(&mut self) {
+    pub fn try_read(&mut self) -> Option<Vec<u8>> {
         let data = match read(&mut self.socket) {
             Ok(data) => data,
             Err(err) => {
                 println!("Connection #{} broken, read failed: {}", self.id, err);
                 self.closed = true;
-                return;
+                return None;
             }
         };
 
-        self.received.push(data);
+        Some(data)
     }
 
     pub fn try_write(&mut self, data: Vec<u8>) {

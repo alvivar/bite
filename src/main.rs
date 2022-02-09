@@ -2,7 +2,6 @@ use std::{
     collections::HashMap,
     io,
     net::TcpListener,
-    str::from_utf8,
     sync::{Arc, Mutex},
     thread,
 };
@@ -13,19 +12,16 @@ mod conn;
 mod data;
 mod db;
 mod msg;
+mod reader;
 mod subs;
 mod writer;
 
 use conn::Connection;
 use data::Data;
 use db::DB;
-use msg::{needs_key, parse, Instr};
+use reader::Reader;
 use subs::Subs;
 use writer::Writer;
-
-const OK: &str = "OK";
-const NOP: &str = "NOP";
-const KEY: &str = "KEY?";
 
 fn main() -> io::Result<()> {
     println!("\nBIT:E\n");
@@ -43,8 +39,12 @@ fn main() -> io::Result<()> {
     let writers = HashMap::<usize, Connection>::new();
     let writers = Arc::new(Mutex::new(writers));
 
+    // The reader
+    let reader = Reader::new(poller.clone(), readers.clone(), writers.clone());
+    let reader_tx = reader.tx.clone();
+
     // The writer
-    let writer = Writer::new(poller.clone(), writers.clone(), readers.clone());
+    let writer = Writer::new(poller.clone(), readers.clone(), writers.clone());
     let subs_writer_tx = writer.tx.clone();
     let data_writer_tx = writer.tx.clone();
     let reader_writer_tx = writer.tx.clone();
@@ -55,9 +55,6 @@ fn main() -> io::Result<()> {
     let data_subs_tx = subs.tx.clone();
     let reader_subs_tx = subs.tx.clone();
 
-    thread::spawn(move || writer.handle(writer_subs_tx));
-    thread::spawn(move || subs.handle());
-
     // Data & DB
     let data = Data::new(data_writer_tx, data_subs_tx);
     let data_map = data.map.clone();
@@ -67,11 +64,15 @@ fn main() -> io::Result<()> {
     let db_modified = db.modified.clone();
     db.load_from_file();
 
+    // Threads
     thread::spawn(move || db.handle(3));
     thread::spawn(move || data.handle(db_modified));
+    thread::spawn(move || subs.handle());
+    thread::spawn(move || writer.handle(writer_subs_tx));
+    thread::spawn(move || reader.handle(data_tx, reader_writer_tx, reader_subs_tx));
 
     // Connections and events via smol Poller.
-    let mut id: usize = 1;
+    let mut id: usize = 1; // 0 belongs to the main TcpListener.
     let mut events = Vec::new();
 
     loop {
@@ -109,186 +110,9 @@ fn main() -> io::Result<()> {
                 }
 
                 id if ev.readable => {
-                    let mut closed = Vec::<usize>::new();
-
-                    if let Some(conn) = readers.lock().unwrap().get_mut(&id) {
-                        conn.try_read();
-
-                        // One at the time.
-                        if !conn.received.is_empty() {
-                            let received = conn.received.remove(0);
-
-                            // Instructions should be string.
-                            if let Ok(utf8) = from_utf8(&received) {
-                                // We assume multiple instructions separated with newlines.
-                                for batched in utf8.trim().split('\n') {
-                                    let text = batched.trim();
-
-                                    let msg = parse(text);
-                                    let instr = msg.instr;
-                                    let key = msg.key;
-                                    let value = msg.value;
-
-                                    match instr {
-                                        // Instructions that doesn't make sense without key.
-                                        _ if key.is_empty() && needs_key(&instr) => {
-                                            reader_writer_tx
-                                                .send(writer::Cmd::Write(conn.id, KEY.into()))
-                                                .unwrap();
-                                        }
-
-                                        // Nop
-                                        Instr::Nop => {
-                                            reader_writer_tx
-                                                .send(writer::Cmd::Write(conn.id, NOP.into()))
-                                                .unwrap();
-                                        }
-
-                                        // Set
-                                        Instr::Set => {
-                                            reader_subs_tx
-                                                .send(subs::Cmd::Call(
-                                                    key.to_owned(),
-                                                    value.to_owned(),
-                                                ))
-                                                .unwrap();
-
-                                            data_tx.send(data::Cmd::Set(key, value)).unwrap();
-
-                                            reader_writer_tx
-                                                .send(writer::Cmd::Write(conn.id, OK.into()))
-                                                .unwrap();
-                                        }
-
-                                        // Set only if the key doesn't exists.
-                                        Instr::SetIfNone => {
-                                            data_tx.send(data::Cmd::SetIfNone(key, value)).unwrap();
-
-                                            reader_writer_tx
-                                                .send(writer::Cmd::Write(conn.id, OK.into()))
-                                                .unwrap();
-                                        }
-
-                                        // Makes the value an integer and increase it in 1.
-                                        Instr::Inc => {
-                                            data_tx.send(data::Cmd::Inc(key, conn.id)).unwrap();
-                                        }
-
-                                        // Appends the value.
-                                        Instr::Append => {
-                                            data_tx
-                                                .send(data::Cmd::Append(key, value, conn.id))
-                                                .unwrap();
-                                        }
-
-                                        // Delete!
-                                        Instr::Delete => {
-                                            data_tx.send(data::Cmd::Delete(key)).unwrap();
-
-                                            reader_writer_tx
-                                                .send(writer::Cmd::Write(conn.id, OK.into()))
-                                                .unwrap();
-                                        }
-
-                                        // Get
-                                        Instr::Get => {
-                                            data_tx.send(data::Cmd::Get(key, conn.id)).unwrap();
-                                        }
-
-                                        // "Bite" query, 0x0 separated key value enumeration: key value'\0x0'key2 value2
-                                        Instr::Bite => {
-                                            data_tx.send(data::Cmd::Bite(key, conn.id)).unwrap();
-                                        }
-
-                                        // Trimmed Json (just the data).
-                                        Instr::Jtrim => {
-                                            data_tx.send(data::Cmd::Jtrim(key, conn.id)).unwrap();
-                                        }
-
-                                        // Json (full path).
-                                        Instr::Json => {
-                                            data_tx.send(data::Cmd::Json(key, conn.id)).unwrap();
-                                        }
-
-                                        // A generic "bite" subscription. Subscribers also receive their key: "key value"
-                                        // Also a first message if value is available.
-                                        Instr::SubGet | Instr::SubBite | Instr::SubJ => {
-                                            if !conn.keys.contains(&key) {
-                                                conn.keys.push(key.to_owned());
-                                            }
-
-                                            reader_subs_tx
-                                                .send(subs::Cmd::Add(
-                                                    key.to_owned(),
-                                                    conn.id,
-                                                    instr,
-                                                ))
-                                                .unwrap();
-
-                                            if !value.is_empty() {
-                                                reader_subs_tx
-                                                    .send(subs::Cmd::Call(key, value))
-                                                    .unwrap()
-                                            }
-
-                                            reader_writer_tx
-                                                .send(writer::Cmd::Write(conn.id, OK.into()))
-                                                .unwrap();
-                                        }
-
-                                        // A desubscription and a last message if value is available.
-                                        Instr::Unsub => {
-                                            if !value.is_empty() {
-                                                reader_subs_tx
-                                                    .send(subs::Cmd::Call(key.to_owned(), value))
-                                                    .unwrap();
-                                            }
-
-                                            reader_subs_tx
-                                                .send(subs::Cmd::Del(key, conn.id))
-                                                .unwrap();
-
-                                            reader_writer_tx
-                                                .send(writer::Cmd::Write(conn.id, OK.into()))
-                                                .unwrap();
-                                        }
-
-                                        // Calls key subscribers with the new value without data modifications.
-                                        Instr::SubCall => {
-                                            reader_subs_tx
-                                                .send(subs::Cmd::Call(key, value))
-                                                .unwrap();
-
-                                            reader_writer_tx
-                                                .send(writer::Cmd::Write(conn.id, OK.into()))
-                                                .unwrap();
-                                        }
-                                    }
-
-                                    println!("{}: {}", conn.addr, text);
-                                }
-                            }
-                        }
-
-                        if conn.closed {
-                            closed.push(conn.id);
-                        } else {
-                            poller.modify(&conn.socket, Event::readable(id))?;
-                        }
-                    }
-
-                    for id in closed {
-                        let rconn = readers.lock().unwrap().remove(&id).unwrap();
-                        let wconn = writers.lock().unwrap().remove(&id).unwrap();
-                        poller.delete(&rconn.socket)?;
-                        poller.delete(&wconn.socket)?;
-                        reader_subs_tx
-                            .send(subs::Cmd::DelAll(rconn.keys, id))
-                            .unwrap();
-                    }
+                    reader_tx.send(reader::Cmd::Read(id)).unwrap();
                 }
 
-                // id if ev.writable => {}
                 _ => unreachable!(),
             }
         }
