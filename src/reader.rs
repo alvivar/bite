@@ -58,8 +58,7 @@ impl Reader {
         loop {
             match self.rx.recv().unwrap() {
                 Cmd::Read(id) => {
-                    let mut closed = Vec::<usize>::new();
-
+                    let mut closed: usize = 0;
                     if let Some(conn) = self.readers.lock().unwrap().get_mut(&id) {
                         if let Some(received) = conn.try_read() {
                             if let Ok(utf8) = from_utf8(&received) {
@@ -211,7 +210,7 @@ impl Reader {
                         }
 
                         if conn.closed {
-                            closed.push(conn.id);
+                            closed = conn.id;
                         } else {
                             self.poller
                                 .modify(&conn.socket, Event::readable(id))
@@ -219,12 +218,13 @@ impl Reader {
                         }
                     }
 
-                    for id in closed {
-                        let rconn = self.readers.lock().unwrap().remove(&id).unwrap();
-                        let wconn = self.writers.lock().unwrap().remove(&id).unwrap();
+                    // 0 is used by the main TcpListener, it will never appear in this context.
+                    if closed > 0 {
+                        let rconn = self.readers.lock().unwrap().remove(&closed).unwrap();
+                        let wconn = self.writers.lock().unwrap().remove(&closed).unwrap();
                         self.poller.delete(&rconn.socket).unwrap();
                         self.poller.delete(&wconn.socket).unwrap();
-                        subs_tx.send(subs::Cmd::DelAll(rconn.keys, id)).unwrap();
+                        subs_tx.send(subs::Cmd::DelAll(rconn.keys, closed)).unwrap();
                     }
                 }
             }
