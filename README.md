@@ -1,6 +1,6 @@
 # Bite
 
-Key-Value server with real time subscriptions.
+Key-Value database with subscriptions, for real time multiplayer applications.
 
 ## Tutorial
 
@@ -13,6 +13,14 @@ To set a value, but only if the key doesn't exist, use **s?**.
 
     s? somekeyname Update if the key doesn't exists
     > OK
+
+To get a value, use **g**.
+
+    g somekey
+    > Some string as a value
+
+    g keywithoutvalue
+    >
 
 To increase a value by 1, use **+1**. The value become 0 if it isn't a number or
 doesn't exist, it returns the result.
@@ -36,17 +44,6 @@ To delete a key and his value, use **d**.
     d somelist
     > OK
 
-To get a value, use **g**.
-
-    s somekey Some string as a value
-    > OK
-
-    g somekey
-    > Some string as a value
-
-    g keywithoutvalue
-    >
-
 A cool thing about **bite**, is that can make a query to get multiple values
 from different keys, as long as you use the **dot** notation to connect the keys
 as parent/children.
@@ -62,7 +59,7 @@ a particular key, separated by the byte 0.
     b data.author
     > name Andrés Villalobostwitter matnesis
 
-A more classic behavior, is that you can construct JSON with **js**.
+A classic detail, is that you can construct JSON with **js**.
 
     js data
     >
@@ -85,7 +82,7 @@ A more classic behavior, is that you can construct JSON with **js**.
         }
     }
 
-Use **j** to get the value without the full path.
+Use **j** to get the json without the full path.
 
     J data
     >
@@ -105,25 +102,47 @@ Everything will be stored sorted on **data/DB.json**.
 
 ### Subscriptions
 
-You can subscribe to a key to receive values in realtime.
+You can subscribe to a key to receive values on changes.
 
-**#g** sends you the value.
+With **#g** you receive the value.
 
     #g parent.child
+    > OK
+
     > Value changed because some client set parent.child to something
 
-**#j** sends you the key and the value as JSON.
+With **#j** you receive the key and value as a JSON.
 
-    #j parent.child
+    #j parent.current
+    > OK
+
     > { "data" : "Value changed because some client set parent.child.data to something" }
 
-**#b** sends you just the key and the value separated by space.
+With **#k** you receive the key and the value separated with space.
 
-    #b parent.child
+    #k parent.child
+    > OK
+
+    *On change*
     > id Value changed because some client set parent.child.data.id to something
 
-^ If you subscribe to **parent.child** you will also receive updates from the
-children in dot key notation, like **parent.child.data.id**.
+^ If you are subscribed to **parent.child** you will also receive updates from
+the children, like changes to **parent.child.data.id**.
+
+Use **!** to call the subscription with a value without changing the database.
+
+    > s key Something
+    > OK
+
+    > ! key New value
+    *Subscriptions to key are called with New value*
+
+    > g key
+    > Something
+
+You can unsubscribe with **#-**.
+
+    > #- key Last message to subscribers
 
 ## C# Library
 
@@ -158,8 +177,9 @@ You could use the first argument to specify a different address.
 
 ## Tech
 
-**Rust** multi-thread **TcpListeners** storing on a **BTreeMap** serialized into
-a json file with **Serde**.
+**Rust** multi-thread **TcpListeners**, using **polling** from **smol** to
+handle sockets events, storing on a **BTreeMap** serialized into a json file
+with **Serde**.
 
 Uses [Google Container
 Tools](https://github.com/GoogleContainerTools/distroless/blob/master/examples/rust/Dockerfile)
@@ -167,9 +187,9 @@ to run the binary on **Docker**.
 
 ## Things that I would like to add
 
-- Auth
+- Auth (Soon, working on a Tokio/Warp proxy with security)
 - The BTree on disk, serialized correctly instead of json
-- "Only on memory" should be an option
-- You should be able to send several instructions at the same time, and receive responses accordinly?
+- "Only on memory" should be optional
+- A small query language (so fun)
 - Maybe some kind of lists?
-- Support ints, floats and bools, everything is a string at the moment
+- Support ints, floats and bools, not just strings (?)
