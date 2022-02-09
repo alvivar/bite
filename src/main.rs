@@ -34,6 +34,7 @@ fn main() -> io::Result<()> {
     poller.add(&server, Event::readable(0))?;
     let poller = Arc::new(poller);
 
+    // The connections
     let readers = HashMap::<usize, Connection>::new();
     let readers = Arc::new(Mutex::new(readers));
     let writers = HashMap::<usize, Connection>::new();
