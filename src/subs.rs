@@ -73,12 +73,12 @@ impl Subs {
                                 let msg = match sub.instr {
                                     Instr::SubGet => value.to_owned(),
 
-                                    Instr::SubBite => {
+                                    Instr::SubKey => {
                                         let key = key.split('.').last().unwrap();
                                         format!("{} {}", key, value)
                                     }
 
-                                    Instr::SubJ => {
+                                    Instr::SubJson => {
                                         let key = key.split('.').last().unwrap();
                                         json!({ key: value }).to_string()
                                     }

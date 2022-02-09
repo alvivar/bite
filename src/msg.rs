@@ -11,8 +11,8 @@ pub enum Instr {
     Jtrim,
     Json,
     SubGet,
-    SubBite,
-    SubJ,
+    SubKey,
+    SubJson,
     Unsub,
     SubCall,
 }
@@ -76,9 +76,9 @@ pub fn parse(text: &str) -> Msg {
         "j" => Instr::Jtrim,
         "js" => Instr::Json,
         "#g" => Instr::SubGet,
-        "#b" => Instr::SubBite,
-        "#j" => Instr::SubJ,
-        "-#" => Instr::Unsub,
+        "#k" => Instr::SubKey,
+        "#j" => Instr::SubJson,
+        "#-" => Instr::Unsub,
         "!" => Instr::SubCall,
         _ => Instr::Nop,
     };
@@ -100,8 +100,8 @@ pub fn needs_key(instr: &Instr) -> bool {
         | Instr::Delete
         | Instr::Get
         | Instr::SubGet
-        | Instr::SubBite
-        | Instr::SubJ
+        | Instr::SubKey
+        | Instr::SubJson
         | Instr::Unsub
         | Instr::SubCall => true,
     }

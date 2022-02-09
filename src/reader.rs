@@ -157,7 +157,7 @@ impl Reader {
 
                                         // A generic "bite" subscription. Subscribers also receive their key: "key value"
                                         // Also a first message if value is available.
-                                        Instr::SubGet | Instr::SubBite | Instr::SubJ => {
+                                        Instr::SubGet | Instr::SubKey | Instr::SubJson => {
                                             if !conn.keys.contains(&key) {
                                                 conn.keys.push(key.to_owned());
                                             }
