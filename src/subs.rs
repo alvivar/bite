@@ -73,7 +73,7 @@ impl Subs {
                                 let msg = match sub.instr {
                                     Instr::SubGet => value.to_owned(),
 
-                                    Instr::SubKey => {
+                                    Instr::SubKeyValue => {
                                         let key = key.split('.').last().unwrap();
                                         format!("{} {}", key, value)
                                     }

@@ -1,15 +1,14 @@
 
     Optimize parser (?)
+    Send multiple commands, batch-like (Multiple sets, to receive multiple results)
     When reading handle the value as bytes, use utf8 to parse the instructions and the key
+
+    Auth by password
     Wondering if cleaning up sockets when broken, could be optimized by locking the mutexes during the cleaning loop (?)
 
     Maybe unsubscriptions for each subscription?
-    Auth by password
-
     Maybe you should be able to subscribe to all the content when you don't specify the key?
     Extract kv range into his own function
-
-    Send multiple commands, batch-like (Multiple sets, to receive multiple results)
 
     tungstenite to support websockets?
     Handle casting, int, float, bool?
@@ -42,6 +41,7 @@
 
 
     2022.02.09
+    x Lots of polish
     x Remove writting polling? It's unused
 
     2022.02.08

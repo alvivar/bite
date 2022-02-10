@@ -58,7 +58,7 @@ impl Reader {
         loop {
             match self.rx.recv().unwrap() {
                 Cmd::Read(id) => {
-                    let mut closed: usize = 0;
+                    let mut closed = false;
                     if let Some(conn) = self.readers.lock().unwrap().get_mut(&id) {
                         if let Some(received) = conn.try_read() {
                             if let Ok(utf8) = from_utf8(&received) {
@@ -141,7 +141,7 @@ impl Reader {
                                         }
 
                                         // "Bite" query, 0x0 separated key value enumeration: key value'\0x0'key2 value2
-                                        Instr::Bite => {
+                                        Instr::KeyValue => {
                                             data_tx.send(data::Cmd::Bite(key, conn.id)).unwrap();
                                         }
 
@@ -157,7 +157,7 @@ impl Reader {
 
                                         // A generic "bite" subscription. Subscribers also receive their key: "key value"
                                         // Also a first message if value is available.
-                                        Instr::SubGet | Instr::SubKey | Instr::SubJson => {
+                                        Instr::SubGet | Instr::SubKeyValue | Instr::SubJson => {
                                             if !conn.keys.contains(&key) {
                                                 conn.keys.push(key.to_owned());
                                             }
@@ -210,7 +210,7 @@ impl Reader {
                         }
 
                         if conn.closed {
-                            closed = conn.id;
+                            closed = true;
                         } else {
                             self.poller
                                 .modify(&conn.socket, Event::readable(id))
@@ -218,13 +218,11 @@ impl Reader {
                         }
                     }
 
-                    // 0 is used by the main TcpListener, it will never appear in this context.
-                    if closed > 0 {
-                        let rconn = self.readers.lock().unwrap().remove(&closed).unwrap();
-                        let wconn = self.writers.lock().unwrap().remove(&closed).unwrap();
+                    if closed {
+                        self.writers.lock().unwrap().remove(&id).unwrap();
+                        let rconn = self.readers.lock().unwrap().remove(&id).unwrap();
                         self.poller.delete(&rconn.socket).unwrap();
-                        self.poller.delete(&wconn.socket).unwrap();
-                        subs_tx.send(subs::Cmd::DelAll(rconn.keys, closed)).unwrap();
+                        subs_tx.send(subs::Cmd::DelAll(rconn.keys, id)).unwrap();
                     }
                 }
             }

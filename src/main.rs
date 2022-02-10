@@ -89,15 +89,17 @@ fn main() -> io::Result<()> {
 
                     println!("Connection #{} from {}", id, addr);
 
-                    // Register the reading socket for events.
+                    // The server continues listening for more clients, always 0.
+                    poller.modify(&server, Event::readable(0))?;
+
+                    // Register the reader socket for reading events.
                     poller.add(&read_socket, Event::readable(id))?;
                     readers
                         .lock()
                         .unwrap()
                         .insert(id, Connection::new(id, read_socket, addr));
 
-                    // Register the writing socket for events.
-                    poller.add(&write_socket, Event::none(id))?;
+                    // Save the writer socket for later use.
                     writers
                         .lock()
                         .unwrap()
@@ -105,9 +107,6 @@ fn main() -> io::Result<()> {
 
                     // One more.
                     id += 1;
-
-                    // The server continues listening for more clients, always 0.
-                    poller.modify(&server, Event::readable(0))?;
                 }
 
                 id if ev.readable => {

@@ -7,11 +7,11 @@ pub enum Instr {
     Append,
     Delete,
     Get,
-    Bite,
+    KeyValue,
     Jtrim,
     Json,
     SubGet,
-    SubKey,
+    SubKeyValue,
     SubJson,
     Unsub,
     SubCall,
@@ -23,8 +23,8 @@ pub struct Msg {
     pub value: String,
 }
 
-/// Returns a Msg with the first character found as instruction, the next word
-/// as key, and the rest as value.
+/// Returns a Msg with the first character found as instruction,
+/// the next word as key, and the rest as value.
 
 /// This text: +hello world is a pretty old meme
 /// Returns: Msg { Instr::Append, "hello", "world is a pretty old meme" }
@@ -57,8 +57,7 @@ pub fn parse(text: &str) -> Msg {
                 }
 
                 _ => {
-                    // @todo There may be a way to push the rest of the iterator
-                    // instead of one by one.
+                    // @todo There may be a way to push the rest of the iterator instead of one by one.
                     value.push(c);
                 }
             },
@@ -72,11 +71,11 @@ pub fn parse(text: &str) -> Msg {
         "+" => Instr::Append,
         "d" => Instr::Delete,
         "g" => Instr::Get,
-        "b" => Instr::Bite,
+        "k" => Instr::KeyValue,
         "j" => Instr::Jtrim,
         "js" => Instr::Json,
         "#g" => Instr::SubGet,
-        "#k" => Instr::SubKey,
+        "#k" => Instr::SubKeyValue,
         "#j" => Instr::SubJson,
         "#-" => Instr::Unsub,
         "!" => Instr::SubCall,
@@ -91,7 +90,7 @@ pub fn parse(text: &str) -> Msg {
 
 pub fn needs_key(instr: &Instr) -> bool {
     match instr {
-        Instr::Nop | Instr::Bite | Instr::Jtrim | Instr::Json => false,
+        Instr::Nop | Instr::KeyValue | Instr::Jtrim | Instr::Json => false,
 
         Instr::Set
         | Instr::SetIfNone
@@ -100,7 +99,7 @@ pub fn needs_key(instr: &Instr) -> bool {
         | Instr::Delete
         | Instr::Get
         | Instr::SubGet
-        | Instr::SubKey
+        | Instr::SubKeyValue
         | Instr::SubJson
         | Instr::Unsub
         | Instr::SubCall => true,
