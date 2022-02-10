@@ -1,7 +1,8 @@
 
+    Optimize parser (?)
     When reading handle the value as bytes, use utf8 to parse the instructions and the key
+    Wondering if cleaning up sockets when broken, could be optimized by locking the mutexes during the cleaning loop (?)
 
-    Update the docs with the new commands
     Maybe unsubscriptions for each subscription?
     Auth by password
 
@@ -40,7 +41,11 @@
     Pop # should return and delete a value
 
 
+    2022.02.09
+    x Remove writting polling? It's unused
+
     2022.02.08
+    x Update the docs with the new commands
     x Refactor so that the main thread only handles connections
     x Reading is his own thread
 
