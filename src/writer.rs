@@ -8,7 +8,10 @@ use std::{
 
 use polling::Poller;
 
-use crate::{conn::Connection, subs};
+use crate::{
+    conn::Connection,
+    subs::{self, Cmd::DelAll},
+};
 
 pub struct Msg {
     pub id: usize,
@@ -66,7 +69,7 @@ impl Writer {
                         self.writers.lock().unwrap().remove(&id).unwrap();
                         let rconn = self.readers.lock().unwrap().remove(&id).unwrap();
                         self.poller.delete(&rconn.socket).unwrap();
-                        subs_tx.send(subs::Cmd::DelAll(rconn.keys, id)).unwrap();
+                        subs_tx.send(DelAll(rconn.keys, id)).unwrap();
                     }
                 }
 
@@ -91,7 +94,7 @@ impl Writer {
                         self.writers.lock().unwrap().remove(&id).unwrap();
                         let rconn = self.readers.lock().unwrap().remove(&id).unwrap();
                         self.poller.delete(&rconn.socket).unwrap();
-                        subs_tx.send(subs::Cmd::DelAll(rconn.keys, id)).unwrap();
+                        subs_tx.send(DelAll(rconn.keys, id)).unwrap();
                     }
                 }
             }

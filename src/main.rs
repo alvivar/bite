@@ -16,12 +16,12 @@ mod reader;
 mod subs;
 mod writer;
 
-use conn::Connection;
-use data::Data;
-use db::DB;
-use reader::Reader;
-use subs::Subs;
-use writer::Writer;
+use crate::conn::Connection;
+use crate::data::Data;
+use crate::db::DB;
+use crate::reader::{Cmd::Read, Reader};
+use crate::subs::Subs;
+use crate::writer::Writer;
 
 fn main() -> io::Result<()> {
     println!("\nBIT:E\n");
@@ -109,9 +109,7 @@ fn main() -> io::Result<()> {
                     id += 1;
                 }
 
-                id if ev.readable => {
-                    reader_tx.send(reader::Cmd::Read(id)).unwrap();
-                }
+                id if ev.readable => reader_tx.send(Read(id)).unwrap(),
 
                 _ => unreachable!(),
             }

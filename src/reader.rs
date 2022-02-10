@@ -11,9 +11,16 @@ use polling::{Event, Poller};
 
 use crate::{
     conn::Connection,
-    data,
+    data::{
+        self,
+        Cmd::{Append, Bite, Delete, Get, Inc, Json, Jtrim, Set, SetIfNone},
+    },
     msg::{needs_key, parse, Instr},
-    subs, writer,
+    subs::{
+        self,
+        Cmd::{Add, Call, Del, DelAll},
+    },
+    writer::{self, Cmd::Write},
 };
 
 const OK: &str = "OK";
@@ -77,82 +84,64 @@ impl Reader {
                                     match instr {
                                         // Instructions that doesn't make sense without key.
                                         _ if key.is_empty() && needs_key(&instr) => {
-                                            writer_tx
-                                                .send(writer::Cmd::Write(conn.id, KEY.into()))
-                                                .unwrap();
+                                            writer_tx.send(Write(conn.id, KEY.into())).unwrap();
                                         }
 
                                         // Nop
                                         Instr::Nop => {
-                                            writer_tx
-                                                .send(writer::Cmd::Write(conn.id, NOP.into()))
-                                                .unwrap();
+                                            writer_tx.send(Write(conn.id, NOP.into())).unwrap();
                                         }
 
                                         // Set
                                         Instr::Set => {
                                             subs_tx
-                                                .send(subs::Cmd::Call(
-                                                    key.to_owned(),
-                                                    value.to_owned(),
-                                                ))
+                                                .send(Call(key.to_owned(), value.to_owned()))
                                                 .unwrap();
 
-                                            data_tx.send(data::Cmd::Set(key, value)).unwrap();
-
-                                            writer_tx
-                                                .send(writer::Cmd::Write(conn.id, OK.into()))
-                                                .unwrap();
+                                            data_tx.send(Set(key, value)).unwrap();
+                                            writer_tx.send(Write(conn.id, OK.into())).unwrap();
                                         }
 
                                         // Set only if the key doesn't exists.
                                         Instr::SetIfNone => {
-                                            data_tx.send(data::Cmd::SetIfNone(key, value)).unwrap();
-
-                                            writer_tx
-                                                .send(writer::Cmd::Write(conn.id, OK.into()))
-                                                .unwrap();
+                                            data_tx.send(SetIfNone(key, value)).unwrap();
+                                            writer_tx.send(Write(conn.id, OK.into())).unwrap();
                                         }
 
                                         // Makes the value an integer and increase it in 1.
                                         Instr::Inc => {
-                                            data_tx.send(data::Cmd::Inc(key, conn.id)).unwrap();
+                                            data_tx.send(Inc(key, conn.id)).unwrap();
                                         }
 
                                         // Appends the value.
                                         Instr::Append => {
-                                            data_tx
-                                                .send(data::Cmd::Append(key, value, conn.id))
-                                                .unwrap();
+                                            data_tx.send(Append(key, value, conn.id)).unwrap();
                                         }
 
                                         // Delete!
                                         Instr::Delete => {
-                                            data_tx.send(data::Cmd::Delete(key)).unwrap();
-
-                                            writer_tx
-                                                .send(writer::Cmd::Write(conn.id, OK.into()))
-                                                .unwrap();
+                                            data_tx.send(Delete(key)).unwrap();
+                                            writer_tx.send(Write(conn.id, OK.into())).unwrap();
                                         }
 
                                         // Get
                                         Instr::Get => {
-                                            data_tx.send(data::Cmd::Get(key, conn.id)).unwrap();
+                                            data_tx.send(Get(key, conn.id)).unwrap();
                                         }
 
-                                        // "Bite" query, 0x0 separated key value enumeration: key value'\0x0'key2 value2
+                                        // 0x0 separated key value enumeration: key value\0x0key2 value2
                                         Instr::KeyValue => {
-                                            data_tx.send(data::Cmd::Bite(key, conn.id)).unwrap();
+                                            data_tx.send(Bite(key, conn.id)).unwrap();
                                         }
 
                                         // Trimmed Json (just the data).
                                         Instr::Jtrim => {
-                                            data_tx.send(data::Cmd::Jtrim(key, conn.id)).unwrap();
+                                            data_tx.send(Jtrim(key, conn.id)).unwrap();
                                         }
 
                                         // Json (full path).
                                         Instr::Json => {
-                                            data_tx.send(data::Cmd::Json(key, conn.id)).unwrap();
+                                            data_tx.send(Json(key, conn.id)).unwrap();
                                         }
 
                                         // A generic "bite" subscription. Subscribers also receive their key: "key value"
@@ -163,44 +152,30 @@ impl Reader {
                                             }
 
                                             subs_tx
-                                                .send(subs::Cmd::Add(
-                                                    key.to_owned(),
-                                                    conn.id,
-                                                    instr,
-                                                ))
+                                                .send(Add(key.to_owned(), conn.id, instr))
                                                 .unwrap();
 
                                             if !value.is_empty() {
-                                                subs_tx.send(subs::Cmd::Call(key, value)).unwrap()
+                                                subs_tx.send(Call(key, value)).unwrap()
                                             }
 
-                                            writer_tx
-                                                .send(writer::Cmd::Write(conn.id, OK.into()))
-                                                .unwrap();
+                                            writer_tx.send(Write(conn.id, OK.into())).unwrap();
                                         }
 
-                                        // A desubscription and a last message if value is available.
+                                        // A unsubscription and a last message if value is available.
                                         Instr::Unsub => {
                                             if !value.is_empty() {
-                                                subs_tx
-                                                    .send(subs::Cmd::Call(key.to_owned(), value))
-                                                    .unwrap();
+                                                subs_tx.send(Call(key.to_owned(), value)).unwrap();
                                             }
 
-                                            subs_tx.send(subs::Cmd::Del(key, conn.id)).unwrap();
-
-                                            writer_tx
-                                                .send(writer::Cmd::Write(conn.id, OK.into()))
-                                                .unwrap();
+                                            subs_tx.send(Del(key, conn.id)).unwrap();
+                                            writer_tx.send(Write(conn.id, OK.into())).unwrap();
                                         }
 
                                         // Calls key subscribers with the new value without data modifications.
                                         Instr::SubCall => {
-                                            subs_tx.send(subs::Cmd::Call(key, value)).unwrap();
-
-                                            writer_tx
-                                                .send(writer::Cmd::Write(conn.id, OK.into()))
-                                                .unwrap();
+                                            subs_tx.send(Call(key, value)).unwrap();
+                                            writer_tx.send(Write(conn.id, OK.into())).unwrap();
                                         }
                                     }
 
@@ -222,7 +197,7 @@ impl Reader {
                         self.writers.lock().unwrap().remove(&id).unwrap();
                         let rconn = self.readers.lock().unwrap().remove(&id).unwrap();
                         self.poller.delete(&rconn.socket).unwrap();
-                        subs_tx.send(subs::Cmd::DelAll(rconn.keys, id)).unwrap();
+                        subs_tx.send(DelAll(rconn.keys, id)).unwrap();
                     }
                 }
             }

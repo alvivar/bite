@@ -1,3 +1,9 @@
+pub struct Msg {
+    pub instr: Instr,
+    pub key: String,
+    pub value: String,
+}
+
 #[derive(PartialEq)]
 pub enum Instr {
     Nop,
@@ -15,12 +21,6 @@ pub enum Instr {
     SubJson,
     Unsub,
     SubCall,
-}
-
-pub struct Msg {
-    pub instr: Instr,
-    pub key: String,
-    pub value: String,
 }
 
 /// Returns a Msg with the first character found as instruction,
@@ -48,18 +48,9 @@ pub fn parse(text: &str) -> Msg {
             }
 
             _ => match word {
-                0 => {
-                    op.push(c);
-                }
-
-                1 => {
-                    key.push(c);
-                }
-
-                _ => {
-                    // @todo There may be a way to push the rest of the iterator instead of one by one.
-                    value.push(c);
-                }
+                0 => op.push(c),
+                1 => key.push(c),
+                _ => value.push(c),
             },
         }
     }

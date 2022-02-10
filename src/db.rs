@@ -10,7 +10,7 @@ use std::{
     time::Duration,
 };
 
-use serde_json::{self};
+use serde_json;
 
 const DB_PATH: &str = "./data";
 const DB_FILE: &str = "./data/DB.json";

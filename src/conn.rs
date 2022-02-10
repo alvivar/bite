@@ -80,8 +80,7 @@ fn read(socket: &mut TcpStream) -> io::Result<Vec<u8>> {
     }
 
     // let received_data = &received_data[..bytes_read];
-    // @doubt Using this slice ^ thing and returning with into() versus using
-    // the resize?
+    // @doubt Using this slice ^ thing and returning with into() versus using the resize?
 
     received.resize(bytes_read, 0);
 

@@ -9,7 +9,10 @@ use std::{
 
 use serde_json::{self, json, Value};
 
-use crate::{subs, writer};
+use crate::{
+    subs::{self, Cmd::Call},
+    writer::{self, Cmd::Write},
+};
 
 pub enum Cmd {
     Set(String, String),
@@ -61,7 +64,7 @@ impl Data {
 
                     if map.get(&key).is_none() {
                         self.subs_tx
-                            .send(subs::Cmd::Call(key.to_owned(), val.to_owned()))
+                            .send(Call(key.to_owned(), val.to_owned()))
                             .unwrap();
 
                         map.insert(key, val);
@@ -83,12 +86,10 @@ impl Data {
                     };
 
                     self.subs_tx
-                        .send(subs::Cmd::Call(key.to_owned(), inc.to_string()))
+                        .send(Call(key.to_owned(), inc.to_string()))
                         .unwrap();
 
-                    self.writer_tx
-                        .send(writer::Cmd::Write(id, inc.to_string()))
-                        .unwrap();
+                    self.writer_tx.send(Write(id, inc.to_string())).unwrap();
 
                     map.insert(key, inc.to_string());
 
@@ -111,12 +112,10 @@ impl Data {
                     };
 
                     self.subs_tx
-                        .send(subs::Cmd::Call(key.to_owned(), append.to_owned()))
+                        .send(Call(key.to_owned(), append.to_owned()))
                         .unwrap();
 
-                    self.writer_tx
-                        .send(writer::Cmd::Write(id, append.to_owned()))
-                        .unwrap();
+                    self.writer_tx.send(Write(id, append.to_owned())).unwrap();
 
                     map.insert(key, append);
 
@@ -138,9 +137,7 @@ impl Data {
                         None => "",
                     };
 
-                    self.writer_tx
-                        .send(writer::Cmd::Write(id, msg.into()))
-                        .unwrap();
+                    self.writer_tx.send(Write(id, msg.into())).unwrap();
                 }
 
                 Cmd::Bite(key, id) => {
@@ -159,7 +156,7 @@ impl Data {
                     }
                     let msg = msg.trim_end().to_owned(); // @todo What's happening here exactly?
 
-                    self.writer_tx.send(writer::Cmd::Write(id, msg)).unwrap();
+                    self.writer_tx.send(Write(id, msg)).unwrap();
                 }
 
                 Cmd::Jtrim(key, id) => {
@@ -184,7 +181,7 @@ impl Data {
                         }
                     };
 
-                    self.writer_tx.send(writer::Cmd::Write(id, msg)).unwrap();
+                    self.writer_tx.send(Write(id, msg)).unwrap();
                 }
 
                 Cmd::Json(key, id) => {
@@ -209,7 +206,7 @@ impl Data {
                         }
                     };
 
-                    self.writer_tx.send(writer::Cmd::Write(id, msg)).unwrap();
+                    self.writer_tx.send(Write(id, msg)).unwrap();
                 }
             }
         }

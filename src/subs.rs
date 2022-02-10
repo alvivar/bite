@@ -41,8 +41,8 @@ impl Subs {
 
     pub fn handle(&mut self) {
         loop {
-            match self.rx.recv() {
-                Ok(Cmd::Add(key, id, instr)) => {
+            match self.rx.recv().unwrap() {
+                Cmd::Add(key, id, instr) => {
                     let subs = self.registry.entry(key).or_insert_with(Vec::new);
 
                     if subs.iter().any(|x| x.id == id && x.instr == instr) {
@@ -52,19 +52,19 @@ impl Subs {
                     subs.push(Sub { id, instr })
                 }
 
-                Ok(Cmd::Del(key, id)) => {
+                Cmd::Del(key, id) => {
                     let subs = self.registry.entry(key).or_insert_with(Vec::new);
                     subs.retain(|x| x.id != id);
                 }
 
-                Ok(Cmd::DelAll(keys, id)) => {
+                Cmd::DelAll(keys, id) => {
                     for key in keys {
                         let subs = self.registry.entry(key).or_insert_with(Vec::new);
                         subs.retain(|x| x.id != id);
                     }
                 }
 
-                Ok(Cmd::Call(key, value)) => {
+                Cmd::Call(key, value) => {
                     let mut msgs = Vec::<writer::Msg>::new();
 
                     for alt_key in get_key_combinations(key.as_str()) {
@@ -95,8 +95,6 @@ impl Subs {
                         self.writer_tx.send(writer::Cmd::WriteAll(msgs)).unwrap();
                     }
                 }
-
-                Err(err) => panic!("The subs channel failed: {}", err),
             }
         }
     }
