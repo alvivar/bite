@@ -1,3 +1,5 @@
+use std::{io::Cursor, str::from_utf8};
+
 pub struct Msg {
     pub instr: Instr,
     pub key: String,
@@ -29,33 +31,15 @@ pub enum Instr {
 /// This text: +hello world is a pretty old meme
 /// Returns: Msg { Instr::Append, "hello", "world is a pretty old meme" }
 
-pub fn parse(text: &str) -> Msg {
-    let mut op = String::new();
-    let mut key = String::new();
-    let mut value = String::new();
+pub fn parse(msg: &[u8]) -> Msg {
+    let mut cursor = Cursor::new(msg);
+    let op = from_utf8(find(&mut cursor, b' ')).unwrap();
+    let key = from_utf8(find(&mut cursor, b' ')).unwrap();
+    let value = from_utf8(remaining(&mut cursor)).unwrap();
 
-    let mut word = 0;
-    for c in text.chars() {
-        match c {
-            _ if c.is_whitespace() => {
-                if !value.is_empty() {
-                    value.push(' ');
-                } else if !key.is_empty() {
-                    word = 2;
-                } else if !op.is_empty() {
-                    word = 1;
-                }
-            }
+    println!("Parse: {}| {}| {}|", op.trim(), key.trim(), value.trim());
 
-            _ => match word {
-                0 => op.push(c),
-                1 => key.push(c),
-                _ => value.push(c),
-            },
-        }
-    }
-
-    let instr = match op.trim_end().to_lowercase().as_str() {
+    let instr = match op.to_lowercase().trim_end() {
         "s" => Instr::Set,
         "s?" => Instr::SetIfNone,
         "+1" => Instr::Inc,
@@ -95,4 +79,26 @@ pub fn needs_key(instr: &Instr) -> bool {
         | Instr::Unsub
         | Instr::SubCall => true,
     }
+}
+
+fn find<'a>(src: &mut Cursor<&'a [u8]>, char: u8) -> &'a [u8] {
+    let start = src.position() as usize;
+    let end = src.get_ref().len() - 1;
+
+    for i in start..end {
+        if src.get_ref()[i] == char {
+            src.set_position(i as u64);
+
+            return &src.get_ref()[start..i];
+        }
+    }
+
+    &[]
+}
+
+fn remaining<'a>(src: &mut Cursor<&'a [u8]>) -> &'a [u8] {
+    let start = src.position() as usize;
+    let end = src.get_ref().len() - 1;
+
+    &src.get_ref()[start..end]
 }

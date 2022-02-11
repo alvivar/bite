@@ -76,7 +76,7 @@ impl Reader {
                                         continue;
                                     }
 
-                                    let msg = parse(text);
+                                    let msg = parse(text.as_bytes());
                                     let instr = msg.instr;
                                     let key = msg.key;
                                     let value = msg.value;
