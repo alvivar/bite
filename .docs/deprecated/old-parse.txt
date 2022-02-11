@@ -1,0 +1,20 @@
+let mut word = 0;
+for c in text.chars() {
+    match c {
+        _ if c.is_whitespace() => {
+            if !value.is_empty() {
+                value.push(' ');
+            } else if !key.is_empty() {
+                word = 2;
+            } else if !op.is_empty() {
+                word = 1;
+            }
+        }
+
+        _ => match word {
+            0 => op.push(c),
+            1 => key.push(c),
+            _ => value.push(c),
+        },
+    }
+}
