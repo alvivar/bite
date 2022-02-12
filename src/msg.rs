@@ -87,37 +87,35 @@ pub fn needs_key(instr: &Instr) -> bool {
     }
 }
 
-pub fn next_line<'a>(src: &mut Cursor<&'a [u8]>) -> Option<&'a [u8]> {
-    let mut start = src.position() as usize;
-    let mut end = src.get_ref().len();
+fn is_newline(c: u8) -> bool {
+    c == b'\r' || c == b'\n'
+}
 
-    if start >= end {
-        return None;
-    }
+pub fn next_line<'a>(cursor: &mut Cursor<&'a [u8]>) -> Option<&'a [u8]> {
+    let mut start = cursor.position() as usize;
+    let mut end = cursor.get_ref().len();
 
-    while src.get_ref()[start] == b' ' {
+    while is_newline(cursor.get_ref()[start]) {
         start += 1;
+
+        if start >= end {
+            return None;
+        }
     }
 
     for i in start..end {
-        if src.get_ref()[i] == b'\n' {
+        if is_newline(cursor.get_ref()[i]) {
             end = i;
             break;
         }
     }
 
-    src.set_position(end as u64);
+    cursor.set_position(end as u64);
 
-    println!("Borders {} {}", start, end);
-
-    if start >= end {
-        return None;
-    } else {
-        Some(&src.get_ref()[start..end])
-    }
+    Some(&cursor.get_ref()[start..end])
 }
 
-fn next_word<'a>(src: &mut Cursor<&'a [u8]>) -> &'a [u8] {
+pub fn next_word<'a>(src: &mut Cursor<&'a [u8]>) -> &'a [u8] {
     let mut start = src.position() as usize;
     let mut end = src.get_ref().len();
 
