@@ -1,3 +1,4 @@
+use core::fmt::{Debug, Display, Formatter, Result};
 use std::{io::Cursor, str::from_utf8};
 
 pub struct Msg {
@@ -6,7 +7,7 @@ pub struct Msg {
     pub value: String,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum Instr {
     Nop,
     Set,
@@ -23,6 +24,12 @@ pub enum Instr {
     SubJson,
     Unsub,
     SubCall,
+}
+
+impl Display for Instr {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        Debug::fmt(self, f)
+    }
 }
 
 /// Returns a Msg with the first character found as instruction,
@@ -78,6 +85,30 @@ pub fn needs_key(instr: &Instr) -> bool {
         | Instr::Unsub
         | Instr::SubCall => true,
     }
+}
+
+pub fn next_line<'a>(src: &mut Cursor<&'a [u8]>) -> &'a [u8] {
+    let mut start = src.position() as usize;
+    let mut end = src.get_ref().len();
+
+    if start == end {
+        return &[];
+    }
+
+    while src.get_ref()[start] == b' ' {
+        start += 1;
+    }
+
+    for i in start..end {
+        if src.get_ref()[i] == b'\n' {
+            end = i;
+            break;
+        }
+    }
+
+    src.set_position(end as u64);
+
+    &src.get_ref()[start..end]
 }
 
 fn next_word<'a>(src: &mut Cursor<&'a [u8]>) -> &'a [u8] {
