@@ -33,11 +33,11 @@ pub enum Instr {
 
 pub fn parse(msg: &[u8]) -> Msg {
     let mut cursor = Cursor::new(msg);
-    let op = from_utf8(find(&mut cursor, b' ')).unwrap();
-    let key = from_utf8(find(&mut cursor, b' ')).unwrap();
+    let op = from_utf8(next_word(&mut cursor)).unwrap();
+    let key = from_utf8(next_word(&mut cursor)).unwrap();
     let value = from_utf8(remaining(&mut cursor)).unwrap();
 
-    println!("Parse: {}| {}| {}|", op.trim(), key.trim(), value.trim());
+    println!("Parse: {}|{}|{}|", op.trim(), key.trim(), value.trim());
 
     let instr = match op.to_lowercase().trim_end() {
         "s" => Instr::Set,
@@ -57,6 +57,7 @@ pub fn parse(msg: &[u8]) -> Msg {
         _ => Instr::Nop,
     };
 
+    // @todo In the future value needs to be a [u8] or at least a Vec<u8>.
     let key = key.trim_end().to_owned();
     let value = value.trim_end().to_owned();
 
@@ -81,24 +82,41 @@ pub fn needs_key(instr: &Instr) -> bool {
     }
 }
 
-fn find<'a>(src: &mut Cursor<&'a [u8]>, char: u8) -> &'a [u8] {
-    let start = src.position() as usize;
-    let end = src.get_ref().len() - 1;
+fn next_word<'a>(src: &mut Cursor<&'a [u8]>) -> &'a [u8] {
+    let mut start = src.position() as usize;
+    let mut end = src.get_ref().len();
+
+    if start == end {
+        return &[];
+    }
+
+    while src.get_ref()[start] == b' ' {
+        start += 1;
+    }
 
     for i in start..end {
-        if src.get_ref()[i] == char {
-            src.set_position(i as u64);
-
-            return &src.get_ref()[start..i];
+        if src.get_ref()[i] == b' ' {
+            end = i;
+            break;
         }
     }
 
-    &[]
+    src.set_position(end as u64);
+
+    &src.get_ref()[start..end]
 }
 
 fn remaining<'a>(src: &mut Cursor<&'a [u8]>) -> &'a [u8] {
-    let start = src.position() as usize;
-    let end = src.get_ref().len() - 1;
+    let mut start = src.position() as usize;
+    let end = src.get_ref().len();
+
+    if start == end {
+        return &[];
+    }
+
+    while src.get_ref()[start] == b' ' {
+        start += 1;
+    }
 
     &src.get_ref()[start..end]
 }
