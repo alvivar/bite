@@ -1,7 +1,7 @@
 use std::{
     io::{
         self,
-        ErrorKind::{BrokenPipe, Interrupted, WouldBlock},
+        ErrorKind::{BrokenPipe, Interrupted, WouldBlock, WriteZero},
         Read, Write,
     },
     net::{SocketAddr, TcpStream},
@@ -42,7 +42,7 @@ impl Connection {
     }
 
     pub fn try_write(&mut self, data: Vec<u8>) {
-        if let Err(err) = self.socket.write(&data) {
+        if let Err(err) = write(&mut self.socket, data) {
             println!("Connection #{} broken, write failed: {}", self.id, err);
             self.closed = true;
         }
@@ -50,7 +50,7 @@ impl Connection {
 }
 
 fn read(socket: &mut TcpStream) -> io::Result<Vec<u8>> {
-    let mut received = vec![0; 1024 * 4]; // @todo What could be the correct size for this?
+    let mut received = vec![0; 1024]; // @todo What could be the correct size for this?
     let mut bytes_read = 0;
 
     loop {
@@ -58,7 +58,7 @@ fn read(socket: &mut TcpStream) -> io::Result<Vec<u8>> {
             Ok(0) => {
                 // Reading 0 bytes means the other side has closed the
                 // connection or is done writing, then so are we.
-                return Err(io::Error::new(BrokenPipe, "0 bytes read"));
+                return Err(BrokenPipe.into());
             }
 
             Ok(n) => {
@@ -79,10 +79,32 @@ fn read(socket: &mut TcpStream) -> io::Result<Vec<u8>> {
         }
     }
 
-    // let received_data = &received_data[..bytes_read];
-    // @doubt Using this slice ^ thing and returning with into() versus using the resize?
-
     received.resize(bytes_read, 0);
 
     Ok(received)
+}
+
+fn write(socket: &mut TcpStream, data: Vec<u8>) -> io::Result<usize> {
+    match socket.write(&data) {
+        // We want to write the entire `DATA` buffer in a single go. If we
+        // write less we'll return a short write error (same as
+        // `io::Write::write_all` does).
+        Ok(n) if n < data.len() => Err(WriteZero.into()),
+
+        Ok(n) => {
+            // After we've written something we'll reregister the connection to
+            // only respond to readable events.
+            Ok(n)
+        }
+
+        // Would block "errors" are the OS's way of saying that the connection
+        // is not actually ready to perform this I/O operation.
+        Err(ref err) if err.kind() == WouldBlock => Err(WouldBlock.into()),
+
+        // Got interrupted (how rude!), we'll try again.
+        Err(ref err) if err.kind() == Interrupted => write(socket, data),
+
+        // Other errors we'll consider fatal.
+        Err(err) => Err(err),
+    }
 }
