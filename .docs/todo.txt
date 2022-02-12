@@ -1,7 +1,4 @@
 
-    Explore this: https://github.com/tokio-rs/mini-redis/blob/master/src/frame.rs
-
-    Optimize parser (?)
     Send multiple commands, batch-like (Multiple sets, to receive multiple results)
     When reading handle the value as bytes, use utf8 to parse the instructions and the key
 
@@ -41,6 +38,10 @@
     Push # value should insert into a list, transform normal values
     Pop # should return and delete a value
 
+
+    2022.02.11
+    x Explore this: https://github.com/tokio-rs/mini-redis/blob/master/src/frame.rs
+    x Optimize parser (?)
 
     2022.02.09
     x Lots of polish
