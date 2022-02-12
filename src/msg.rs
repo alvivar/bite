@@ -95,6 +95,10 @@ pub fn next_line<'a>(cursor: &mut Cursor<&'a [u8]>) -> Option<&'a [u8]> {
     let mut start = cursor.position() as usize;
     let mut end = cursor.get_ref().len();
 
+    if start >= end {
+        return None;
+    }
+
     while is_newline(cursor.get_ref()[start]) {
         start += 1;
 
