@@ -72,12 +72,8 @@ impl Reader {
 
                             // We assume multiple instructions separated with newlines.
                             let mut cursor = Cursor::new(received);
-                            let mut line = next_line(&mut cursor);
-
-                            while !line.is_empty() {
+                            while let Some(line) = next_line(&mut cursor) {
                                 let msg = parse(line);
-                                line = next_line(&mut cursor);
-
                                 let instr = msg.instr;
                                 let key = msg.key;
                                 let value = msg.value;

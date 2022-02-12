@@ -87,12 +87,12 @@ pub fn needs_key(instr: &Instr) -> bool {
     }
 }
 
-pub fn next_line<'a>(src: &mut Cursor<&'a [u8]>) -> &'a [u8] {
+pub fn next_line<'a>(src: &mut Cursor<&'a [u8]>) -> Option<&'a [u8]> {
     let mut start = src.position() as usize;
     let mut end = src.get_ref().len();
 
     if start >= end {
-        return &[];
+        return None;
     }
 
     while src.get_ref()[start] == b' ' {
@@ -108,7 +108,13 @@ pub fn next_line<'a>(src: &mut Cursor<&'a [u8]>) -> &'a [u8] {
 
     src.set_position(end as u64);
 
-    &src.get_ref()[start..end]
+    println!("Borders {} {}", start, end);
+
+    if start >= end {
+        return None;
+    } else {
+        Some(&src.get_ref()[start..end])
+    }
 }
 
 fn next_word<'a>(src: &mut Cursor<&'a [u8]>) -> &'a [u8] {
