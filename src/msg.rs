@@ -37,8 +37,6 @@ pub fn parse(msg: &[u8]) -> Msg {
     let key = from_utf8(next_word(&mut cursor)).unwrap();
     let value = from_utf8(remaining(&mut cursor)).unwrap();
 
-    println!("Parse: {}|{}|{}|", op.trim(), key.trim(), value.trim());
-
     let instr = match op.to_lowercase().trim_end() {
         "s" => Instr::Set,
         "s?" => Instr::SetIfNone,
