@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     io::Cursor,
+    str::from_utf8,
     sync::{
         mpsc::{channel, Receiver, Sender},
         Arc, Mutex,
@@ -68,6 +69,9 @@ impl Reader {
                     let mut closed = false;
                     if let Some(conn) = self.readers.lock().unwrap().get_mut(&id) {
                         if let Some(received) = conn.try_read() {
+                            let text = from_utf8(&received).unwrap();
+                            println!("{}", text);
+
                             let received = &received[..];
 
                             // We assume multiple instructions separated with newlines.
