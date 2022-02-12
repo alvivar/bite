@@ -91,7 +91,7 @@ pub fn next_line<'a>(src: &mut Cursor<&'a [u8]>) -> &'a [u8] {
     let mut start = src.position() as usize;
     let mut end = src.get_ref().len();
 
-    if start == end {
+    if start >= end {
         return &[];
     }
 
@@ -115,7 +115,7 @@ fn next_word<'a>(src: &mut Cursor<&'a [u8]>) -> &'a [u8] {
     let mut start = src.position() as usize;
     let mut end = src.get_ref().len();
 
-    if start == end {
+    if start >= end {
         return &[];
     }
 
@@ -139,7 +139,7 @@ fn remaining<'a>(src: &mut Cursor<&'a [u8]>) -> &'a [u8] {
     let mut start = src.position() as usize;
     let end = src.get_ref().len();
 
-    if start == end {
+    if start >= end {
         return &[];
     }
 
