@@ -161,6 +161,10 @@ fn remaining<'a>(src: &mut Cursor<&'a [u8]>) -> &'a [u8] {
 
     while is_whitespace(src.get_ref()[start]) {
         start += 1;
+
+        if start >= end {
+            return &[];
+        }
     }
 
     &src.get_ref()[start..end]

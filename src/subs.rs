@@ -5,7 +5,7 @@ use std::{
 
 use serde_json::json;
 
-use crate::{msg::Instr, writer};
+use crate::{parse::Instr, writer};
 
 pub enum Cmd {
     Add(String, usize, Instr),

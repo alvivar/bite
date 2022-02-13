@@ -11,7 +11,7 @@ use polling::{Event, Poller};
 mod conn;
 mod data;
 mod db;
-mod msg;
+mod parse;
 mod reader;
 mod subs;
 mod writer;

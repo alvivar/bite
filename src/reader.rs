@@ -15,7 +15,7 @@ use crate::{
         self,
         Cmd::{Append, Bite, Delete, Get, Inc, Json, Jtrim, Set, SetIfNone},
     },
-    msg::{needs_key, next_line, parse, Instr},
+    parse::{needs_key, next_line, parse, Instr},
     subs::{
         self,
         Cmd::{Add, Call, Del, DelAll},
