@@ -31,9 +31,7 @@ impl DB {
 
             if self.modified.load(Ordering::Relaxed) {
                 self.modified.swap(false, Ordering::Relaxed);
-
                 self.save_to_file();
-
                 println!("DB.json saved");
             }
         }
@@ -42,26 +40,22 @@ impl DB {
     pub fn load_from_file(&self) {
         fs::create_dir_all(DB_PATH).unwrap();
 
-        let mut file = OpenOptions::new()
+        let file = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
-            .open(DB_FILE)
-            .unwrap();
+            .open(DB_FILE);
 
         let mut contents = String::new();
-        file.read_to_string(&mut contents).unwrap();
+        file.unwrap().read_to_string(&mut contents).unwrap();
 
         if !contents.is_empty() {
-            let c = self.data.clone();
-            let mut map = c.lock().unwrap();
+            let mut map = self.data.lock().unwrap();
             *map = serde_json::from_str(&contents).unwrap();
         }
     }
 
     pub fn save_to_file(&self) {
-        let map = self.data.lock().unwrap();
-
         let file = OpenOptions::new()
             .read(true)
             .write(true)
@@ -69,6 +63,7 @@ impl DB {
             .truncate(true)
             .open(DB_FILE);
 
+        let map = self.data.lock().unwrap();
         let json = serde_json::to_string_pretty(&*map).unwrap();
         file.unwrap().write_all(json.as_bytes()).unwrap();
     }
