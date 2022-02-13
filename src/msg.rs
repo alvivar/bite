@@ -91,6 +91,10 @@ fn is_newline(c: u8) -> bool {
     c == b'\r' || c == b'\n'
 }
 
+fn is_whitespace(c: u8) -> bool {
+    c == b' ' || c == b'\t' || c == b'\r' || c == b'\n'
+}
+
 pub fn next_line<'a>(cursor: &mut Cursor<&'a [u8]>) -> Option<&'a [u8]> {
     let mut start = cursor.position() as usize;
     let mut end = cursor.get_ref().len();
@@ -127,12 +131,16 @@ pub fn next_word<'a>(src: &mut Cursor<&'a [u8]>) -> &'a [u8] {
         return &[];
     }
 
-    while src.get_ref()[start] == b' ' {
+    while is_whitespace(src.get_ref()[start]) {
         start += 1;
+
+        if start >= end {
+            return &[];
+        }
     }
 
     for i in start..end {
-        if src.get_ref()[i] == b' ' {
+        if is_whitespace(src.get_ref()[i]) {
             end = i;
             break;
         }
@@ -151,7 +159,7 @@ fn remaining<'a>(src: &mut Cursor<&'a [u8]>) -> &'a [u8] {
         return &[];
     }
 
-    while src.get_ref()[start] == b' ' {
+    while is_whitespace(src.get_ref()[start]) {
         start += 1;
     }
 
