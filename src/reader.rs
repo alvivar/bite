@@ -58,10 +58,8 @@ impl Reader {
                     let mut closed = false;
                     if let Some(conn) = self.readers.lock().unwrap().get_mut(&id) {
                         if let Some(received) = conn.try_read() {
-                            let received = &received[..];
-
                             // We assume multiple instructions separated with newlines.
-                            let mut cursor = Cursor::new(received);
+                            let mut cursor = Cursor::new(&received[..]);
                             while let Some(line) = next_line(&mut cursor) {
                                 let msg = parse(line);
                                 let instr = msg.instr;
