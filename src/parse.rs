@@ -40,8 +40,8 @@ impl Display for Instr {
 
 pub fn parse(msg: &[u8]) -> Msg {
     let mut cursor = Cursor::new(msg);
-    let op = from_utf8(next_word(&mut cursor)).unwrap();
-    let key = from_utf8(next_word(&mut cursor)).unwrap();
+    let op = to_utf8(next_word(&mut cursor));
+    let key = to_utf8(next_word(&mut cursor));
     let value = from_utf8(remaining(&mut cursor)).unwrap();
 
     let instr = match op.to_lowercase().trim_end() {
@@ -85,14 +85,6 @@ pub fn needs_key(instr: &Instr) -> bool {
         | Instr::Unsub
         | Instr::SubCall => true,
     }
-}
-
-fn is_newline(c: u8) -> bool {
-    c == b'\r' || c == b'\n'
-}
-
-fn is_whitespace(c: u8) -> bool {
-    c == b' ' || c == b'\t' || c == b'\r' || c == b'\n'
 }
 
 pub fn next_line<'a>(cursor: &mut Cursor<&'a [u8]>) -> Option<&'a [u8]> {
@@ -168,4 +160,19 @@ fn remaining<'a>(src: &mut Cursor<&'a [u8]>) -> &'a [u8] {
     }
 
     &src.get_ref()[start..end]
+}
+
+fn to_utf8(str: &[u8]) -> &str {
+    match from_utf8(str) {
+        Ok(str) => str,
+        Err(_) => "",
+    }
+}
+
+fn is_newline(c: u8) -> bool {
+    c == b'\r' || c == b'\n'
+}
+
+fn is_whitespace(c: u8) -> bool {
+    c == b' ' || c == b'\t' || c == b'\r' || c == b'\n'
 }
