@@ -1,5 +1,4 @@
 
-    Send multiple commands, batch-like (Multiple sets, to receive multiple results)
     When reading handle the value as bytes, use utf8 to parse the instructions and the key
 
     Auth by password
@@ -9,11 +8,7 @@
     Maybe you should be able to subscribe to all the content when you don't specify the key?
     Extract kv range into his own function
 
-    tungstenite to support websockets?
     Handle casting, int, float, bool?
-
-    Document questions for the mentor
-    @mentor Does dropping the lock helps somehow?
 
     Trim '.' at the end to avoid weird formats?
 
@@ -38,6 +33,10 @@
     Push # value should insert into a list, transform normal values
     Pop # should return and delete a value
 
+
+    2022.02.13
+    x Send multiple commands, batch-like (Multiple sets, to receive multiple results)
+    x Parsing words and lines improved using cursors and &[u8] lifetimes
 
     2022.02.11
     x Explore this: https://github.com/tokio-rs/mini-redis/blob/master/src/frame.rs
