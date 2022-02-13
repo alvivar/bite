@@ -83,9 +83,9 @@ fn main() -> io::Result<()> {
         for ev in &events {
             match ev.key {
                 0 => {
-                    let (read_socket, addr) = server.accept()?;
-                    read_socket.set_nonblocking(true)?;
-                    let write_socket = read_socket.try_clone().unwrap();
+                    let (reader, addr) = server.accept()?;
+                    reader.set_nonblocking(true)?;
+                    let writer = reader.try_clone().unwrap();
 
                     println!("Connection #{} from {}", id, addr);
 
@@ -93,17 +93,17 @@ fn main() -> io::Result<()> {
                     poller.modify(&server, Event::readable(0))?;
 
                     // Register the reader socket for reading events.
-                    poller.add(&read_socket, Event::readable(id))?;
+                    poller.add(&reader, Event::readable(id))?;
                     readers
                         .lock()
                         .unwrap()
-                        .insert(id, Connection::new(id, read_socket, addr));
+                        .insert(id, Connection::new(id, reader, addr));
 
                     // Save the writer socket for later use.
                     writers
                         .lock()
                         .unwrap()
-                        .insert(id, Connection::new(id, write_socket, addr));
+                        .insert(id, Connection::new(id, writer, addr));
 
                     // One more.
                     id += 1;
