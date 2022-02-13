@@ -1,17 +1,15 @@
+use crate::{
+    subs::{self, Cmd::Call},
+    writer::{self, Cmd::Write},
+};
+use crossbeam_channel::{unbounded, Receiver, Sender};
+use serde_json::{self, json, Value};
 use std::{
     collections::BTreeMap,
     sync::{
         atomic::{AtomicBool, Ordering},
-        mpsc::{channel, Receiver, Sender},
         Arc, Mutex,
     },
-};
-
-use serde_json::{self, json, Value};
-
-use crate::{
-    subs::{self, Cmd::Call},
-    writer::{self, Cmd::Write},
 };
 
 pub enum Cmd {
@@ -37,7 +35,7 @@ pub struct Data {
 impl Data {
     pub fn new(writer_tx: Sender<writer::Cmd>, subs_tx: Sender<subs::Cmd>) -> Data {
         let map = Arc::new(Mutex::new(BTreeMap::<String, String>::new()));
-        let (tx, rx) = channel::<Cmd>();
+        let (tx, rx) = unbounded::<Cmd>();
 
         Data {
             map,

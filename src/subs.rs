@@ -1,14 +1,10 @@
-use std::{
-    collections::HashMap,
-    sync::mpsc::{channel, Receiver, Sender},
-};
-
-use serde_json::json;
-
 use crate::{
     parse::Instr,
     writer::{self, Msg},
 };
+use crossbeam_channel::{unbounded, Receiver, Sender};
+use serde_json::json;
+use std::collections::HashMap;
 
 pub enum Cmd {
     Add(String, usize, Instr),
@@ -32,7 +28,7 @@ pub struct Subs {
 impl Subs {
     pub fn new(writer_tx: Sender<writer::Cmd>) -> Subs {
         let registry = HashMap::<String, Vec<Sub>>::new();
-        let (tx, rx) = channel::<Cmd>();
+        let (tx, rx) = unbounded::<Cmd>();
 
         Subs {
             registry,

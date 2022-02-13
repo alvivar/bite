@@ -1,14 +1,3 @@
-use std::{
-    collections::HashMap,
-    io::Cursor,
-    sync::{
-        mpsc::{channel, Receiver, Sender},
-        Arc, Mutex,
-    },
-};
-
-use polling::{Event, Poller};
-
 use crate::{
     conn::Connection,
     data::{
@@ -21,6 +10,13 @@ use crate::{
         Cmd::{Add, Call, Del, DelAll},
     },
     writer::{self, Cmd::Write},
+};
+use crossbeam_channel::{unbounded, Receiver, Sender};
+use polling::{Event, Poller};
+use std::{
+    collections::HashMap,
+    io::Cursor,
+    sync::{Arc, Mutex},
 };
 
 const OK: &str = "OK";
@@ -45,7 +41,7 @@ impl Reader {
         readers: Arc<Mutex<HashMap<usize, Connection>>>,
         writers: Arc<Mutex<HashMap<usize, Connection>>>,
     ) -> Reader {
-        let (tx, rx) = channel::<Cmd>();
+        let (tx, rx) = unbounded::<Cmd>();
 
         Reader {
             poller,

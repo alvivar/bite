@@ -1,16 +1,12 @@
-use std::{
-    collections::HashMap,
-    sync::{
-        mpsc::{channel, Receiver, Sender},
-        Arc, Mutex,
-    },
-};
-
-use polling::Poller;
-
 use crate::{
     conn::Connection,
     subs::{self, Cmd::DelAll},
+};
+use crossbeam_channel::{unbounded, Receiver, Sender};
+use polling::Poller;
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
 };
 
 pub struct Msg {
@@ -37,7 +33,7 @@ impl Writer {
         readers: Arc<Mutex<HashMap<usize, Connection>>>,
         writers: Arc<Mutex<HashMap<usize, Connection>>>,
     ) -> Writer {
-        let (tx, rx) = channel::<Cmd>();
+        let (tx, rx) = unbounded::<Cmd>();
 
         Writer {
             poller,
