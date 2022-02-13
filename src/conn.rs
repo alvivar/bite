@@ -1,11 +1,6 @@
-use std::{
-    io::{
-        self,
-        ErrorKind::{BrokenPipe, Interrupted, WouldBlock, WriteZero},
-        Read, Write,
-    },
-    net::{SocketAddr, TcpStream},
-};
+use std::io::ErrorKind::{BrokenPipe, Interrupted, WouldBlock, WriteZero};
+use std::io::{self, Read, Write};
+use std::net::{SocketAddr, TcpStream};
 
 pub struct Connection {
     pub id: usize,

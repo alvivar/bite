@@ -1,5 +1,6 @@
 use core::fmt::{Debug, Display, Formatter, Result};
-use std::{io::Cursor, str::from_utf8};
+use std::io::Cursor;
+use std::str::from_utf8;
 
 pub struct Msg {
     pub instr: Instr,

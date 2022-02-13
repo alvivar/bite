@@ -1,16 +1,12 @@
-use crate::{
-    subs::{self, Cmd::Call},
-    writer::{self, Cmd::Write},
-};
+use crate::subs::{self, Cmd::Call};
+use crate::writer::{self, Cmd::Write};
+
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use serde_json::{self, json, Value};
-use std::{
-    collections::BTreeMap,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc, Mutex,
-    },
-};
+
+use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 
 pub enum Cmd {
     Set(String, String),

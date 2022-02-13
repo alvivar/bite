@@ -1,13 +1,3 @@
-use std::{
-    collections::HashMap,
-    io,
-    net::TcpListener,
-    sync::{Arc, Mutex},
-    thread,
-};
-
-use polling::{Event, Poller};
-
 mod conn;
 mod data;
 mod db;
@@ -22,6 +12,14 @@ use crate::db::DB;
 use crate::reader::{Cmd::Read, Reader};
 use crate::subs::Subs;
 use crate::writer::Writer;
+
+use polling::{Event, Poller};
+
+use std::collections::HashMap;
+use std::io;
+use std::net::TcpListener;
+use std::sync::{Arc, Mutex};
+use std::thread;
 
 fn main() -> io::Result<()> {
     println!("\nBIT:E\n");

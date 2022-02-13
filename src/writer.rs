@@ -1,13 +1,9 @@
-use crate::{
-    conn::Connection,
-    subs::{self, Cmd::DelAll},
-};
+use crate::conn::Connection;
+use crate::subs::{self, Cmd::DelAll};
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use polling::Poller;
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 pub struct Msg {
     pub id: usize,

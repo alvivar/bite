@@ -1,23 +1,17 @@
-use crate::{
-    conn::Connection,
-    data::{
-        self,
-        Cmd::{Append, Bite, Delete, Get, Inc, Json, Jtrim, Set, SetIfNone},
-    },
-    parse::{needs_key, next_line, parse, Instr},
-    subs::{
-        self,
-        Cmd::{Add, Call, Del, DelAll},
-    },
-    writer::{self, Cmd::Write},
-};
+use crate::conn::Connection;
+use crate::data;
+use crate::data::Cmd::{Append, Bite, Delete, Get, Inc, Json, Jtrim, Set, SetIfNone};
+use crate::parse::{needs_key, next_line, parse, Instr};
+use crate::subs;
+use crate::subs::Cmd::{Add, Call, Del, DelAll};
+use crate::writer::{self, Cmd::Write};
+
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use polling::{Event, Poller};
-use std::{
-    collections::HashMap,
-    io::Cursor,
-    sync::{Arc, Mutex},
-};
+
+use std::collections::HashMap;
+use std::io::Cursor;
+use std::sync::{Arc, Mutex};
 
 const OK: &str = "OK";
 const NOP: &str = "NOP";

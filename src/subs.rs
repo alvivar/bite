@@ -1,9 +1,9 @@
-use crate::{
-    parse::Instr,
-    writer::{self, Msg},
-};
+use crate::parse::Instr;
+use crate::writer::{self, Msg};
+
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use serde_json::json;
+
 use std::collections::HashMap;
 
 pub enum Cmd {
