@@ -5,7 +5,10 @@ use std::{
 
 use serde_json::json;
 
-use crate::{parse::Instr, writer};
+use crate::{
+    parse::Instr,
+    writer::{self, Msg},
+};
 
 pub enum Cmd {
     Add(String, usize, Instr),
@@ -65,7 +68,7 @@ impl Subs {
                 }
 
                 Cmd::Call(key, value) => {
-                    let mut msgs = Vec::<writer::Msg>::new();
+                    let mut msgs = Vec::<Msg>::new();
 
                     for alt_key in get_key_combinations(key.as_str()) {
                         if let Some(subs) = self.registry.get(&alt_key) {
@@ -86,7 +89,7 @@ impl Subs {
                                     _ => unreachable!(),
                                 };
 
-                                msgs.push(writer::Msg { id: sub.id, msg });
+                                msgs.push(Msg { id: sub.id, msg });
                             }
                         }
                     }
