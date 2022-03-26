@@ -1,5 +1,5 @@
 use crate::subs::{self, Cmd::Call};
-use crate::writer::{self, Cmd::Write};
+use crate::writer::{self, Cmd::Push};
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use serde_json::{self, json, Value};
@@ -83,7 +83,7 @@ impl Data {
                         .send(Call(key.to_owned(), inc.to_string()))
                         .unwrap();
 
-                    self.writer_tx.send(Write(id, inc.to_string())).unwrap();
+                    self.writer_tx.send(Push(id, inc.to_string())).unwrap();
 
                     map.insert(key, inc.to_string());
 
@@ -109,7 +109,7 @@ impl Data {
                         .send(Call(key.to_owned(), append.to_owned()))
                         .unwrap();
 
-                    self.writer_tx.send(Write(id, append.to_owned())).unwrap();
+                    self.writer_tx.send(Push(id, append.to_owned())).unwrap();
 
                     map.insert(key, append);
 
@@ -131,7 +131,7 @@ impl Data {
                         None => "",
                     };
 
-                    self.writer_tx.send(Write(id, msg.into())).unwrap();
+                    self.writer_tx.send(Push(id, msg.into())).unwrap();
                 }
 
                 Cmd::Bite(key, id) => {
@@ -150,7 +150,7 @@ impl Data {
                     }
                     let msg = msg.trim_end().to_owned(); // @todo What's happening here exactly?
 
-                    self.writer_tx.send(Write(id, msg)).unwrap();
+                    self.writer_tx.send(Push(id, msg)).unwrap();
                 }
 
                 Cmd::Jtrim(key, id) => {
@@ -166,7 +166,7 @@ impl Data {
 
                     // [!] Returns the pointer.
                     // Always returns everything when the key is empty.
-                    let pointr = format!("/{}", key.replace(".", "/"));
+                    let pointr = format!("/{}", key.replace('.', "/"));
                     let msg = match json.pointer(pointr.as_str()) {
                         Some(val) => val.to_string(),
                         None => {
@@ -175,7 +175,7 @@ impl Data {
                         }
                     };
 
-                    self.writer_tx.send(Write(id, msg)).unwrap();
+                    self.writer_tx.send(Push(id, msg)).unwrap();
                 }
 
                 Cmd::Json(key, id) => {
@@ -191,7 +191,7 @@ impl Data {
 
                     // [!] Returns the json, but only if the pointer is real.
                     // Always returns everything when the key is empty.
-                    let pointr = format!("/{}", key.replace(".", "/"));
+                    let pointr = format!("/{}", key.replace('.', "/"));
                     let msg = match json.pointer(pointr.as_str()) {
                         Some(_) => json.to_string(),
                         None => {
@@ -200,7 +200,7 @@ impl Data {
                         }
                     };
 
-                    self.writer_tx.send(Write(id, msg)).unwrap();
+                    self.writer_tx.send(Push(id, msg)).unwrap();
                 }
             }
         }

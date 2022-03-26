@@ -91,7 +91,7 @@ impl Subs {
                     }
 
                     if !msgs.is_empty() {
-                        self.writer_tx.send(writer::Cmd::WriteAll(msgs)).unwrap();
+                        self.writer_tx.send(writer::Cmd::PushAll(msgs)).unwrap();
                     }
                 }
             }

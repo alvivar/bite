@@ -1,7 +1,7 @@
 use crate::conn::Connection;
 use crate::subs::{self, Cmd::DelAll};
 use crossbeam_channel::{unbounded, Receiver, Sender};
-use polling::Poller;
+use polling::{Event, Poller};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -11,8 +11,9 @@ pub struct Msg {
 }
 
 pub enum Cmd {
-    Write(usize, String), // @todo Maybe Vec<u8> would be better than String.
-    WriteAll(Vec<Msg>),
+    Push(usize, String),
+    PushAll(Vec<Msg>),
+    Send(usize), // @todo Maybe Vec<u8> would be better than String.
 }
 
 pub struct Writer {
@@ -43,53 +44,83 @@ impl Writer {
     pub fn handle(&self, subs_tx: Sender<subs::Cmd>) {
         loop {
             match self.rx.recv().unwrap() {
-                Cmd::Write(id, msg) => {
+                Cmd::Push(id, msg) => {
+                    if let Some(conn) = self.writers.lock().unwrap().get_mut(&id) {
+                        let msg = msg.trim_end().to_owned();
+                        conn.to_send.push(msg);
+                        self.poll_write(conn);
+                    }
+                }
+
+                Cmd::PushAll(msgs) => {
+                    let mut writers = self.writers.lock().unwrap();
+                    for msg in msgs {
+                        if let Some(conn) = writers.get_mut(&msg.id) {
+                            let msg = msg.msg.trim_end().to_owned();
+                            conn.to_send.push(msg);
+                            self.poll_write(conn);
+                        }
+                    }
+                }
+
+                Cmd::Send(id) => {
                     let mut closed = false;
 
                     if let Some(conn) = self.writers.lock().unwrap().get_mut(&id) {
-                        let mut msg = msg.trim_end().to_owned();
-                        msg.push('\n');
+                        if conn.to_send.is_empty() {
+                            return;
+                        }
 
+                        let msg = conn.to_send.remove(0);
                         conn.try_write(msg.into());
 
                         if conn.closed {
                             closed = true;
+                        } else if !conn.to_send.is_empty() {
+                            self.poll_write(conn);
                         }
                     }
 
                     if closed {
-                        self.writers.lock().unwrap().remove(&id).unwrap();
-                        let rconn = self.readers.lock().unwrap().remove(&id).unwrap();
-                        self.poller.delete(&rconn.socket).unwrap();
-                        subs_tx.send(DelAll(rconn.keys, id)).unwrap();
-                    }
-                }
-
-                Cmd::WriteAll(msgs) => {
-                    let mut closed = Vec::<usize>::new();
-                    let mut writers = self.writers.lock().unwrap();
-
-                    for msg in msgs {
-                        if let Some(conn) = writers.get_mut(&msg.id) {
-                            let mut msg = msg.msg.trim_end().to_owned();
-                            msg.push('\n');
-
-                            conn.try_write(msg.into());
-
-                            if conn.closed {
-                                closed.push(conn.id);
-                            }
-                        }
-                    }
-
-                    for id in closed {
-                        self.writers.lock().unwrap().remove(&id).unwrap();
-                        let rconn = self.readers.lock().unwrap().remove(&id).unwrap();
-                        self.poller.delete(&rconn.socket).unwrap();
-                        subs_tx.send(DelAll(rconn.keys, id)).unwrap();
+                        let rcon = self.readers.lock().unwrap().remove(&id).unwrap();
+                        let wcon = self.writers.lock().unwrap().remove(&id).unwrap();
+                        self.poller.delete(&rcon.socket).unwrap();
+                        self.poller.delete(&wcon.socket).unwrap();
+                        subs_tx.send(DelAll(rcon.keys, id)).unwrap();
                     }
                 }
             }
         }
     }
+
+    pub fn poll_write(&self, conn: &mut Connection) {
+        self.poller
+            .modify(&conn.socket, Event::writable(conn.id))
+            .unwrap();
+    }
 }
+
+// Cmd::WriteAll(msgs) => {
+//     let mut closed = Vec::<usize>::new();
+//     let mut writers = self.writers.lock().unwrap();
+
+//     for msg in msgs {
+//         if let Some(conn) = writers.get_mut(&msg.id) {
+//             let mut msg = msg.msg.trim_end().to_owned();
+//             msg.push('\n');
+
+//             conn.try_write(msg.into());
+
+//             if conn.closed {
+//                 closed.push(conn.id);
+//             }
+//         }
+//     }
+
+//     for id in closed {
+//         self.writers.lock().unwrap().remove(&id).unwrap();
+//         let rconn = self.readers.lock().unwrap().remove(&id).unwrap();
+//         self.poller.delete(&rconn.socket).unwrap();
+//         subs_tx.send(DelAll(rconn.keys, id)).unwrap();
+//     }
+// }

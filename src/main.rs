@@ -11,7 +11,7 @@ use crate::data::Data;
 use crate::db::DB;
 use crate::reader::{Cmd::Read, Reader};
 use crate::subs::Subs;
-use crate::writer::Writer;
+use crate::writer::{Cmd::Send, Writer};
 
 use polling::{Event, Poller};
 
@@ -44,6 +44,7 @@ fn main() -> io::Result<()> {
 
     // The writer
     let writer = Writer::new(poller.clone(), readers.clone(), writers.clone());
+    let writer_tx = writer.tx.clone();
     let subs_writer_tx = writer.tx.clone();
     let data_writer_tx = writer.tx.clone();
     let reader_writer_tx = writer.tx.clone();
@@ -71,7 +72,7 @@ fn main() -> io::Result<()> {
     thread::spawn(move || reader.handle(data_tx, reader_writer_tx, reader_subs_tx));
 
     // Connections and events via smol Poller.
-    let mut id: usize = 1; // 0 belongs to the main TcpListener.
+    let mut id_count: usize = 1; // 0 belongs to the main TcpListener.
     let mut events = Vec::new();
 
     loop {
@@ -85,29 +86,31 @@ fn main() -> io::Result<()> {
                     reader.set_nonblocking(true)?;
                     let writer = reader.try_clone().unwrap();
 
-                    println!("Connection #{} from {}", id, addr);
+                    println!("Connection #{} from {}", id_count, addr);
 
                     // The server continues listening for more clients, always 0.
                     poller.modify(&server, Event::readable(0))?;
 
                     // Register the reader socket for reading events.
-                    poller.add(&reader, Event::readable(id))?;
+                    poller.add(&reader, Event::readable(id_count))?;
                     readers
                         .lock()
                         .unwrap()
-                        .insert(id, Connection::new(id, reader, addr));
+                        .insert(id_count, Connection::new(id_count, reader, addr));
 
                     // Save the writer socket for later use.
+                    poller.add(&writer, Event::none(id_count))?;
                     writers
                         .lock()
                         .unwrap()
-                        .insert(id, Connection::new(id, writer, addr));
+                        .insert(id_count, Connection::new(id_count, writer, addr));
 
-                    // One more.
-                    id += 1;
+                    id_count += 1;
                 }
 
                 id if ev.readable => reader_tx.send(Read(id)).unwrap(),
+
+                id if ev.writable => writer_tx.send(Send(id)).unwrap(),
 
                 _ => unreachable!(),
             }

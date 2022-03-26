@@ -4,7 +4,7 @@ use crate::data::Cmd::{Append, Bite, Delete, Get, Inc, Json, Jtrim, Set, SetIfNo
 use crate::parse::{needs_key, next_line, parse, Instr};
 use crate::subs;
 use crate::subs::Cmd::{Add, Call, Del, DelAll};
-use crate::writer::{self, Cmd::Write};
+use crate::writer::{self, Cmd::Push};
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use polling::{Event, Poller};
@@ -71,12 +71,12 @@ impl Reader {
                                 match instr {
                                     // Instructions that doesn't make sense without key.
                                     _ if key.is_empty() && needs_key(&instr) => {
-                                        writer_tx.send(Write(conn.id, KEY.into())).unwrap();
+                                        writer_tx.send(Push(conn.id, KEY.into())).unwrap();
                                     }
 
                                     // Nop
                                     Instr::Nop => {
-                                        writer_tx.send(Write(conn.id, NOP.into())).unwrap();
+                                        writer_tx.send(Push(conn.id, NOP.into())).unwrap();
                                     }
 
                                     // Set
@@ -86,13 +86,13 @@ impl Reader {
                                             .unwrap();
 
                                         data_tx.send(Set(key, value)).unwrap();
-                                        writer_tx.send(Write(conn.id, OK.into())).unwrap();
+                                        writer_tx.send(Push(conn.id, OK.into())).unwrap();
                                     }
 
                                     // Set only if the key doesn't exists.
                                     Instr::SetIfNone => {
                                         data_tx.send(SetIfNone(key, value)).unwrap();
-                                        writer_tx.send(Write(conn.id, OK.into())).unwrap();
+                                        writer_tx.send(Push(conn.id, OK.into())).unwrap();
                                     }
 
                                     // Makes the value an integer and increase it in 1.
@@ -108,7 +108,7 @@ impl Reader {
                                     // Delete!
                                     Instr::Delete => {
                                         data_tx.send(Delete(key)).unwrap();
-                                        writer_tx.send(Write(conn.id, OK.into())).unwrap();
+                                        writer_tx.send(Push(conn.id, OK.into())).unwrap();
                                     }
 
                                     // Get
@@ -144,7 +144,7 @@ impl Reader {
                                             subs_tx.send(Call(key, value)).unwrap()
                                         }
 
-                                        writer_tx.send(Write(conn.id, OK.into())).unwrap();
+                                        writer_tx.send(Push(conn.id, OK.into())).unwrap();
                                     }
 
                                     // A unsubscription and a last message if value is available.
@@ -154,13 +154,13 @@ impl Reader {
                                         }
 
                                         subs_tx.send(Del(key, conn.id)).unwrap();
-                                        writer_tx.send(Write(conn.id, OK.into())).unwrap();
+                                        writer_tx.send(Push(conn.id, OK.into())).unwrap();
                                     }
 
                                     // Calls key subscribers with the new value without data modifications.
                                     Instr::SubCall => {
                                         subs_tx.send(Call(key, value)).unwrap();
-                                        writer_tx.send(Write(conn.id, OK.into())).unwrap();
+                                        writer_tx.send(Push(conn.id, OK.into())).unwrap();
                                     }
                                 }
                             }
@@ -176,10 +176,11 @@ impl Reader {
                     }
 
                     if closed {
-                        self.writers.lock().unwrap().remove(&id).unwrap();
-                        let rconn = self.readers.lock().unwrap().remove(&id).unwrap();
-                        self.poller.delete(&rconn.socket).unwrap();
-                        subs_tx.send(DelAll(rconn.keys, id)).unwrap();
+                        let rcon = self.readers.lock().unwrap().remove(&id).unwrap();
+                        let wcon = self.writers.lock().unwrap().remove(&id).unwrap();
+                        self.poller.delete(&rcon.socket).unwrap();
+                        self.poller.delete(&wcon.socket).unwrap();
+                        subs_tx.send(DelAll(rcon.keys, id)).unwrap();
                     }
                 }
             }

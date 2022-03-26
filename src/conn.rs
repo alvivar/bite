@@ -7,18 +7,21 @@ pub struct Connection {
     pub socket: TcpStream,
     pub addr: SocketAddr,
     pub keys: Vec<String>, // Only Readers know the keys in the current algorithm.
+    pub to_send: Vec<String>,
     pub closed: bool,
 }
 
 impl Connection {
     pub fn new(id: usize, socket: TcpStream, addr: SocketAddr) -> Connection {
         let keys = Vec::<String>::new();
+        let to_send = Vec::<String>::new();
 
         Connection {
             id,
             socket,
             addr,
             keys,
+            to_send,
             closed: false,
         }
     }
