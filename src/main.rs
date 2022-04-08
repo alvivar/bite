@@ -110,7 +110,10 @@ fn main() -> io::Result<()> {
 
                 id if ev.readable => reader_tx.send(Read(id)).unwrap(),
 
-                id if ev.writable => writer_tx.send(Send(id)).unwrap(),
+                id if ev.writable => {
+                    println!("writer_tx.send: {}", id);
+                    writer_tx.send(Send(id)).unwrap()
+                }
 
                 _ => unreachable!(),
             }
