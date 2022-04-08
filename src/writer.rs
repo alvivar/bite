@@ -47,6 +47,7 @@ impl Writer {
                 Cmd::Push(id, msg) => {
                     if let Some(conn) = self.writers.lock().unwrap().get_mut(&id) {
                         let msg = msg.trim_end().to_owned();
+                        println!("conn.to_send.push: {}", msg);
                         conn.to_send.push(msg);
                         self.poll_write(conn);
                     }
@@ -57,6 +58,7 @@ impl Writer {
                     for msg in msgs {
                         if let Some(conn) = writers.get_mut(&msg.id) {
                             let msg = msg.msg.trim_end().to_owned();
+                            println!("conn.to_send.push: {}", msg);
                             conn.to_send.push(msg);
                             self.poll_write(conn);
                         }
@@ -66,17 +68,19 @@ impl Writer {
                 Cmd::Send(id) => {
                     let mut closed = false;
 
-                    if let Some(conn) = self.writers.lock().unwrap().get_mut(&id) {
-                        if conn.to_send.is_empty() {
-                            return;
-                        }
+                    // @todo Wondering if this could be batched?
 
+                    if let Some(conn) = self.writers.lock().unwrap().get_mut(&id) {
                         let msg = conn.to_send.remove(0);
+
+                        println!("conn.try_write: {}", msg);
                         conn.try_write(msg.into());
 
                         if conn.closed {
                             closed = true;
-                        } else if !conn.to_send.is_empty() {
+                        } else if conn.to_send.len() > 0 {
+                            let val = conn.to_send.get(0).unwrap();
+                            println!("repolling {}", val);
                             self.poll_write(conn);
                         }
                     }
@@ -98,29 +102,10 @@ impl Writer {
             .modify(&conn.socket, Event::writable(conn.id))
             .unwrap();
     }
+
+    pub fn poll_clean(&self, conn: &mut Connection) {
+        self.poller
+            .modify(&conn.socket, Event::none(conn.id))
+            .unwrap();
+    }
 }
-
-// Cmd::WriteAll(msgs) => {
-//     let mut closed = Vec::<usize>::new();
-//     let mut writers = self.writers.lock().unwrap();
-
-//     for msg in msgs {
-//         if let Some(conn) = writers.get_mut(&msg.id) {
-//             let mut msg = msg.msg.trim_end().to_owned();
-//             msg.push('\n');
-
-//             conn.try_write(msg.into());
-
-//             if conn.closed {
-//                 closed.push(conn.id);
-//             }
-//         }
-//     }
-
-//     for id in closed {
-//         self.writers.lock().unwrap().remove(&id).unwrap();
-//         let rconn = self.readers.lock().unwrap().remove(&id).unwrap();
-//         self.poller.delete(&rconn.socket).unwrap();
-//         subs_tx.send(DelAll(rconn.keys, id)).unwrap();
-//     }
-// }
