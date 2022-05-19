@@ -48,7 +48,7 @@ impl Connection {
 }
 
 fn read(socket: &mut TcpStream) -> io::Result<Vec<u8>> {
-    let mut received = vec![0; 1024]; // @todo What could be the correct size for this?
+    let mut received = vec![0; 4096]; // @todo What could be the correct size for this?
     let mut bytes_read = 0;
 
     loop {
