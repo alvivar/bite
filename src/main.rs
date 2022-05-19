@@ -97,7 +97,7 @@ fn main() -> io::Result<()> {
                         .lock()
                         .unwrap()
                         .insert(id_count, Connection::new(id_count, reader, addr));
-                        
+
                     // Save the writer socket for later use.
                     poller.add(&writer, Event::none(id_count))?;
                     writers
@@ -110,10 +110,7 @@ fn main() -> io::Result<()> {
 
                 id if ev.readable => reader_tx.send(Read(id)).unwrap(),
 
-                id if ev.writable => {
-                    println!("writer_tx.send: {}", id);
-                    writer_tx.send(Send(id)).unwrap()
-                }
+                id if ev.writable => writer_tx.send(Send(id)).unwrap(),
 
                 _ => unreachable!(),
             }
