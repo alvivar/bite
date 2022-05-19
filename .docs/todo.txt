@@ -34,6 +34,9 @@
     Pop # should return and delete a value
 
 
+    May 19, 2022
+    x Lots of optimizations and testing
+
     2022.02.13
     x Crossbeam channel!
     x Clean up & Polish +1
