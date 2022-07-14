@@ -1,4 +1,6 @@
 
+    Sometimes long messages arrived splitted, so, the read loop confuse them as instructions, but they belong to the previous cycle.
+
     When reading handle the value as bytes, use utf8 to parse the instructions and the key
 
     Auth by password
