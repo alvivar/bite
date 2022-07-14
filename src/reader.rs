@@ -58,6 +58,8 @@ impl Reader {
                     let mut closed = false;
                     if let Some(conn) = self.readers.lock().unwrap().get_mut(&id) {
                         if let Some(received) = conn.try_read() {
+                            println!("Received: {:?}", &received);
+
                             // We assume multiple instructions separated with newlines.
                             let mut cursor = Cursor::new(&received[..]);
                             while let Some(line) = next_line(&mut cursor) {
@@ -66,7 +68,7 @@ impl Reader {
                                 let key = msg.key;
                                 let value = msg.value;
 
-                                println!("{}: {} {} {}", conn.addr, instr, key, value);
+                                println!("\n{}: {} {} {}", conn.addr, instr, key, value);
 
                                 match instr {
                                     // Instructions that doesn't make sense without key.
