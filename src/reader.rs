@@ -58,7 +58,8 @@ impl Reader {
                     let mut closed = false;
                     if let Some(conn) = self.readers.lock().unwrap().get_mut(&id) {
                         if let Some(received) = conn.try_read() {
-                            println!("Received: {:?}", &received);
+                            let received_utf8 = String::from_utf8_lossy(&received);
+                            println!("Received: {}", received_utf8);
 
                             // We assume multiple instructions separated with newlines.
                             let mut cursor = Cursor::new(&received[..]);
