@@ -64,6 +64,7 @@ fn read(socket: &mut TcpStream) -> io::Result<Vec<u8>> {
                 if bytes_read == received.len() {
                     received.resize(received.len() + 1024, 0);
                 }
+                println!("Resizing!");
             }
 
             // Would block "errors" are the OS's way of saying that the
@@ -73,7 +74,10 @@ fn read(socket: &mut TcpStream) -> io::Result<Vec<u8>> {
                 break;
             }
 
-            Err(ref err) if err.kind() == Interrupted => continue,
+            Err(ref err) if err.kind() == Interrupted => {
+                println!("Interrupted!");
+                continue;
+            }
 
             // Other errors we'll consider fatal.
             Err(err) => return Err(err),
@@ -81,6 +85,7 @@ fn read(socket: &mut TcpStream) -> io::Result<Vec<u8>> {
     }
 
     received.resize(bytes_read, 0);
+    println!("Completed!");
 
     Ok(received)
 }
