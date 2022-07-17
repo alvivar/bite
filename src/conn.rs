@@ -68,7 +68,10 @@ fn read(socket: &mut TcpStream) -> io::Result<Vec<u8>> {
 
             // Would block "errors" are the OS's way of saying that the
             // connection is not actually ready to perform this I/O operation.
-            Err(ref err) if err.kind() == WouldBlock => break,
+            Err(ref err) if err.kind() == WouldBlock => {
+                println!("Would block!");
+                break;
+            }
 
             Err(ref err) if err.kind() == Interrupted => continue,
 
