@@ -50,7 +50,7 @@ impl Reader {
 
                             // The first 2 bytes are the size.
 
-                            let size = ((received[0] as u32) << 8) + ((received[1] as u32) << 0);
+                            let size = (received[0] as u32) << 8 | (received[1] as u32) << 0;
                             println!("Size from received: {}", size);
 
                             parser_tx
