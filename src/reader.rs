@@ -43,14 +43,10 @@ impl Reader {
                 Cmd::Read(id) => {
                     let mut closed = false;
                     if let Some(conn) = self.readers.lock().unwrap().get_mut(&id) {
-                        if let Some(received) = conn.try_read() {
-                            // @todo Here we should start collecting messages
-                            // based on the size of the message, and send the
-                            // complete data to the parser thread to be handled.
-
+                        if let Some(mut received) = conn.try_read() {
                             // The first 2 bytes are the size.
-
-                            let size = (received[0] as u32) << 8 | (received[1] as u32) << 0;
+                            let size = (received[0] as u32) << 8 | (received[1] as u32) << 0; // BigEndian
+                            received.drain(0..2);
                             println!("Size from received: {}", size);
 
                             parser_tx
