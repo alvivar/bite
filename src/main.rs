@@ -1,8 +1,7 @@
 mod conn;
 mod data;
 mod db;
-mod frame;
-mod parse;
+mod parser;
 mod reader;
 mod subs;
 mod writer;
@@ -10,7 +9,7 @@ mod writer;
 use crate::conn::Connection;
 use crate::data::Data;
 use crate::db::DB;
-use crate::frame::Frame;
+use crate::parser::Parser;
 use crate::reader::{Cmd::Read, Reader};
 use crate::subs::Subs;
 use crate::writer::{Cmd::Send, Writer};
@@ -52,7 +51,7 @@ fn main() -> io::Result<()> {
     let frame_writer_tx = writer.tx.clone();
 
     // The frame parser & protocol handler
-    let frame = Frame::new();
+    let parser = Parser::new();
 
     // Subs
     let mut subs = Subs::new(subs_writer_tx);
@@ -76,7 +75,7 @@ fn main() -> io::Result<()> {
     thread::spawn(move || subs.handle());
     thread::spawn(move || writer.handle(writer_subs_tx));
     thread::spawn(move || reader.handle(reader_subs_tx));
-    thread::spawn(move || frame.handle(frame_data_tx, frame_writer_tx, frame_subs_tx));
+    thread::spawn(move || parser.handle(frame_data_tx, frame_writer_tx, frame_subs_tx));
 
     // Connections and events via smol Poller.
     let mut id_count: usize = 1; // 0 belongs to the main TcpListener.

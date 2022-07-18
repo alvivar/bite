@@ -1,4 +1,4 @@
-use crate::parse::Instr;
+use crate::parser::Instr;
 use crate::writer::{self, Msg};
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
