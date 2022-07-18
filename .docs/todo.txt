@@ -1,4 +1,6 @@
 
+    Subs should be able to handle a registry of ids vs keys, so DelAll can use that information for clean up.
+
     Creating a new thread to handle the message, this way reading is only about the protocol.
     Sometimes long messages arrived splitted, so, the read loop confuse them as instructions, but they belong to the previous cycle.
 
