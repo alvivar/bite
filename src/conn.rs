@@ -6,7 +6,7 @@ pub struct Connection {
     pub id: usize,
     pub socket: TcpStream,
     pub addr: SocketAddr,
-    pub keys: Vec<String>, // Only reading connections know the subscription keys.
+    pub keys: Vec<String>, // Only reading connections end up having subscription keys.
     pub to_send: Vec<String>,
     pub closed: bool,
 }
