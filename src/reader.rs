@@ -47,7 +47,9 @@ impl Reader {
                             // The first 2 bytes are the size.
                             let size = (received[0] as u32) << 8 | (received[1] as u32) << 0; // BigEndian
                             received.drain(0..2);
-                            println!("Size from received: {}", size);
+
+                            println!("Size from protocol: {}", size);
+                            println!("Size from read: {}", received.len());
 
                             parser_tx
                                 .send(parser::Cmd::Parse(id, received, conn.addr))
