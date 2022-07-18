@@ -1,6 +1,7 @@
 mod conn;
 mod data;
 mod db;
+mod frame;
 mod parse;
 mod reader;
 mod subs;
@@ -9,6 +10,7 @@ mod writer;
 use crate::conn::Connection;
 use crate::data::Data;
 use crate::db::DB;
+use crate::frame::Frame;
 use crate::reader::{Cmd::Read, Reader};
 use crate::subs::Subs;
 use crate::writer::{Cmd::Send, Writer};
@@ -47,18 +49,22 @@ fn main() -> io::Result<()> {
     let writer_tx = writer.tx.clone();
     let subs_writer_tx = writer.tx.clone();
     let data_writer_tx = writer.tx.clone();
-    let reader_writer_tx = writer.tx.clone();
+    let frame_writer_tx = writer.tx.clone();
+
+    // The frame parser & protocol handler
+    let frame = Frame::new();
 
     // Subs
     let mut subs = Subs::new(subs_writer_tx);
     let writer_subs_tx = subs.tx.clone();
     let data_subs_tx = subs.tx.clone();
     let reader_subs_tx = subs.tx.clone();
+    let frame_subs_tx = subs.tx.clone();
 
     // Data & DB
     let data = Data::new(data_writer_tx, data_subs_tx);
     let data_map = data.map.clone();
-    let data_tx = data.tx.clone();
+    let frame_data_tx = data.tx.clone();
 
     let mut db = DB::new(data_map);
     let db_modified = db.modified.clone();
@@ -69,7 +75,8 @@ fn main() -> io::Result<()> {
     thread::spawn(move || data.handle(db_modified));
     thread::spawn(move || subs.handle());
     thread::spawn(move || writer.handle(writer_subs_tx));
-    thread::spawn(move || reader.handle(data_tx, reader_writer_tx, reader_subs_tx));
+    thread::spawn(move || reader.handle(reader_subs_tx));
+    thread::spawn(move || frame.handle(frame_data_tx, frame_writer_tx, frame_subs_tx));
 
     // Connections and events via smol Poller.
     let mut id_count: usize = 1; // 0 belongs to the main TcpListener.
