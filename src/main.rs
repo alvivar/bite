@@ -52,6 +52,7 @@ fn main() -> io::Result<()> {
 
     // The frame parser & protocol handler
     let parser = Parser::new();
+    let reader_parser_tx = parser.tx.clone();
 
     // Subs
     let mut subs = Subs::new(subs_writer_tx);
@@ -74,7 +75,7 @@ fn main() -> io::Result<()> {
     thread::spawn(move || data.handle(db_modified));
     thread::spawn(move || subs.handle());
     thread::spawn(move || writer.handle(writer_subs_tx));
-    thread::spawn(move || reader.handle(reader_subs_tx));
+    thread::spawn(move || reader.handle(reader_parser_tx, reader_subs_tx));
     thread::spawn(move || parser.handle(frame_data_tx, frame_writer_tx, frame_subs_tx));
 
     // Connections and events via smol Poller.
