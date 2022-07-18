@@ -50,7 +50,7 @@ fn main() -> io::Result<()> {
     let data_writer_tx = writer.tx.clone();
     let frame_writer_tx = writer.tx.clone();
 
-    // The frame parser & protocol handler
+    // The parser
     let parser = Parser::new();
     let reader_parser_tx = parser.tx.clone();
 

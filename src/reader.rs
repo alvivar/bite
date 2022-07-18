@@ -46,8 +46,12 @@ impl Reader {
                         if let Some(received) = conn.try_read() {
                             // @todo Here we should start collecting messages
                             // based on the size of the message, and send the
-                            // complete data to the frame thread to be parsed
-                            // and handled.
+                            // complete data to the parser thread to be handled.
+
+                            // The first 2 bytes are the size.
+
+                            let size = ((received[0] as u32) << 8) + ((received[1] as u32) << 0);
+                            println!("Size from received: {}", size);
 
                             parser_tx
                                 .send(parser::Cmd::Parse(id, received, conn.addr))
