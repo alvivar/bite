@@ -50,11 +50,9 @@ impl Reader {
                             self.buffer.append(&mut received);
 
                             // The first 2 bytes are the size.
-                            let mut size =
-                                (self.buffer[0] as u32) << 8 | (self.buffer[1] as u32) << 0; // BigEndian
-                            size += 2;
-
+                            let size = (self.buffer[0] as u32) << 8 | (self.buffer[1] as u32) << 0; // BigEndian
                             let buffer_len = self.buffer.len() as u32;
+
                             println!("Sizes {} / {}", size, buffer_len);
 
                             if size == buffer_len {
