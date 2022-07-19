@@ -16,6 +16,7 @@ pub struct Reader {
     poller: Arc<Poller>,
     readers: Arc<Mutex<HashMap<usize, Connection>>>,
     writers: Arc<Mutex<HashMap<usize, Connection>>>,
+    buffer: Vec<u8>,
     pub tx: Sender<Cmd>,
     rx: Receiver<Cmd>,
 }
@@ -27,33 +28,41 @@ impl Reader {
         writers: Arc<Mutex<HashMap<usize, Connection>>>,
     ) -> Reader {
         let (tx, rx) = unbounded::<Cmd>();
+        let buffer = Vec::new();
 
         Reader {
             poller,
-            writers,
             readers,
+            writers,
+            buffer,
             tx,
             rx,
         }
     }
 
-    pub fn handle(&self, parser_tx: Sender<parser::Cmd>, subs_tx: Sender<subs::Cmd>) {
+    pub fn handle(&mut self, parser_tx: Sender<parser::Cmd>, subs_tx: Sender<subs::Cmd>) {
         loop {
             match self.rx.recv().unwrap() {
                 Cmd::Read(id) => {
                     let mut closed = false;
                     if let Some(conn) = self.readers.lock().unwrap().get_mut(&id) {
                         if let Some(mut received) = conn.try_read() {
+                            self.buffer.append(&mut received);
+
                             // The first 2 bytes are the size.
-                            let size = (received[0] as u32) << 8 | (received[1] as u32) << 0; // BigEndian
-                            received.drain(0..2);
+                            let size = (self.buffer[0] as u32) << 8 | (self.buffer[1] as u32) << 0; // BigEndian
+                            let buffer_len = self.buffer.len() as u32;
+                            println!("Sizes {} / {}", size, buffer_len);
 
-                            println!("Size from protocol: {}", size);
-                            println!("Size from read: {}", received.len());
+                            if size == buffer_len {
+                                self.buffer.drain(0..2);
 
-                            parser_tx
-                                .send(parser::Cmd::Parse(id, received, conn.addr))
-                                .unwrap();
+                                parser_tx
+                                    .send(parser::Cmd::Parse(id, self.buffer.to_owned(), conn.addr))
+                                    .unwrap();
+
+                                self.buffer.clear();
+                            }
                         }
 
                         if conn.closed {

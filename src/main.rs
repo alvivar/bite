@@ -40,7 +40,7 @@ fn main() -> io::Result<()> {
     let writers = Arc::new(Mutex::new(writers));
 
     // The reader
-    let reader = Reader::new(poller.clone(), readers.clone(), writers.clone());
+    let mut reader = Reader::new(poller.clone(), readers.clone(), writers.clone());
     let reader_tx = reader.tx.clone();
 
     // The writer
