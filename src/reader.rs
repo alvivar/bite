@@ -49,33 +49,49 @@ impl Reader {
                         if let Some(mut received) = conn.try_read() {
                             self.buffer.append(&mut received);
 
-                            // The first 2 bytes are the size.
-                            let size = (self.buffer[0] as u32) << 8 | (self.buffer[1] as u32) << 0; // BigEndian
-                            let buffer_len = self.buffer.len() as u32;
+                            // Loop because sometimes "received" could have more
+                            // than one message.
+                            loop {
+                                let size = // The first 2 bytes are the size.
+                                    (self.buffer[0] as u32) << 8 | (self.buffer[1] as u32) << 0; // BigEndian
+                                let buffer_len = self.buffer.len() as u32;
 
-                            println!("Sizes {} / {}", size, buffer_len);
+                                println!("Sizes {} / {}", size, buffer_len);
 
-                            if size == buffer_len {
-                                self.buffer.drain(0..2);
+                                // The message is complete!
+                                if size == buffer_len {
+                                    self.buffer.drain(0..2);
 
-                                parser_tx
-                                    .send(parser::Cmd::Parse(id, self.buffer.to_owned(), conn.addr))
-                                    .unwrap();
+                                    parser_tx
+                                        .send(parser::Cmd::Parse(
+                                            id,
+                                            self.buffer.to_owned(),
+                                            conn.addr,
+                                        ))
+                                        .unwrap();
 
-                                self.buffer.clear();
-                            } else if buffer_len > size {
-                                let split = self.buffer.split_off(size as usize);
+                                    self.buffer.clear();
+                                    break;
+                                }
+                                // The message contains more than one message,
+                                // let's send and loop.
+                                else if buffer_len > size {
+                                    let split = self.buffer.split_off(size as usize);
 
-                                self.buffer.drain(0..2);
-                                parser_tx
-                                    .send(parser::Cmd::Parse(id, self.buffer.to_owned(), conn.addr))
-                                    .unwrap();
+                                    self.buffer.drain(0..2);
+                                    parser_tx
+                                        .send(parser::Cmd::Parse(
+                                            id,
+                                            self.buffer.to_owned(),
+                                            conn.addr,
+                                        ))
+                                        .unwrap();
 
-                                self.buffer = split;
-                            } else {
-                                let utf8 = String::from_utf8_lossy(&self.buffer);
-                                println!("\nSizes don't match: {}", utf8);
-                                println!("Sizes don't match: {:?}", &self.buffer);
+                                    self.buffer = split;
+                                    let utf8 = String::from_utf8_lossy(&self.buffer);
+                                    println!("\nAfter split: {}", utf8);
+                                    println!("After split: {:?}", &self.buffer);
+                                }
                             }
                         }
 
