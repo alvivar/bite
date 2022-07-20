@@ -1,10 +1,12 @@
 use crate::conn::Connection;
+use crate::parser::Cmd::Parse;
 use crate::subs::Cmd::DelAll;
 use crate::{parser, subs};
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use polling::{Event, Poller};
 
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -47,56 +49,56 @@ impl Reader {
                     let mut closed = false;
                     if let Some(conn) = self.readers.lock().unwrap().get_mut(&id) {
                         if let Some(mut received) = conn.try_read() {
-                            // Loop because sometimes "received" could have more
-                            // than one message.
                             loop {
+                                // Loop because sometimes "received" could have
+                                // more than one message in the same read.
+
                                 self.buffer.append(&mut received);
 
-                                let size = // The first 2 bytes are the size.
-                                    (self.buffer[0] as u32) << 8 | (self.buffer[1] as u32) << 0; // BigEndian
+                                // The first 2 bytes represent the message size.
+                                let size = (self.buffer[0] as u32) << 8 | (self.buffer[1] as u32); // BigEndian
                                 let buffer_len = self.buffer.len() as u32;
 
-                                println!("Sizes {} / {}", size, buffer_len);
+                                match size.cmp(&buffer_len) {
+                                    Ordering::Equal => {
+                                        // The message is complete, just send it
+                                        // and break.
 
-                                // The message is complete!
-                                if size == buffer_len {
-                                    self.buffer.drain(0..2);
+                                        self.buffer.drain(0..2);
 
-                                    parser_tx
-                                        .send(parser::Cmd::Parse(
-                                            id,
-                                            self.buffer.to_owned(),
-                                            conn.addr,
-                                        ))
-                                        .unwrap();
+                                        parser_tx
+                                            .send(Parse(id, self.buffer.to_owned(), conn.addr))
+                                            .unwrap();
 
-                                    self.buffer.clear();
-                                    break;
-                                }
-                                // The message contains more than one message,
-                                // let's send and loop.
-                                else if buffer_len > size {
-                                    let split = self.buffer.split_off(size as usize);
+                                        self.buffer.clear();
 
-                                    self.buffer.drain(0..2);
-                                    parser_tx
-                                        .send(parser::Cmd::Parse(
-                                            id,
-                                            self.buffer.to_owned(),
-                                            conn.addr,
-                                        ))
-                                        .unwrap();
+                                        break;
+                                    }
 
-                                    self.buffer = split;
-                                    let utf8 = String::from_utf8_lossy(&self.buffer);
-                                    println!("\nAfter split: {}", utf8);
-                                    println!("After split: {:?}", &self.buffer);
-                                } else {
-                                    let utf8 = String::from_utf8_lossy(&self.buffer);
-                                    println!("\nUnfinished: {}", utf8);
-                                    println!("Unfinished: {:?}", &self.buffer);
+                                    Ordering::Less => {
+                                        // The message received contains more
+                                        // than one message, let's split, send
+                                        // the first part and deal with the rest
+                                        // on the next loop.
 
-                                    break;
+                                        let split = self.buffer.split_off(size as usize);
+
+                                        self.buffer.drain(0..2);
+                                        parser_tx
+                                            .send(Parse(id, self.buffer.to_owned(), conn.addr))
+                                            .unwrap();
+
+                                        self.buffer = split;
+                                    }
+
+                                    _ => {
+                                        // The loop should only happen when we
+                                        // need to unpack more than one message
+                                        // received in the same read, else break
+                                        // to deal with the buffer or new
+                                        // messages.
+                                        break;
+                                    }
                                 }
                             }
                         }
