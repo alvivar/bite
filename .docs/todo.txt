@@ -1,4 +1,5 @@
 
+    Deal with wrong messages, i.e. messages that does't have the first 2 bytes representing the length of the message.
     Subs should be able to handle a registry of ids vs keys, so DelAll can use that information for clean up.
 
     Auth by password
