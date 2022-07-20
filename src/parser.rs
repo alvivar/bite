@@ -40,9 +40,6 @@ impl Parser {
         loop {
             match self.rx.recv().unwrap() {
                 Cmd::Parse(id, message, addr) => {
-                    let received_utf8 = String::from_utf8_lossy(&message);
-                    println!("\nReceived: {}", received_utf8);
-
                     // We assume multiple instructions separated with newlines.
                     let mut cursor = Cursor::new(&message[..]);
                     while let Some(line) = next_line(&mut cursor) {

@@ -40,8 +40,8 @@ impl Connection {
     }
 
     pub fn try_write(&mut self, data: Vec<u8>) {
-        // @todo Should we propagate the ammout of bytes written instead of only
-        // catching the error?
+        // @todo Should we propagate the ammount of bytes written instead of
+        // only catching the error?
 
         if let Err(err) = write(&mut self.socket, data) {
             println!("Connection #{} broken, write failed: {}", self.id, err);
@@ -67,30 +67,23 @@ fn read(socket: &mut TcpStream) -> io::Result<Vec<u8>> {
                 if bytes_read == received.len() {
                     received.resize(received.len() + 1024, 0);
                 }
-                println!("Resizing!");
             }
 
             // Would block "errors" are the OS's way of saying that the
             // connection is not actually ready to perform this I/O operation.
-            Err(ref err) if err.kind() == WouldBlock => {
-                println!("Would block!");
-                break;
-            }
+            Err(ref err) if err.kind() == WouldBlock => break,
 
-            Err(ref err) if err.kind() == Interrupted => {
-                println!("Interrupted!");
-                continue;
-            }
+            // Got interrupted (how rude!), we'll try again.
+            Err(ref err) if err.kind() == Interrupted => continue,
 
             // Other errors we'll consider fatal.
             Err(err) => return Err(err),
         }
     }
 
-    // @todo Do we really need to truncate?
+    // @todo Do we really need to truncate? Probably because if we grew
 
     received.truncate(bytes_read);
-    println!("Completed!");
 
     Ok(received)
 }
