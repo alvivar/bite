@@ -1,11 +1,6 @@
 
     Subs should be able to handle a registry of ids vs keys, so DelAll can use that information for clean up.
 
-    Creating a new thread to handle the message, this way reading is only about the protocol.
-    Sometimes long messages arrived splitted, so, the read loop confuse them as instructions, but they belong to the previous cycle.
-
-    When reading handle the value as bytes, use utf8 to parse the instructions and the key
-
     Auth by password
     Wondering if cleaning up sockets when broken, could be optimized by locking the mutexes during the cleaning loop (?)
 
@@ -38,6 +33,11 @@
     Push # value should insert into a list, transform normal values
     Pop # should return and delete a value
 
+
+    7/20/2022
+    x Sometimes long messages arrived splitted, so, the read loop confuse them as instructions, but they belong to the previous cycle.
+    x Creating a new thread to handle the message, this way reading is only about the protocol.
+    x When reading handle the value as bytes, use utf8 to parse the instructions and the key
 
     May 19, 2022
     x Lots of optimizations and testing
