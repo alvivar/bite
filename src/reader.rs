@@ -47,11 +47,11 @@ impl Reader {
                     let mut closed = false;
                     if let Some(conn) = self.readers.lock().unwrap().get_mut(&id) {
                         if let Some(mut received) = conn.try_read() {
-                            self.buffer.append(&mut received);
-
                             // Loop because sometimes "received" could have more
                             // than one message.
                             loop {
+                                self.buffer.append(&mut received);
+
                                 let size = // The first 2 bytes are the size.
                                     (self.buffer[0] as u32) << 8 | (self.buffer[1] as u32) << 0; // BigEndian
                                 let buffer_len = self.buffer.len() as u32;
