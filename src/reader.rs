@@ -95,6 +95,8 @@ impl Reader {
                                     let utf8 = String::from_utf8_lossy(&self.buffer);
                                     println!("\nUnusual: {}", utf8);
                                     println!("Unusual: {:?}", &self.buffer);
+
+                                    panic!("Unusual");
                                 }
                             }
                         }
