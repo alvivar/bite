@@ -91,6 +91,10 @@ impl Reader {
                                     let utf8 = String::from_utf8_lossy(&self.buffer);
                                     println!("\nAfter split: {}", utf8);
                                     println!("After split: {:?}", &self.buffer);
+                                } else {
+                                    let utf8 = String::from_utf8_lossy(&self.buffer);
+                                    println!("\nUnusual: {}", utf8);
+                                    println!("Unusual: {:?}", &self.buffer);
                                 }
                             }
                         }
