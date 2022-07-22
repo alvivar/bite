@@ -10,7 +10,7 @@
             On changeset -> apply it on the local copy and swap the copy with Data atomically (maybe atomic pointer here?)
 
         Handler threads
-            1. Receive an instruction (blocking)
+            1. Receive an command (blocking)
             2. Send a message to the database thread
             3. If the message is a write
                 4. Compose a changeset and send it to the database thread
@@ -31,7 +31,7 @@
             OnMsg -> do stuff and reply the sender
 
         Handler threads
-            1. Receive an instruction (blocking)
+            1. Receive an command (blocking)
             2. Send a message to the database thread
             3. If the message has a response
                 4. Wait for a message from the database thread (HOW? we could send our communication channel with the message) (blocking)
@@ -50,8 +50,8 @@
             1. On message -> Write Data to disk
 
         Handler threads
-            1. Receive an instruction (blocking)
-            2. Execute the instruction (synchronously accessed data using an RwLock) <- this is also a source of inefficiency
+            1. Receive an command (blocking)
+            2. Execute the command (synchronously accessed data using an RwLock) <- this is also a source of inefficiency
             3. Send a message to the Write-to-disk-thread
             4. Send the result (blocking)
 
