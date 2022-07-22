@@ -117,7 +117,7 @@ impl Reader {
                         let wcon = self.writers.lock().unwrap().remove(&id).unwrap();
                         self.poller.delete(&rcon.socket).unwrap();
                         self.poller.delete(&wcon.socket).unwrap();
-                        subs_tx.send(DelAll(rcon.keys, id)).unwrap();
+                        subs_tx.send(DelAll(id)).unwrap();
                     }
                 }
             }
