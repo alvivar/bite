@@ -15,7 +15,7 @@ pub struct Msg {
 pub enum Cmd {
     Push(usize, String),
     PushAll(Vec<Msg>),
-    Send(usize), // @todo Maybe Vec<u8> would be better than String.
+    Send(usize),
 }
 
 pub struct Writer {
@@ -59,6 +59,9 @@ impl Writer {
                     let mut writers = self.writers.lock().unwrap();
                     for msg in msgs {
                         if let Some(conn) = writers.get_mut(&msg.id) {
+                            // @todo Wondering if triming the string goes
+                            // againts the protocol or certain type of messages.
+
                             let mut msg = msg.msg.trim_end().to_owned();
                             msg.push('\n');
                             conn.to_send.push(msg);
@@ -91,7 +94,7 @@ impl Writer {
                         let wcon = self.writers.lock().unwrap().remove(&id).unwrap();
                         self.poller.delete(&rcon.socket).unwrap();
                         self.poller.delete(&wcon.socket).unwrap();
-                        subs_tx.send(DelAll(rcon.keys, id)).unwrap();
+                        subs_tx.send(DelAll(id)).unwrap();
                     }
                 }
             }
