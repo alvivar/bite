@@ -66,11 +66,11 @@ impl Subs {
                 }
 
                 Cmd::DelAll(id) => {
-                    let keys = self.id_keys.remove(&id).unwrap();
-
-                    for key in keys {
-                        let subs = self.key_subs.entry(key).or_insert_with(Vec::new);
-                        subs.retain(|x| x.id != id);
+                    if let Some(keys) = self.id_keys.remove(&id) {
+                        for key in keys {
+                            let subs = self.key_subs.entry(key).or_insert_with(Vec::new);
+                            subs.retain(|x| x.id != id);
+                        }
                     }
                 }
 
