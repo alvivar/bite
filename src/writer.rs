@@ -59,8 +59,9 @@ impl Writer {
                     let mut writers = self.writers.lock().unwrap();
                     for msg in msgs {
                         if let Some(conn) = writers.get_mut(&msg.id) {
-                            // @todo Wondering if triming the string goes
-                            // againts the protocol or certain type of messages.
+                            // @todo Wondering if triming the string affects
+                            // certain type of messages? Or should be part of
+                            // the protocol?
 
                             let mut msg = msg.msg.trim_end().to_owned();
                             msg.push('\n');
