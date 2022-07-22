@@ -71,8 +71,6 @@ impl Writer {
                 }
 
                 Cmd::Send(id) => {
-                    // @todo Wondering if this could be batched?
-
                     let mut closed = false;
                     if let Some(conn) = self.writers.lock().unwrap().get_mut(&id) {
                         if !conn.to_send.is_empty() {
