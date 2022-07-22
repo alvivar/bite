@@ -1,4 +1,4 @@
-use crate::parser::Instr;
+use crate::parser::Command;
 use crate::writer::{self, Msg};
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
@@ -7,19 +7,20 @@ use serde_json::json;
 use std::collections::HashMap;
 
 pub enum Cmd {
-    Add(String, usize, Instr),
+    Add(String, usize, Command),
     Del(String, usize),
-    DelAll(Vec<String>, usize),
+    DelAll(usize),
     Call(String, String),
 }
 
 pub struct Sub {
     id: usize,
-    instr: Instr,
+    command: Command,
 }
 
 pub struct Subs {
-    registry: HashMap<String, Vec<Sub>>,
+    key_subs: HashMap<String, Vec<Sub>>,
+    id_keys: HashMap<usize, Vec<String>>,
     writer_tx: Sender<writer::Cmd>,
     pub tx: Sender<Cmd>,
     rx: Receiver<Cmd>,
@@ -27,11 +28,13 @@ pub struct Subs {
 
 impl Subs {
     pub fn new(writer_tx: Sender<writer::Cmd>) -> Subs {
-        let registry = HashMap::<String, Vec<Sub>>::new();
+        let key_subs = HashMap::<String, Vec<Sub>>::new();
+        let id_keys = HashMap::<usize, Vec<String>>::new();
         let (tx, rx) = unbounded::<Cmd>();
 
         Subs {
-            registry,
+            key_subs,
+            id_keys,
             writer_tx,
             tx,
             rx,
@@ -41,24 +44,32 @@ impl Subs {
     pub fn handle(&mut self) {
         loop {
             match self.rx.recv().unwrap() {
-                Cmd::Add(key, id, instr) => {
-                    let subs = self.registry.entry(key).or_insert_with(Vec::new);
+                Cmd::Add(key, id, command) => {
+                    let keys = self.id_keys.entry(id).or_insert_with(Vec::new);
 
-                    if subs.iter().any(|x| x.id == id && x.instr == instr) {
-                        continue;
+                    if !keys.contains(&key) {
+                        keys.push(key.to_owned());
                     }
 
-                    subs.push(Sub { id, instr })
+                    let subs = self.key_subs.entry(key).or_insert_with(Vec::new);
+
+                    if subs.iter().any(|x| x.id == id && x.command == command) {
+                        continue;
+                    } else {
+                        subs.push(Sub { id, command })
+                    }
                 }
 
                 Cmd::Del(key, id) => {
-                    let subs = self.registry.entry(key).or_insert_with(Vec::new);
+                    let subs = self.key_subs.entry(key).or_insert_with(Vec::new);
                     subs.retain(|x| x.id != id);
                 }
 
-                Cmd::DelAll(keys, id) => {
+                Cmd::DelAll(id) => {
+                    let keys = self.id_keys.remove(&id).unwrap();
+
                     for key in keys {
-                        let subs = self.registry.entry(key).or_insert_with(Vec::new);
+                        let subs = self.key_subs.entry(key).or_insert_with(Vec::new);
                         subs.retain(|x| x.id != id);
                     }
                 }
@@ -67,17 +78,17 @@ impl Subs {
                     let mut msgs = Vec::<Msg>::new();
 
                     for alt_key in get_key_combinations(key.as_str()) {
-                        if let Some(subs) = self.registry.get(&alt_key) {
+                        if let Some(subs) = self.key_subs.get(&alt_key) {
                             for sub in subs {
-                                let msg = match sub.instr {
-                                    Instr::SubGet => value.to_owned(),
+                                let msg = match sub.command {
+                                    Command::SubGet => value.to_owned(),
 
-                                    Instr::SubKeyValue => {
+                                    Command::SubKeyValue => {
                                         let key = key.split('.').last().unwrap();
                                         format!("{} {}", key, value)
                                     }
 
-                                    Instr::SubJson => {
+                                    Command::SubJson => {
                                         let key = key.split('.').last().unwrap();
                                         json!({ key: value }).to_string()
                                     }
