@@ -5,12 +5,14 @@ use crossbeam_channel::{unbounded, Receiver, Sender};
 use serde_json::json;
 
 use std::collections::HashMap;
+use std::str::from_utf8;
+use std::string;
 
 pub enum Cmd {
     Add(String, usize, Command),
     Del(String, usize),
     DelAll(usize),
-    Call(String, String),
+    Call(String, Vec<u8>),
 }
 
 pub struct Sub {
@@ -74,23 +76,30 @@ impl Subs {
                     }
                 }
 
-                Cmd::Call(key, value) => {
+                Cmd::Call(key, data) => {
                     let mut msgs = Vec::<Msg>::new();
 
                     for alt_key in get_key_combinations(key.as_str()) {
                         if let Some(subs) = self.key_subs.get(&alt_key) {
                             for sub in subs {
                                 let msg = match sub.command {
-                                    Command::SubGet => value.to_owned(),
+                                    Command::SubGet => data.to_owned(),
 
                                     Command::SubKeyValue => {
                                         let key = key.split('.').last().unwrap();
-                                        format!("{} {}", key, value)
+                                        let msg = Vec::<u8>::new();
+
+                                        msg.extend(key.as_bytes());
+                                        msg.extend(" ".as_bytes());
+                                        msg.extend(data);
+                                        msg
                                     }
 
                                     Command::SubJson => {
                                         let key = key.split('.').last().unwrap();
-                                        json!({ key: value }).to_string()
+                                        let msg = String::from_utf8_lossy(&data);
+
+                                        json!({ key: msg }).to_string().into_bytes()
                                     }
 
                                     _ => unreachable!(),

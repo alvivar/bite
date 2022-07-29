@@ -9,10 +9,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 pub enum Cmd {
-    Set(String, String),
-    SetIfNone(String, String),
+    Set(String, Vec<u8>),
+    SetIfNone(String, Vec<u8>),
     Inc(String, usize),
-    Append(String, String, usize),
+    Append(String, Vec<u8>, usize),
     Delete(String),
     Get(String, usize),
     Bite(String, usize),
@@ -21,7 +21,7 @@ pub enum Cmd {
 }
 
 pub struct Data {
-    pub map: Arc<Mutex<BTreeMap<String, String>>>,
+    pub map: Arc<Mutex<BTreeMap<String, Vec<u8>>>>,
     writer_tx: Sender<writer::Cmd>,
     subs_tx: Sender<subs::Cmd>,
     pub tx: Sender<Cmd>,
@@ -30,7 +30,7 @@ pub struct Data {
 
 impl Data {
     pub fn new(writer_tx: Sender<writer::Cmd>, subs_tx: Sender<subs::Cmd>) -> Data {
-        let map = Arc::new(Mutex::new(BTreeMap::<String, String>::new()));
+        let map = Arc::new(Mutex::new(BTreeMap::<String, Vec<u8>>::new()));
         let (tx, rx) = unbounded::<Cmd>();
 
         Data {
@@ -71,21 +71,17 @@ impl Data {
                     let mut map = self.map.lock().unwrap();
 
                     let inc = match map.get(&key) {
-                        Some(val) => match val.parse::<u32>() {
-                            Ok(n) => n + 1,
-                            Err(_) => 0,
-                        },
-
+                        Some(val) => vec_to_u64(val) + 1,
                         None => 0,
                     };
 
                     self.subs_tx
-                        .send(Call(key.to_owned(), inc.to_string()))
+                        .send(Call(key.to_owned(), u64_to_vec(inc)))
                         .unwrap();
 
-                    self.writer_tx.send(Push(id, inc.to_string())).unwrap();
+                    self.writer_tx.send(Push(id, u64_to_vec(inc))).unwrap();
 
-                    map.insert(key, inc.to_string());
+                    map.insert(key, u64_to_vec(inc));
 
                     db_modified.swap(true, Ordering::Relaxed);
                 }
@@ -232,4 +228,17 @@ fn insert(mut json: &mut Value, key: &str, val: Value) {
     if json == &json!({}) {
         *json = val;
     }
+}
+
+fn vec_to_u64(vec: &Vec<u8>) -> u64 {
+    let vec64: &[u8; 8] = match vec[0..8].try_into() {
+        Ok(vec) => vec,
+        Err(_) => &[0; 8],
+    };
+
+    u64::from_be_bytes(*vec64)
+}
+
+fn u64_to_vec(n: u64) -> Vec<u8> {
+    n.to_be_bytes().to_vec()
 }

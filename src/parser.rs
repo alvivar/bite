@@ -22,7 +22,7 @@ pub enum Cmd {
 pub struct Message {
     pub command: Command,
     pub key: String,
-    pub value: String,
+    pub data: Vec<u8>,
 }
 
 #[derive(PartialEq, Debug)]
@@ -77,9 +77,9 @@ impl Parser {
                         let message = parse(line);
                         let command = message.command;
                         let key = message.key;
-                        let value = message.value;
+                        let data = message.data;
 
-                        println!("\n{}: {} {} {}", addr, command, key, value);
+                        println!("\n{}: {} {} {:?}", addr, command, key, data);
 
                         match command {
                             // Commands that doesn't make sense without key.
@@ -94,17 +94,15 @@ impl Parser {
 
                             // Set
                             Command::Set => {
-                                subs_tx
-                                    .send(Call(key.to_owned(), value.to_owned()))
-                                    .unwrap();
+                                subs_tx.send(Call(key.to_owned(), data.to_owned())).unwrap();
 
-                                data_tx.send(Set(key, value)).unwrap();
+                                data_tx.send(Set(key, data)).unwrap();
                                 writer_tx.send(Push(id, OK.into())).unwrap();
                             }
 
                             // Set only if the key doesn't exists.
                             Command::SetIfNone => {
-                                data_tx.send(SetIfNone(key, value)).unwrap();
+                                data_tx.send(SetIfNone(key, data)).unwrap();
                                 writer_tx.send(Push(id, OK.into())).unwrap();
                             }
 
@@ -115,7 +113,7 @@ impl Parser {
 
                             // Appends the value.
                             Command::Append => {
-                                data_tx.send(Append(key, value, id)).unwrap();
+                                data_tx.send(Append(key, data, id)).unwrap();
                             }
 
                             // Delete!
@@ -149,8 +147,8 @@ impl Parser {
                             Command::SubGet | Command::SubKeyValue | Command::SubJson => {
                                 subs_tx.send(Add(key.to_owned(), id, command)).unwrap();
 
-                                if !value.is_empty() {
-                                    subs_tx.send(Call(key, value)).unwrap()
+                                if !data.is_empty() {
+                                    subs_tx.send(Call(key, data)).unwrap()
                                 }
 
                                 writer_tx.send(Push(id, OK.into())).unwrap();
@@ -158,8 +156,8 @@ impl Parser {
 
                             // A unsubscription and a last message if value is available.
                             Command::Unsub => {
-                                if !value.is_empty() {
-                                    subs_tx.send(Call(key.to_owned(), value)).unwrap();
+                                if !data.is_empty() {
+                                    subs_tx.send(Call(key.to_owned(), data)).unwrap();
                                 }
 
                                 subs_tx.send(Del(key, id)).unwrap();
@@ -168,7 +166,7 @@ impl Parser {
 
                             // Calls key subscribers with the new value without data modifications.
                             Command::SubCall => {
-                                subs_tx.send(Call(key, value)).unwrap();
+                                subs_tx.send(Call(key, data)).unwrap();
                                 writer_tx.send(Push(id, OK.into())).unwrap();
                             }
                         }
@@ -216,7 +214,7 @@ pub fn parse(msg: &[u8]) -> Message {
     Message {
         command,
         key,
-        value,
+        data: value,
     }
 }
 

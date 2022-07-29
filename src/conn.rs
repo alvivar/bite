@@ -6,13 +6,13 @@ pub struct Connection {
     pub id: usize,
     pub socket: TcpStream,
     pub addr: SocketAddr,
-    pub to_send: Vec<String>,
+    pub to_send: Vec<Vec<u8>>,
     pub closed: bool,
 }
 
 impl Connection {
     pub fn new(id: usize, socket: TcpStream, addr: SocketAddr) -> Connection {
-        let to_send = Vec::<String>::new();
+        let to_send = Vec::<Vec<u8>>::new();
 
         Connection {
             id,

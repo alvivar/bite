@@ -9,11 +9,11 @@ use std::sync::{Arc, Mutex};
 
 pub struct Msg {
     pub id: usize,
-    pub msg: String,
+    pub msg: Vec<u8>,
 }
 
 pub enum Cmd {
-    Push(usize, String),
+    Push(usize, Vec<u8>),
     PushAll(Vec<Msg>),
     Send(usize),
 }
@@ -51,8 +51,8 @@ impl Writer {
                         // @todo Wondering if triming the string affects certain
                         // type of messages? Or should be part of the protocol?
 
-                        let mut msg = msg.trim_end().to_owned();
-                        msg.push('\n');
+                        // let mut msg = msg;
+                        msg.push(b'\n');
                         conn.to_send.push(msg);
                         self.poll_write(conn);
                     }
@@ -66,8 +66,8 @@ impl Writer {
                             // certain type of messages? Or should be part of
                             // the protocol?
 
-                            let mut msg = msg.msg.trim_end().to_owned();
-                            msg.push('\n');
+                            let mut msg = msg.msg.to_owned();
+                            msg.push(b'\n');
                             conn.to_send.push(msg);
                             self.poll_write(conn);
                         }
