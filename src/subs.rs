@@ -5,8 +5,6 @@ use crossbeam_channel::{unbounded, Receiver, Sender};
 use serde_json::json;
 
 use std::collections::HashMap;
-use std::str::from_utf8;
-use std::string;
 
 pub enum Cmd {
     Add(String, usize, Command),
@@ -87,19 +85,18 @@ impl Subs {
 
                                     Command::SubKeyValue => {
                                         let key = key.split('.').last().unwrap();
-                                        let msg = Vec::<u8>::new();
+                                        let mut message = Vec::<u8>::new();
 
-                                        msg.extend(key.as_bytes());
-                                        msg.extend(" ".as_bytes());
-                                        msg.extend(data);
-                                        msg
+                                        message.extend(key.as_bytes());
+                                        message.extend(" ".as_bytes());
+                                        message.extend(&data);
+                                        message
                                     }
 
                                     Command::SubJson => {
                                         let key = key.split('.').last().unwrap();
-                                        let msg = String::from_utf8_lossy(&data);
-
-                                        json!({ key: msg }).to_string().into_bytes()
+                                        let message = String::from_utf8_lossy(&data);
+                                        json!({ key: message }).to_string().into_bytes()
                                     }
 
                                     _ => unreachable!(),

@@ -2,7 +2,7 @@ use crate::data;
 use crate::data::Cmd::{Append, Bite, Delete, Get, Inc, Json, Jtrim, Set, SetIfNone};
 use crate::subs;
 use crate::subs::Cmd::{Add, Call, Del};
-use crate::writer::{self, Cmd::Push};
+use crate::writer::{self, Cmd::Queue};
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
 
@@ -84,12 +84,12 @@ impl Parser {
                         match command {
                             // Commands that doesn't make sense without key.
                             _ if key.is_empty() && needs_key(&command) => {
-                                writer_tx.send(Push(id, KEY.into())).unwrap();
+                                writer_tx.send(Queue(id, KEY.into())).unwrap();
                             }
 
                             // Nop
                             Command::Nop => {
-                                writer_tx.send(Push(id, NOP.into())).unwrap();
+                                writer_tx.send(Queue(id, NOP.into())).unwrap();
                             }
 
                             // Set
@@ -97,13 +97,13 @@ impl Parser {
                                 subs_tx.send(Call(key.to_owned(), data.to_owned())).unwrap();
 
                                 data_tx.send(Set(key, data)).unwrap();
-                                writer_tx.send(Push(id, OK.into())).unwrap();
+                                writer_tx.send(Queue(id, OK.into())).unwrap();
                             }
 
                             // Set only if the key doesn't exists.
                             Command::SetIfNone => {
                                 data_tx.send(SetIfNone(key, data)).unwrap();
-                                writer_tx.send(Push(id, OK.into())).unwrap();
+                                writer_tx.send(Queue(id, OK.into())).unwrap();
                             }
 
                             // Makes the value an integer and increase it in 1.
@@ -119,7 +119,7 @@ impl Parser {
                             // Delete!
                             Command::Delete => {
                                 data_tx.send(Delete(key)).unwrap();
-                                writer_tx.send(Push(id, OK.into())).unwrap();
+                                writer_tx.send(Queue(id, OK.into())).unwrap();
                             }
 
                             // Get
@@ -151,7 +151,7 @@ impl Parser {
                                     subs_tx.send(Call(key, data)).unwrap()
                                 }
 
-                                writer_tx.send(Push(id, OK.into())).unwrap();
+                                writer_tx.send(Queue(id, OK.into())).unwrap();
                             }
 
                             // A unsubscription and a last message if value is available.
@@ -161,13 +161,13 @@ impl Parser {
                                 }
 
                                 subs_tx.send(Del(key, id)).unwrap();
-                                writer_tx.send(Push(id, OK.into())).unwrap();
+                                writer_tx.send(Queue(id, OK.into())).unwrap();
                             }
 
                             // Calls key subscribers with the new value without data modifications.
                             Command::SubCall => {
                                 subs_tx.send(Call(key, data)).unwrap();
-                                writer_tx.send(Push(id, OK.into())).unwrap();
+                                writer_tx.send(Queue(id, OK.into())).unwrap();
                             }
                         }
                     }
@@ -187,7 +187,7 @@ pub fn parse(msg: &[u8]) -> Message {
     let mut cursor = Cursor::new(msg);
     let op = to_utf8(next_word(&mut cursor));
     let key = to_utf8(next_word(&mut cursor));
-    let value = from_utf8(remaining(&mut cursor)).unwrap();
+    let data = remaining(&mut cursor);
 
     let command = match op.to_lowercase().trim_end() {
         "s" => Command::Set,
@@ -209,12 +209,11 @@ pub fn parse(msg: &[u8]) -> Message {
 
     // @todo In the future value needs to be a [u8] or at least a Vec<u8>.
     let key = key.trim_end().to_owned();
-    let value = value.trim_end().to_owned();
 
     Message {
         command,
         key,
-        data: value,
+        data: data.to_owned(),
     }
 }
 

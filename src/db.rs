@@ -10,12 +10,12 @@ const DB_PATH: &str = "./data";
 const DB_FILE: &str = "./data/DB.json";
 
 pub struct DB {
-    data: Arc<Mutex<BTreeMap<String, String>>>,
+    data: Arc<Mutex<BTreeMap<String, Vec<u8>>>>,
     pub modified: Arc<AtomicBool>,
 }
 
 impl DB {
-    pub fn new(data: Arc<Mutex<BTreeMap<String, String>>>) -> DB {
+    pub fn new(data: Arc<Mutex<BTreeMap<String, Vec<u8>>>>) -> DB {
         let modified = Arc::new(AtomicBool::new(false));
 
         DB { data, modified }

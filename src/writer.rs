@@ -13,7 +13,7 @@ pub struct Msg {
 }
 
 pub enum Cmd {
-    Push(usize, Vec<u8>),
+    Queue(usize, Vec<u8>),
     PushAll(Vec<Msg>),
     Send(usize),
 }
@@ -46,12 +46,12 @@ impl Writer {
     pub fn handle(&self, subs_tx: Sender<subs::Cmd>) {
         loop {
             match self.rx.recv().unwrap() {
-                Cmd::Push(id, msg) => {
+                Cmd::Queue(id, msg) => {
                     if let Some(conn) = self.writers.lock().unwrap().get_mut(&id) {
                         // @todo Wondering if triming the string affects certain
                         // type of messages? Or should be part of the protocol?
 
-                        // let mut msg = msg;
+                        let mut msg = msg;
                         msg.push(b'\n');
                         conn.to_send.push(msg);
                         self.poll_write(conn);

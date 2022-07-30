@@ -1,5 +1,5 @@
 use crate::subs::{self, Cmd::Call};
-use crate::writer::{self, Cmd::Push};
+use crate::writer::{self, Cmd::Queue};
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use serde_json::{self, json, Value};
@@ -79,7 +79,7 @@ impl Data {
                         .send(Call(key.to_owned(), u64_to_vec(inc)))
                         .unwrap();
 
-                    self.writer_tx.send(Push(id, u64_to_vec(inc))).unwrap();
+                    self.writer_tx.send(Queue(id, u64_to_vec(inc))).unwrap();
 
                     map.insert(key, u64_to_vec(inc));
 
@@ -89,25 +89,21 @@ impl Data {
                 Cmd::Append(key, val, id) => {
                     let mut map = self.map.lock().unwrap();
 
-                    let mut append = String::new();
-                    match map.get_mut(&key) {
-                        Some(v) => {
-                            append.push_str(v);
-                            append.push_str(&val);
+                    let data = match map.get_mut(&key) {
+                        Some(value) => {
+                            value.extend(val);
+                            value.to_owned()
                         }
-
-                        None => {
-                            append = val;
-                        }
+                        None => Vec::new(),
                     };
 
                     self.subs_tx
-                        .send(Call(key.to_owned(), append.to_owned()))
+                        .send(Call(key.to_owned(), data.to_owned()))
                         .unwrap();
 
-                    self.writer_tx.send(Push(id, append.to_owned())).unwrap();
+                    self.writer_tx.send(Queue(id, data.to_owned())).unwrap();
 
-                    map.insert(key, append);
+                    map.insert(key, data);
 
                     db_modified.swap(true, Ordering::Relaxed);
                 }
@@ -122,65 +118,67 @@ impl Data {
 
                 Cmd::Get(key, id) => {
                     let map = self.map.lock().unwrap();
-                    let msg = match map.get(&key) {
-                        Some(val) => val,
-                        None => "",
+
+                    let message = match map.get(&key) {
+                        Some(value) => value.to_owned(),
+                        None => Vec::new(),
                     };
 
-                    self.writer_tx.send(Push(id, msg.into())).unwrap();
+                    self.writer_tx.send(Queue(id, message.into())).unwrap();
                 }
 
                 Cmd::Bite(key, id) => {
                     let map = self.map.lock().unwrap();
                     let range = map.range(key.to_owned()..);
 
-                    let kv: Vec<(&str, &str)> = range
+                    let key_value: Vec<_> = range
                         .take_while(|(k, _)| k.starts_with(&key))
-                        .map(|(k, v)| (k.as_str(), v.as_str()))
+                        .map(|(k, v)| (k.as_str(), v.to_owned()))
                         .collect();
 
-                    let mut msg = String::new();
-                    for (k, v) in kv {
-                        let k = k.split('.').last().unwrap();
-                        msg.push_str(format!("{} {}\0", k, v).as_str());
+                    let mut message = Vec::<u8>::new();
+                    for (key, mut value) in key_value {
+                        let key = key.split('.').last().unwrap();
+                        message.extend(key.as_bytes());
+                        message.extend(b" ");
+                        message.append(&mut value);
                     }
-                    let msg = msg.trim_end().to_owned(); // @todo What's happening here exactly?
 
-                    self.writer_tx.send(Push(id, msg)).unwrap();
+                    self.writer_tx.send(Queue(id, message)).unwrap();
                 }
 
                 Cmd::Jtrim(key, id) => {
                     let map = self.map.lock().unwrap();
                     let range = map.range(key.to_owned()..);
 
-                    let kv: Vec<(&str, &str)> = range
+                    let key_value: Vec<_> = range
                         .take_while(|(k, _)| k.starts_with(&key))
-                        .map(|(k, v)| (k.as_str(), v.as_str()))
+                        .map(|(k, v)| (k.as_str(), v))
                         .collect();
 
-                    let json = kv_to_json(&*kv);
+                    let json = kv_to_json(&*key_value);
 
                     // [!] Returns the pointer.
                     // Always returns everything when the key is empty.
                     let pointr = format!("/{}", key.replace('.', "/"));
-                    let msg = match json.pointer(pointr.as_str()) {
-                        Some(val) => val.to_string(),
+                    let message = match json.pointer(pointr.as_str()) {
+                        Some(value) => value.to_string(),
                         None => {
-                            let msg = if pointr.len() <= 1 { json } else { json!({}) };
-                            msg.to_string()
+                            let message = if pointr.len() <= 1 { json } else { json!({}) };
+                            message.to_string()
                         }
                     };
 
-                    self.writer_tx.send(Push(id, msg)).unwrap();
+                    self.writer_tx.send(Queue(id, message.into())).unwrap();
                 }
 
                 Cmd::Json(key, id) => {
                     let map = self.map.lock().unwrap();
                     let range = map.range(key.to_owned()..);
 
-                    let kv: Vec<(&str, &str)> = range
+                    let kv: Vec<_> = range
                         .take_while(|(k, _)| k.starts_with(&key))
-                        .map(|(k, v)| (k.as_str(), v.as_str()))
+                        .map(|(k, v)| (k.as_str(), v))
                         .collect();
 
                     let json = kv_to_json(&*kv);
@@ -188,22 +186,24 @@ impl Data {
                     // [!] Returns the json, but only if the pointer is real.
                     // Always returns everything when the key is empty.
                     let pointr = format!("/{}", key.replace('.', "/"));
-                    let msg = match json.pointer(pointr.as_str()) {
+                    let message = match json.pointer(pointr.as_str()) {
                         Some(_) => json.to_string(),
                         None => {
-                            let msg = if pointr.len() <= 1 { json } else { json!({}) };
-                            msg.to_string()
+                            let message = if pointr.len() <= 1 { json } else { json!({}) };
+                            message.to_string()
                         }
                     };
 
-                    self.writer_tx.send(Push(id, msg)).unwrap();
+                    self.writer_tx.send(Queue(id, message.into())).unwrap();
                 }
             }
         }
     }
 }
 
-pub fn kv_to_json(kv: &[(&str, &str)]) -> Value {
+// @todo I don't really understand this, I took this code from a Discord chat
+// when I asked for help. I wanted to merge
+pub fn kv_to_json(kv: &[(&str, &Vec<u8>)]) -> Value {
     let mut merged_json = json!({});
 
     // NOTE(Wojciech): Unfinished alternative.
