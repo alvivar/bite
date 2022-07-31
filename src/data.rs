@@ -75,13 +75,18 @@ impl Data {
                         None => 0,
                     };
 
+                    let inc_vec = u64_to_vec(inc);
+                    let inc_u64 = vec_to_u64(&inc_vec);
+
+                    println!("Cmd::Inc {} / {:?} / {}", inc, inc_vec, inc_u64);
+
                     self.subs_tx
-                        .send(Call(key.to_owned(), u64_to_vec(inc)))
+                        .send(Call(key.to_owned(), inc_vec.to_owned()))
                         .unwrap();
 
-                    self.writer_tx.send(Queue(id, u64_to_vec(inc))).unwrap();
+                    self.writer_tx.send(Queue(id, inc_vec)).unwrap();
 
-                    map.insert(key, u64_to_vec(inc));
+                    map.insert(key, u64_to_vec(inc_u64));
 
                     db_modified.swap(true, Ordering::Relaxed);
                 }
