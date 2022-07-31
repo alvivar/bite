@@ -14,7 +14,7 @@ pub struct Msg {
 
 pub enum Cmd {
     Queue(usize, Vec<u8>),
-    PushAll(Vec<Msg>),
+    QueueAll(Vec<Msg>),
     Send(usize),
 }
 
@@ -58,7 +58,7 @@ impl Writer {
                     }
                 }
 
-                Cmd::PushAll(msgs) => {
+                Cmd::QueueAll(msgs) => {
                     let mut writers = self.writers.lock().unwrap();
                     for msg in msgs {
                         if let Some(conn) = writers.get_mut(&msg.id) {
