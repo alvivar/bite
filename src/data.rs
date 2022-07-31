@@ -124,7 +124,7 @@ impl Data {
                         None => Vec::new(),
                     };
 
-                    self.writer_tx.send(Queue(id, message.into())).unwrap();
+                    self.writer_tx.send(Queue(id, message)).unwrap();
                 }
 
                 Cmd::Bite(key, id) => {
@@ -230,12 +230,8 @@ fn insert(mut json: &mut Value, key: &str, val: Value) {
     }
 }
 
-fn vec_to_u64(vec: &Vec<u8>) -> u64 {
-    let vec64: &[u8; 8] = match vec[0..8].try_into() {
-        Ok(vec) => vec,
-        Err(_) => &[0; 8],
-    };
-
+fn vec_to_u64(vec: &[u8]) -> u64 {
+    let vec64 = vec[0..8].try_into().unwrap_or(&[0; 8]);
     u64::from_be_bytes(*vec64)
 }
 
