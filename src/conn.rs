@@ -58,12 +58,11 @@ impl Connection {
                 }
 
                 Ordering::Less => {
-                    // The message received contains more than one message,
-                    // let's split, send the first part and deal with the
-                    // rest on the next loop.
+                    // The message received contains more than one message.
+                    // Let's split, send the first part and deal with the rest
+                    // on the next iteration.
 
                     let split = self.buffer.split_off(size as usize);
-
                     self.buffer.drain(0..2);
                     let result = self.buffer.to_owned();
                     self.buffer = split;
