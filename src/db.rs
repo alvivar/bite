@@ -42,12 +42,18 @@ impl DB {
             .create(true)
             .open(DB_FILE);
 
-        let mut contents = String::new();
-        file.unwrap().read_to_string(&mut contents).unwrap();
+        let mut content = Vec::<u8>::new();
+        file.unwrap().read_to_end(&mut content).unwrap();
 
-        if !contents.is_empty() {
+        if !content.is_empty() {
             let mut map = self.data.lock().unwrap();
-            *map = serde_json::from_str(&contents).unwrap();
+
+            let data = match bincode::deserialize::<BTreeMap<String, Vec<u8>>>(&content[..]) {
+                Ok(data) => data,
+                Err(_) => BTreeMap::<String, Vec<u8>>::new(),
+            };
+
+            *map = data;
         }
     }
 
@@ -60,7 +66,8 @@ impl DB {
             .open(DB_FILE);
 
         let map = self.data.lock().unwrap();
-        let json = serde_json::to_string_pretty(&*map).unwrap();
-        file.unwrap().write_all(json.as_bytes()).unwrap();
+
+        let json_bytes: Vec<u8> = bincode::serialize(&*map).unwrap();
+        file.unwrap().write_all(&json_bytes[..]).unwrap();
     }
 }
