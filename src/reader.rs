@@ -1,4 +1,4 @@
-use crate::conn::Connection;
+use crate::conn::{self, Connection};
 use crate::parser::Cmd::Parse;
 use crate::subs::Cmd::DelAll;
 use crate::{parser, subs};
@@ -45,8 +45,23 @@ impl Reader {
                     let mut closed = false;
 
                     if let Some(conn) = self.readers.lock().unwrap().get_mut(&id) {
-                        if let Some(received) = conn.try_read_message() {
+                        loop {
+                            let mut pending = false;
+
+                            let received = match conn.try_read_message() {
+                                conn::Response::None => break,
+                                conn::Response::Some(received) => received,
+                                conn::Response::Pending(received) => {
+                                    pending = true;
+                                    received
+                                }
+                            };
+
                             parser_tx.send(Parse(id, received, conn.addr)).unwrap();
+
+                            if !pending {
+                                break;
+                            }
                         }
 
                         if conn.closed {
