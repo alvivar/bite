@@ -78,8 +78,8 @@ impl Writer {
                     let mut closed = false;
                     if let Some(conn) = self.writers.lock().unwrap().get_mut(&id) {
                         if !conn.to_send.is_empty() {
-                            let msg = conn.to_send.remove(0);
-                            conn.try_write(msg.into());
+                            let data = conn.to_send.remove(0);
+                            conn.try_write(data);
                         }
 
                         if conn.closed {
