@@ -9,7 +9,6 @@ use crossbeam_channel::{unbounded, Receiver, Sender};
 use core::fmt::{Debug, Display, Formatter, Result};
 use std::io::Cursor;
 use std::net::SocketAddr;
-use std::str::from_utf8;
 
 const OK: &str = "OK";
 const NOP: &str = "NOP";
@@ -185,11 +184,11 @@ impl Parser {
 
 pub fn parse(msg: &[u8]) -> Message {
     let mut cursor = Cursor::new(msg);
-    let op = to_utf8(next_word(&mut cursor));
-    let key = to_utf8(next_word(&mut cursor));
+    let instruction = String::from_utf8_lossy(next_word(&mut cursor));
+    let key = String::from_utf8_lossy(next_word(&mut cursor));
     let data = remaining(&mut cursor);
 
-    let command = match op.to_lowercase().trim_end() {
+    let command = match instruction.to_lowercase().trim_end() {
         "s" => Command::Set,
         "s?" => Command::SetIfNone,
         "+1" => Command::Inc,
@@ -207,7 +206,6 @@ pub fn parse(msg: &[u8]) -> Message {
         _ => Command::Nop,
     };
 
-    // @todo In the future value needs to be a [u8] or at least a Vec<u8>.
     let key = key.trim_end().to_owned();
 
     Message {
@@ -308,13 +306,6 @@ fn remaining<'a>(src: &mut Cursor<&'a [u8]>) -> &'a [u8] {
     }
 
     &src.get_ref()[start..end]
-}
-
-fn to_utf8(str: &[u8]) -> &str {
-    match from_utf8(str) {
-        Ok(str) => str,
-        Err(_) => "",
-    }
 }
 
 fn is_newline(c: u8) -> bool {
