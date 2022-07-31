@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::io::ErrorKind::{BrokenPipe, Interrupted, WouldBlock, WriteZero};
 use std::io::{self, Read, Write};
 use std::net::{SocketAddr, TcpStream};
@@ -8,22 +9,77 @@ pub struct Connection {
     pub addr: SocketAddr,
     pub to_send: Vec<Vec<u8>>,
     pub closed: bool,
+    buffer: Vec<u8>,
 }
 
 impl Connection {
     pub fn new(id: usize, socket: TcpStream, addr: SocketAddr) -> Connection {
         let to_send = Vec::<Vec<u8>>::new();
+        let buffer = Vec::<u8>::new();
 
         Connection {
             id,
             socket,
             addr,
             to_send,
+            buffer,
             closed: false,
         }
     }
 
-    pub fn try_read(&mut self) -> Option<Vec<u8>> {
+    /// Returns the complete message according to the protocol, even if needs
+    /// multiple reads from the socket.
+    pub fn try_read_message(&mut self) -> Option<Vec<u8>> {
+        if let Some(mut received) = self.try_read() {
+            loop {
+                // Loop because sometimes "received" could have more than one
+                // message in the same read.
+
+                self.buffer.append(&mut received);
+
+                // The first 2 bytes represent the message size.
+                let size = (self.buffer[0] as u32) << 8 | (self.buffer[1] as u32); // BigEndian
+                let buffer_len = self.buffer.len() as u32;
+
+                match size.cmp(&buffer_len) {
+                    Ordering::Equal => {
+                        // The message is complete, just send it and break.
+
+                        self.buffer.drain(0..2);
+                        let result = self.buffer.to_owned();
+                        self.buffer.clear();
+
+                        return Some(result);
+                    }
+
+                    Ordering::Less => {
+                        // The message received contains more than one message,
+                        // let's split, send the first part and deal with the
+                        // rest on the next loop.
+
+                        let split = self.buffer.split_off(size as usize);
+
+                        self.buffer.drain(0..2);
+                        let result = self.buffer.to_owned();
+                        self.buffer = split;
+
+                        return Some(result);
+                    }
+
+                    Ordering::Greater => {
+                        // The loop should only happen when we need to unpack
+                        // more than one message received in the same read, else
+                        // break to deal with the buffer or new messages.
+                        return None;
+                    }
+                }
+            }
+        }
+
+        return None;
+    }
+
+    fn try_read(&mut self) -> Option<Vec<u8>> {
         let data = match read(&mut self.socket) {
             Ok(data) => data,
             Err(err) => {
