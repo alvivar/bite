@@ -67,7 +67,7 @@ impl DB {
 
         let map = self.data.lock().unwrap();
 
-        let json_bytes: Vec<u8> = bincode::serialize(&*map).unwrap();
-        file.unwrap().write_all(&json_bytes[..]).unwrap();
+        let data: Vec<u8> = bincode::serialize(&*map).unwrap();
+        file.unwrap().write_all(&data[..]).unwrap();
     }
 }
