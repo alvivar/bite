@@ -1,4 +1,6 @@
 
+    INC doesn't translate correctly on the client.
+
     conn.rs Should abstract the buffer (Better idea! Let's created a buffer?)
 
     Check out the parser, maybe insted of utf8, the value should be bytes.
