@@ -1,9 +1,4 @@
 
-    INC doesn't translate correctly on the client.
-
-    conn.rs Should abstract the buffer (Better idea! Let's created a buffer?)
-
-    Check out the parser, maybe insted of utf8, the value should be bytes.
     Maybe the writer on the subs should be on the handle, instead of new?
     Deal with wrong messages, i.e. messages that does't have the first 2 bytes representing the length of the message, or wrong messages.
 
@@ -39,6 +34,11 @@
     Push # value should insert into a list, transform normal values
     Pop # should return and delete a value
 
+
+    8/1/2022
+    x BITE is full bytes now!
+    x conn.rs Should abstract the buffer (Better idea! Let's created a buffer?)
+    x Check out the parser, maybe insted of utf8, the value should be bytes.
 
     7/21/2022
     x Subs should be able to handle a registry of ids vs keys, so DelAll can use that information for clean up.
