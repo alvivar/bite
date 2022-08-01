@@ -7,7 +7,7 @@ use std::thread::sleep;
 use std::time::Duration;
 
 const DB_PATH: &str = "./data";
-const DB_FILE: &str = "./data/DB.json";
+const DB_FILE: &str = "./data/DB.bincode";
 
 pub struct DB {
     data: Arc<Mutex<BTreeMap<String, Vec<u8>>>>,
