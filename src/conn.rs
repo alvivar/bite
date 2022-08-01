@@ -34,7 +34,7 @@ impl Connection {
     }
 
     /// Returns the complete message according to the protocol, even if needs
-    /// multiple reads from the socket.
+    /// multiple reads from the socket. @todo Should this be a trait? Probably.
     pub fn try_read_message(&mut self) -> Response {
         if let Some(mut received) = self.try_read() {
             // Loop because sometimes "received" could have more than one

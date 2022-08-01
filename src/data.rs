@@ -204,7 +204,7 @@ impl Data {
 }
 
 // @todo I don't really understand this, I took this code from a Discord chat
-// when I asked for help. I wanted to merge
+// when I asked for help. I wanted to merge json values with the same parent.
 pub fn kv_to_json(kv: &[(&str, &Vec<u8>)]) -> Value {
     let mut merged_json = json!({});
 
