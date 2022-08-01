@@ -1,4 +1,5 @@
 
+    Does the protocol need an ID or something? This way clients could now which response belongs to the message.
     We need a client that's able to test the server, something like nc but considering the protocol.
 
     Maybe the writer on the subs should be on the handle, instead of new?
