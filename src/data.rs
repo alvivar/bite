@@ -88,24 +88,28 @@ impl Data {
                     db_modified.swap(true, Ordering::Relaxed);
                 }
 
-                Cmd::Append(key, val, id) => {
+                Cmd::Append(key, mut data, id) => {
                     let mut map = self.map.lock().unwrap();
 
-                    let data = match map.get_mut(&key) {
+                    let value = match map.get_mut(&key) {
                         Some(value) => {
-                            value.extend(val);
+                            value.append(&mut data);
                             value.to_owned()
                         }
-                        None => Vec::new(),
+                        None => {
+                            let mut value = Vec::new();
+                            value.append(&mut data);
+                            value
+                        }
                     };
 
                     self.subs_tx
-                        .send(Call(key.to_owned(), data.to_owned()))
+                        .send(Call(key.to_owned(), value.to_owned()))
                         .unwrap();
 
-                    self.writer_tx.send(Queue(id, data.to_owned())).unwrap();
+                    self.writer_tx.send(Queue(id, value.to_owned())).unwrap();
 
-                    map.insert(key, data);
+                    map.insert(key, value);
 
                     db_modified.swap(true, Ordering::Relaxed);
                 }
@@ -144,6 +148,11 @@ impl Data {
                         message.extend(key.as_bytes());
                         message.extend(b" ");
                         message.append(&mut value);
+                        message.extend(b"\0");
+                    }
+
+                    if message[message.len() - 1] == b'\0' {
+                        message.pop();
                     }
 
                     self.writer_tx.send(Queue(id, message)).unwrap();
