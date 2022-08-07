@@ -47,10 +47,10 @@ impl Writer {
         loop {
             match self.rx.recv().unwrap() {
                 Cmd::Queue(id, mut message) => {
-                    if let Some(conn) = self.writers.lock().unwrap().get_mut(&id) {
+                    if let Some(connection) = self.writers.lock().unwrap().get_mut(&id) {
                         message.push(b'\n');
-                        conn.to_send.push(message);
-                        self.poll_write(conn);
+                        connection.to_send.push(message);
+                        self.poll_write(connection);
                     }
                 }
 
@@ -68,18 +68,18 @@ impl Writer {
 
                 Cmd::Write(id) => {
                     let mut closed = false;
-                    if let Some(conn) = self.writers.lock().unwrap().get_mut(&id) {
-                        if !conn.to_send.is_empty() {
-                            let data = conn.to_send.remove(0);
-                            conn.try_write(data);
+                    if let Some(connection) = self.writers.lock().unwrap().get_mut(&id) {
+                        if !connection.to_send.is_empty() {
+                            let data = connection.to_send.remove(0);
+                            connection.try_write(data);
                         }
 
-                        if conn.closed {
+                        if connection.closed {
                             closed = true;
-                        } else if !conn.to_send.is_empty() {
-                            self.poll_write(conn);
+                        } else if !connection.to_send.is_empty() {
+                            self.poll_write(connection);
                         } else {
-                            self.poll_clean(conn);
+                            self.poll_clean(connection);
                         }
                     }
 
@@ -95,15 +95,15 @@ impl Writer {
         }
     }
 
-    pub fn poll_write(&self, conn: &mut Connection) {
+    pub fn poll_write(&self, connection: &mut Connection) {
         self.poller
-            .modify(&conn.socket, Event::writable(conn.id))
+            .modify(&connection.socket, Event::writable(connection.id))
             .unwrap();
     }
 
-    pub fn poll_clean(&self, conn: &mut Connection) {
+    pub fn poll_clean(&self, connection: &mut Connection) {
         self.poller
-            .modify(&conn.socket, Event::none(conn.id))
+            .modify(&connection.socket, Event::none(connection.id))
             .unwrap();
     }
 }
