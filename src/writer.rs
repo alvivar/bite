@@ -84,10 +84,10 @@ impl Writer {
                     }
 
                     if closed {
-                        let rcon = self.readers.lock().unwrap().remove(&id).unwrap();
-                        let wcon = self.writers.lock().unwrap().remove(&id).unwrap();
-                        self.poller.delete(&rcon.socket).unwrap();
-                        self.poller.delete(&wcon.socket).unwrap();
+                        let rs = self.readers.lock().unwrap().remove(&id).unwrap();
+                        let ws = self.writers.lock().unwrap().remove(&id).unwrap();
+                        self.poller.delete(&rs.socket).unwrap();
+                        self.poller.delete(&ws.socket).unwrap();
                         subs_tx.send(DelAll(id)).unwrap();
                     }
                 }
