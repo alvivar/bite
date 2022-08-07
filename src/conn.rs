@@ -156,8 +156,6 @@ fn read(socket: &mut TcpStream) -> io::Result<Vec<u8>> {
         }
     }
 
-    // @todo Do we really need to truncate? Probably because if we grew
-
     received.truncate(bytes_read);
 
     Ok(received)
