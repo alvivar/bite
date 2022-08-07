@@ -69,9 +69,9 @@ impl Connection {
                 }
 
                 Ordering::Greater => {
-                    // The loop should only happen when we need to unpack
-                    // more than one message received in the same read, else
-                    // break to deal with the buffer or new messages.
+                    // The loop should only happen when we need to unpack more
+                    // than one message received in the same read, else break to
+                    // deal with the buffer or new messages.
                     return Response::None;
                 }
             }
@@ -115,6 +115,9 @@ impl Connection {
         }
     }
 }
+
+// Both functions below were taken and modified from the Tokio/mio client server
+// example.
 
 fn read(socket: &mut TcpStream) -> io::Result<Vec<u8>> {
     let mut received = vec![0; 4096]; // @todo What could be the correct size for this?
