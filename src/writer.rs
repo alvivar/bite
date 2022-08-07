@@ -48,9 +48,6 @@ impl Writer {
             match self.rx.recv().unwrap() {
                 Cmd::Queue(id, msg) => {
                     if let Some(conn) = self.writers.lock().unwrap().get_mut(&id) {
-                        // @todo Wondering if triming the string affects certain
-                        // type of messages? Or should be part of the protocol?
-
                         let mut msg = msg;
                         msg.push(b'\n');
                         conn.to_send.push(msg);
@@ -62,10 +59,6 @@ impl Writer {
                     let mut writers = self.writers.lock().unwrap();
                     for msg in msgs {
                         if let Some(conn) = writers.get_mut(&msg.id) {
-                            // @todo Wondering if triming the string affects
-                            // certain type of messages? Or should be part of
-                            // the protocol?
-
                             let mut msg = msg.msg.to_owned();
                             msg.push(b'\n');
                             conn.to_send.push(msg);
