@@ -12,7 +12,7 @@ use crate::db::DB;
 use crate::parser::Parser;
 use crate::reader::{Cmd::Read, Reader};
 use crate::subs::Subs;
-use crate::writer::{Cmd::Send, Writer};
+use crate::writer::{Cmd::Write, Writer};
 
 use polling::{Event, Poller};
 
@@ -117,7 +117,7 @@ fn main() -> io::Result<()> {
 
                 id if ev.readable => reader_tx.send(Read(id)).unwrap(),
 
-                id if ev.writable => writer_tx.send(Send(id)).unwrap(),
+                id if ev.writable => writer_tx.send(Write(id)).unwrap(),
 
                 _ => unreachable!(),
             }

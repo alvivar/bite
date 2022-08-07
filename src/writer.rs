@@ -7,15 +7,15 @@ use polling::{Event, Poller};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-pub struct Msg {
+pub struct Message {
     pub id: usize,
-    pub msg: Vec<u8>,
+    pub data: Vec<u8>,
 }
 
 pub enum Cmd {
     Queue(usize, Vec<u8>),
-    QueueAll(Vec<Msg>),
-    Send(usize),
+    QueueAll(Vec<Message>),
+    Write(usize),
 }
 
 pub struct Writer {
@@ -46,28 +46,27 @@ impl Writer {
     pub fn handle(&self, subs_tx: Sender<subs::Cmd>) {
         loop {
             match self.rx.recv().unwrap() {
-                Cmd::Queue(id, msg) => {
+                Cmd::Queue(id, mut message) => {
                     if let Some(conn) = self.writers.lock().unwrap().get_mut(&id) {
-                        let mut msg = msg;
-                        msg.push(b'\n');
-                        conn.to_send.push(msg);
+                        message.push(b'\n');
+                        conn.to_send.push(message);
                         self.poll_write(conn);
                     }
                 }
 
-                Cmd::QueueAll(msgs) => {
+                Cmd::QueueAll(messages) => {
                     let mut writers = self.writers.lock().unwrap();
-                    for msg in msgs {
-                        if let Some(conn) = writers.get_mut(&msg.id) {
-                            let mut msg = msg.msg.to_owned();
-                            msg.push(b'\n');
-                            conn.to_send.push(msg);
+                    for message in messages {
+                        if let Some(conn) = writers.get_mut(&message.id) {
+                            let mut message = message.data;
+                            message.push(b'\n');
+                            conn.to_send.push(message);
                             self.poll_write(conn);
                         }
                     }
                 }
 
-                Cmd::Send(id) => {
+                Cmd::Write(id) => {
                     let mut closed = false;
                     if let Some(conn) = self.writers.lock().unwrap().get_mut(&id) {
                         if !conn.to_send.is_empty() {

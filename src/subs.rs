@@ -1,5 +1,5 @@
 use crate::parser::Command;
-use crate::writer::{self, Msg};
+use crate::writer::{self, Message};
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use serde_json::json;
@@ -75,12 +75,12 @@ impl Subs {
                 }
 
                 Cmd::Call(key, data) => {
-                    let mut msgs = Vec::<Msg>::new();
+                    let mut messages = Vec::<Message>::new();
 
                     for alt_key in get_key_combinations(key.as_str()) {
                         if let Some(subs) = self.key_subs.get(&alt_key) {
                             for sub in subs {
-                                let msg = match sub.command {
+                                let data = match sub.command {
                                     Command::SubGet => data.to_owned(),
 
                                     Command::SubKeyValue => {
@@ -102,13 +102,15 @@ impl Subs {
                                     _ => unreachable!(),
                                 };
 
-                                msgs.push(Msg { id: sub.id, msg });
+                                messages.push(Message { id: sub.id, data });
                             }
                         }
                     }
 
-                    if !msgs.is_empty() {
-                        self.writer_tx.send(writer::Cmd::QueueAll(msgs)).unwrap();
+                    if !messages.is_empty() {
+                        self.writer_tx
+                            .send(writer::Cmd::QueueAll(messages))
+                            .unwrap();
                     }
                 }
             }

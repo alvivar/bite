@@ -44,11 +44,11 @@ impl Reader {
                 Cmd::Read(id) => {
                     let mut closed = false;
 
-                    if let Some(conn) = self.readers.lock().unwrap().get_mut(&id) {
+                    if let Some(connection) = self.readers.lock().unwrap().get_mut(&id) {
                         loop {
                             let mut pending = false;
 
-                            let received = match conn.try_read_message() {
+                            let received = match connection.try_read_message() {
                                 conn::Response::None => break,
                                 conn::Response::Some(received) => received,
                                 conn::Response::Pending(received) => {
@@ -57,18 +57,20 @@ impl Reader {
                                 }
                             };
 
-                            parser_tx.send(Parse(id, received, conn.addr)).unwrap();
+                            parser_tx
+                                .send(Parse(id, received, connection.addr))
+                                .unwrap();
 
                             if !pending {
                                 break;
                             }
                         }
 
-                        if conn.closed {
+                        if connection.closed {
                             closed = true;
                         } else {
                             self.poller
-                                .modify(&conn.socket, Event::readable(id))
+                                .modify(&connection.socket, Event::readable(id))
                                 .unwrap();
                         }
                     }

@@ -176,14 +176,14 @@ impl Parser {
     }
 }
 
-/// Returns a Msg with the first character found as command,
+/// Returns a Message with the first character found as command,
 /// the next word as key, and the rest as value.
 
 /// This text: + hello world is a pretty old meme
-/// Returns: Msg { Command::Append, "hello", "world is a pretty old meme" }
+/// Returns: Message { Command::Append, "hello", "world is a pretty old meme" }
 
-pub fn parse(msg: &[u8]) -> Message {
-    let mut cursor = Cursor::new(msg);
+pub fn parse(message: &[u8]) -> Message {
+    let mut cursor = Cursor::new(message);
     let instruction = String::from_utf8_lossy(next_word(&mut cursor));
     let key = String::from_utf8_lossy(next_word(&mut cursor));
     let data = remaining(&mut cursor);
