@@ -50,7 +50,6 @@ impl Connection {
                 Ordering::Equal => {
                     // The message is complete, just send it and break.
 
-                    self.buffer.drain(0..2);
                     let result = self.buffer.to_owned();
                     self.buffer.clear();
 
@@ -63,7 +62,6 @@ impl Connection {
                     // on the next iteration.
 
                     let split = self.buffer.split_off(size as usize);
-                    self.buffer.drain(0..2);
                     let result = self.buffer.to_owned();
                     self.buffer = split;
 
