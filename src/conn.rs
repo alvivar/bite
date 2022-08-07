@@ -47,7 +47,7 @@ impl Connection {
             self.buffer.append(&mut received);
 
             // The first 2 bytes represent the message size.
-            let size = (self.buffer[0] as u32) << 8 | (self.buffer[1] as u32); // BigEndian
+            let size = (self.buffer[0] as u32) << 8 | (self.buffer[1] as u32); // Big endian
             let buffer_len = self.buffer.len() as u32;
 
             match size.cmp(&buffer_len) {
