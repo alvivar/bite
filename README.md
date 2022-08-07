@@ -1,4 +1,4 @@
-# Bite
+# BITE
 
 Key-Value database with subscriptions, for real time multiplayer applications.
 
@@ -48,7 +48,7 @@ A cool thing about **bite**, is that can make a query to get multiple values
 from different keys, as long as you use the **dot** notation to connect the keys
 as parent/children.
 
-    s data.name Bite
+    s data.name BITE
     s data.why Simplest database ever
     s data.author.name Andrés Villalobos
     s data.author.twitter matnesis
@@ -69,7 +69,7 @@ A classic detail, is that you can construct JSON with **js**.
                 "name": "Andrés Villalobos",
                 "twitter": "matnesis"
             },
-            "name": "Bite",
+            "name": "BITE",
             "why": "Simplest database ever"
         }
     }
@@ -91,7 +91,7 @@ Use **j** to get the json without the full path.
             "name": "Andrés Villalobos",
             "twitter": "matnesis"
         },
-        "name": "Bite",
+        "name": "BITE",
         "why": "Simplest database ever"
     }
 
@@ -187,9 +187,9 @@ to run the binary on **Docker**.
 
 ## Things that I would like to add
 
-- Auth (Soon, working on a Tokio/Warp proxy with security)
-- The BTree on disk, serialized correctly instead of json
-- "Only on memory" should be optional
-- A small query language (so fun)
-- Maybe some kind of lists?
-- Support ints, floats and bools, not just strings (?)
+-   Auth (Soon, working on a Tokio/Warp proxy with security)
+-   The BTree on disk, serialized correctly instead of json
+-   "Only on memory" should be optional
+-   A small query language (so fun)
+-   Maybe some kind of lists?
+-   Support ints, floats and bools, not just strings (?)
