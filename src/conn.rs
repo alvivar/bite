@@ -33,8 +33,11 @@ impl Connection {
         }
     }
 
-    /// Returns the complete message according to the protocol, even if needs
-    /// multiple reads from the socket. @todo Should this be a trait? Probably.
+    // @todo Should this be a trait? Probably because it belongs to the Bite pro
+
+    /// Reads the socket and acts like a buffer to return complete messages
+    /// according to the protocol. You need to call this function in a loop and
+    /// retry when Response::Pending is returned.
     pub fn try_read_message(&mut self) -> Response {
         if let Some(mut received) = self.try_read() {
             // Loop because sometimes "received" could have more than one
@@ -50,6 +53,7 @@ impl Connection {
                 Ordering::Equal => {
                     // The message is complete, just send it and break.
 
+                    self.buffer.drain(0..2);
                     let result = self.buffer.to_owned();
                     self.buffer.clear();
 
@@ -62,6 +66,7 @@ impl Connection {
                     // on the next iteration.
 
                     let split = self.buffer.split_off(size as usize);
+                    self.buffer.drain(0..2);
                     let result = self.buffer.to_owned();
                     self.buffer = split;
 
