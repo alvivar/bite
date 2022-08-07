@@ -77,11 +77,11 @@ impl Data {
 
                     let inc_vec = u64_to_vec(inc);
 
+                    self.writer_tx.send(Queue(id, inc_vec.to_owned())).unwrap();
+
                     self.subs_tx
                         .send(Call(key.to_owned(), inc_vec.to_owned()))
                         .unwrap();
-
-                    self.writer_tx.send(Queue(id, inc_vec.to_owned())).unwrap();
 
                     map.insert(key, inc_vec);
 
@@ -103,11 +103,11 @@ impl Data {
                         }
                     };
 
+                    self.writer_tx.send(Queue(id, value.to_owned())).unwrap();
+
                     self.subs_tx
                         .send(Call(key.to_owned(), value.to_owned()))
                         .unwrap();
-
-                    self.writer_tx.send(Queue(id, value.to_owned())).unwrap();
 
                     map.insert(key, value);
 
@@ -151,9 +151,15 @@ impl Data {
                         message.extend(b"\0");
                     }
 
+                    // The classic
                     if message[message.len() - 1] == b'\0' {
                         message.pop();
                     }
+
+                    // The antagonist
+                    // if message.iter().last().unwrap() == &b'\0' {
+                    //     message.pop();
+                    // }
 
                     self.writer_tx.send(Queue(id, message)).unwrap();
                 }
