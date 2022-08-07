@@ -93,16 +93,15 @@ impl Parser {
 
                             // Set
                             Command::Set => {
-                                subs_tx.send(Call(key.to_owned(), data.to_owned())).unwrap();
-
-                                data_tx.send(Set(key, data)).unwrap();
                                 writer_tx.send(Queue(id, OK.into())).unwrap();
+                                subs_tx.send(Call(key.to_owned(), data.to_owned())).unwrap();
+                                data_tx.send(Set(key, data)).unwrap();
                             }
 
                             // Set only if the key doesn't exists.
                             Command::SetIfNone => {
-                                data_tx.send(SetIfNone(key, data)).unwrap();
                                 writer_tx.send(Queue(id, OK.into())).unwrap();
+                                data_tx.send(SetIfNone(key, data)).unwrap();
                             }
 
                             // Makes the value an integer and increase it in 1.
@@ -117,8 +116,8 @@ impl Parser {
 
                             // Delete!
                             Command::Delete => {
-                                data_tx.send(Delete(key)).unwrap();
                                 writer_tx.send(Queue(id, OK.into())).unwrap();
+                                data_tx.send(Delete(key)).unwrap();
                             }
 
                             // Get
@@ -144,29 +143,30 @@ impl Parser {
                             // A generic "bite" subscription. Subscribers also receive their key: "key value"
                             // Also a first message if value is available.
                             Command::SubGet | Command::SubKeyValue | Command::SubJson => {
+                                writer_tx.send(Queue(id, OK.into())).unwrap();
+
                                 subs_tx.send(Add(key.to_owned(), id, command)).unwrap();
 
                                 if !data.is_empty() {
                                     subs_tx.send(Call(key, data)).unwrap()
                                 }
-
-                                writer_tx.send(Queue(id, OK.into())).unwrap();
                             }
 
                             // A unsubscription and a last message if value is available.
                             Command::Unsub => {
+                                writer_tx.send(Queue(id, OK.into())).unwrap();
+
                                 if !data.is_empty() {
                                     subs_tx.send(Call(key.to_owned(), data)).unwrap();
                                 }
 
                                 subs_tx.send(Del(key, id)).unwrap();
-                                writer_tx.send(Queue(id, OK.into())).unwrap();
                             }
 
                             // Calls key subscribers with the new value without data modifications.
                             Command::SubCall => {
-                                subs_tx.send(Call(key, data)).unwrap();
                                 writer_tx.send(Queue(id, OK.into())).unwrap();
+                                subs_tx.send(Call(key, data)).unwrap();
                             }
                         }
                     }
