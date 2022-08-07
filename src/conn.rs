@@ -33,15 +33,16 @@ impl Connection {
         }
     }
 
-    // @todo Should this be a trait? Probably because it belongs to the Bite pro
+    // @todo This probably needs to be a trait, because it belongs to the BITE
+    // concept.
 
     /// Reads the socket and acts like a buffer to return complete messages
     /// according to the protocol. You need to call this function in a loop and
     /// retry when Response::Pending is returned.
     pub fn try_read_message(&mut self) -> Response {
         if let Some(mut received) = self.try_read() {
-            // Loop because sometimes "received" could have more than one
-            // message in the same read.
+            // Loop because "received" could have more than one message in the
+            // same read.
 
             self.buffer.append(&mut received);
 
