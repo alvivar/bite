@@ -46,9 +46,8 @@ impl Writer {
     pub fn handle(&self, subs_tx: Sender<subs::Cmd>) {
         loop {
             match self.rx.recv().unwrap() {
-                Cmd::Queue(id, mut message) => {
+                Cmd::Queue(id, message) => {
                     if let Some(connection) = self.writers.lock().unwrap().get_mut(&id) {
-                        message.push(b'\n');
                         connection.to_send.push(message);
                         self.poll_write(connection);
                     }
@@ -57,11 +56,9 @@ impl Writer {
                 Cmd::QueueAll(messages) => {
                     let mut writers = self.writers.lock().unwrap();
                     for message in messages {
-                        if let Some(conn) = writers.get_mut(&message.id) {
-                            let mut message = message.data;
-                            message.push(b'\n');
-                            conn.to_send.push(message);
-                            self.poll_write(conn);
+                        if let Some(connection) = writers.get_mut(&message.id) {
+                            connection.to_send.push(message.data);
+                            self.poll_write(connection);
                         }
                     }
                 }
@@ -71,7 +68,7 @@ impl Writer {
                     if let Some(connection) = self.writers.lock().unwrap().get_mut(&id) {
                         if !connection.to_send.is_empty() {
                             let data = connection.to_send.remove(0);
-                            connection.try_write(data);
+                            connection.try_write_message(data);
                         }
 
                         if connection.closed {
@@ -84,10 +81,10 @@ impl Writer {
                     }
 
                     if closed {
-                        let rs = self.readers.lock().unwrap().remove(&id).unwrap();
-                        let ws = self.writers.lock().unwrap().remove(&id).unwrap();
-                        self.poller.delete(&rs.socket).unwrap();
-                        self.poller.delete(&ws.socket).unwrap();
+                        let readers = self.readers.lock().unwrap().remove(&id).unwrap();
+                        let writers = self.writers.lock().unwrap().remove(&id).unwrap();
+                        self.poller.delete(&readers.socket).unwrap();
+                        self.poller.delete(&writers.socket).unwrap();
                         subs_tx.send(DelAll(id)).unwrap();
                     }
                 }
@@ -95,13 +92,13 @@ impl Writer {
         }
     }
 
-    pub fn poll_write(&self, connection: &mut Connection) {
+    fn poll_write(&self, connection: &mut Connection) {
         self.poller
             .modify(&connection.socket, Event::writable(connection.id))
             .unwrap();
     }
 
-    pub fn poll_clean(&self, connection: &mut Connection) {
+    fn poll_clean(&self, connection: &mut Connection) {
         self.poller
             .modify(&connection.socket, Event::none(connection.id))
             .unwrap();

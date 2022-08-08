@@ -76,10 +76,10 @@ impl Reader {
                     }
 
                     if closed {
-                        let rs = self.readers.lock().unwrap().remove(&id).unwrap();
-                        let ws = self.writers.lock().unwrap().remove(&id).unwrap();
-                        self.poller.delete(&rs.socket).unwrap();
-                        self.poller.delete(&ws.socket).unwrap();
+                        let readers = self.readers.lock().unwrap().remove(&id).unwrap();
+                        let writers = self.writers.lock().unwrap().remove(&id).unwrap();
+                        self.poller.delete(&readers.socket).unwrap();
+                        self.poller.delete(&writers.socket).unwrap();
                         subs_tx.send(DelAll(id)).unwrap();
                     }
                 }

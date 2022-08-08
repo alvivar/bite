@@ -86,19 +86,16 @@ impl Connection {
         Response::None
     }
 
-    #[allow(dead_code)]
-    pub fn try_write_message(&mut self, data: &[u8]) {
-        let mut vec = Vec::<u8>::new();
-        let len = data.len() + 2;
+    pub fn try_write_message(&mut self, mut data: Vec<u8>) {
+        // let len = data.len() + 2;
+        // data.insert(0, ((len & 0xFF00) >> 8) as u8);
+        // data.insert(1, (len & 0x00FF) as u8);
 
-        vec.push(((len & 0xFF00) >> 8) as u8);
-        vec.push((len & 0x00FF) as u8);
-        vec.extend_from_slice(data);
-
-        self.try_write(vec);
+        data.push(b'\n');
+        self.try_write(data);
     }
 
-    pub fn try_read(&mut self) -> Option<Vec<u8>> {
+    fn try_read(&mut self) -> Option<Vec<u8>> {
         let data = match read(&mut self.socket) {
             Ok(data) => data,
             Err(err) => {
@@ -111,7 +108,7 @@ impl Connection {
         Some(data)
     }
 
-    pub fn try_write(&mut self, data: Vec<u8>) {
+    fn try_write(&mut self, data: Vec<u8>) {
         // @todo Should we propagate the ammount of bytes written instead of
         // only catching the error?
 
