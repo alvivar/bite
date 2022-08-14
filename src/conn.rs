@@ -7,6 +7,7 @@ pub enum Response {
     None,
     Some(Vec<u8>),
     Pending(Vec<u8>),
+    Error(io::Error),
 }
 
 pub struct Connection {
@@ -33,88 +34,92 @@ impl Connection {
         }
     }
 
-    // @todo This probably needs to be a trait, because it belongs to the BITE
-    // concept.
+    // @todo This probably needs to be a trait, because it belongs to the
+    // protocol idea.
 
     /// Reads the socket and acts like a buffer to return complete messages
     /// according to the protocol. You need to call this function in a loop and
     /// retry when Response::Pending is returned.
     pub fn try_read_message(&mut self) -> Response {
-        if let Some(mut received) = self.try_read() {
-            // Loop because "received" could have more than one message in the
-            // same read.
+        match self.try_read() {
+            Ok(mut received) => {
+                // Loop because "received" could have more than one message in the
+                // same read.
 
-            self.buffer.append(&mut received);
+                self.buffer.append(&mut received);
 
-            // The first 2 bytes represent the message size.
-            let size = (self.buffer[0] as u32) << 8 | (self.buffer[1] as u32); // Big endian
-            let buffer_len = self.buffer.len() as u32;
+                // The first 2 bytes represent the message size.
+                let size = (self.buffer[0] as u32) << 8 | (self.buffer[1] as u32); // Big endian
+                let buffer_len = self.buffer.len() as u32;
 
-            match size.cmp(&buffer_len) {
-                Ordering::Equal => {
-                    // The message is complete, just send it and break.
+                match size.cmp(&buffer_len) {
+                    Ordering::Equal => {
+                        // The message is complete, just send it and break.
 
-                    self.buffer.drain(0..2);
-                    let result = self.buffer.to_owned();
-                    self.buffer.clear();
+                        self.buffer.drain(0..2);
+                        let result = self.buffer.to_owned();
+                        self.buffer.clear();
 
-                    return Response::Some(result);
-                }
+                        Response::Some(result)
+                    }
 
-                Ordering::Less => {
-                    // The message received contains more than one message.
-                    // Let's split, send the first part and deal with the rest
-                    // on the next iteration.
+                    Ordering::Less => {
+                        // The message received contains more than one message.
+                        // Let's split, send the first part and deal with the rest
+                        // on the next iteration.
 
-                    let split = self.buffer.split_off(size as usize);
-                    self.buffer.drain(0..2);
-                    let result = self.buffer.to_owned();
-                    self.buffer = split;
+                        let split = self.buffer.split_off(size as usize);
+                        self.buffer.drain(0..2);
+                        let result = self.buffer.to_owned();
+                        self.buffer = split;
 
-                    return Response::Pending(result);
-                }
+                        Response::Pending(result)
+                    }
 
-                Ordering::Greater => {
-                    // The loop should only happen when we need to unpack more
-                    // than one message received in the same read, else break to
-                    // deal with the buffer or new messages.
-                    return Response::None;
+                    Ordering::Greater => {
+                        // The loop should only happen when we need to unpack more
+                        // than one message received in the same read, else break to
+                        // deal with the buffer or new messages.
+
+                        Response::None
+                    }
                 }
             }
-        }
 
-        Response::None
+            Err(err) => Response::Error(err),
+        }
     }
 
-    pub fn try_write_message(&mut self, mut data: Vec<u8>) {
+    pub fn try_write_message(&mut self, mut data: Vec<u8>) -> io::Result<usize> {
         // let len = data.len() + 2;
         // data.insert(0, ((len & 0xFF00) >> 8) as u8);
         // data.insert(1, (len & 0x00FF) as u8);
 
         data.push(b'\n');
-        self.try_write(data);
+        self.try_write(data)
     }
 
-    fn try_read(&mut self) -> Option<Vec<u8>> {
-        let data = match read(&mut self.socket) {
-            Ok(data) => data,
+    fn try_read(&mut self) -> io::Result<Vec<u8>> {
+        match read(&mut self.socket) {
+            Ok(data) => Ok(data),
+
             Err(err) => {
-                println!("Connection #{} broken, read failed: {}", self.id, err);
                 self.closed = true;
-                return None;
-            }
-        };
 
-        Some(data)
+                Err(err)
+            }
+        }
     }
 
-    fn try_write(&mut self, data: Vec<u8>) {
-        // @todo Should we propagate the ammount of bytes written instead of
-        // only catching the error?
+    fn try_write(&mut self, data: Vec<u8>) -> io::Result<usize> {
+        match write(&mut self.socket, data) {
+            Ok(count) => Ok(count),
 
-        if let Err(err) = write(&mut self.socket, data) {
-            println!("Connection #{} broken, write failed: {}", self.id, err);
-            self.closed = true;
+            Err(err) => {
+                self.closed = true;
+
+                Err(err)
+            }
         }
     }
 }

@@ -50,10 +50,17 @@ impl Reader {
 
                             let received = match connection.try_read_message() {
                                 conn::Response::None => break,
+
                                 conn::Response::Some(received) => received,
+
                                 conn::Response::Pending(received) => {
                                     pending = true;
                                     received
+                                }
+
+                                conn::Response::Error(err) => {
+                                    println!("Connection #{} broken, read failed: {}", id, err);
+                                    break;
                                 }
                             };
 

@@ -68,7 +68,10 @@ impl Writer {
                     if let Some(connection) = self.writers.lock().unwrap().get_mut(&id) {
                         if !connection.to_send.is_empty() {
                             let data = connection.to_send.remove(0);
-                            connection.try_write_message(data);
+
+                            if let Err(err) = connection.try_write_message(data) {
+                                println!("Connection #{} broken, write failed: {}", id, err);
+                            }
                         }
 
                         if connection.closed {
