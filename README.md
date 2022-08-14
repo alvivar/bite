@@ -162,7 +162,7 @@ Ready to run on **127.0.0.1:1984**.
 ## Rust
 
 The server runs on **0.0.0.0:1984**, you can send/receive messages with any TCP
-connection, just send complete lines (0xA) before flush.
+connection, just send complete lines (0xA). @todo Check this.
 
     cargo run --release --p server
 
