@@ -151,13 +151,15 @@ impl Data {
                         message.extend(b"\0");
                     }
 
-                    // The classic
-                    if message[message.len() - 1] == b'\0' {
-                        message.pop();
+                    // The Rust way
+                    if let Some(last) = message.iter().last() {
+                        if last == &b'\0' {
+                            message.pop();
+                        }
                     }
 
-                    // The antagonist
-                    // if message.iter().last().unwrap() == &b'\0' {
+                    // The classic, but faulty on index 0.
+                    // if message[message.len() - 1] == b'\0' {
                     //     message.pop();
                     // }
 
