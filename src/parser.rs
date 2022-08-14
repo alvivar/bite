@@ -1,5 +1,5 @@
 use crate::data;
-use crate::data::Cmd::{Append, Bite, Delete, Get, Inc, Json, Jtrim, Set, SetIfNone};
+use crate::data::Cmd::{Append, Delete, Get, Inc, Json, Jtrim, KeyValue, Set, SetIfNone};
 use crate::subs;
 use crate::subs::Cmd::{Add, Call, Del};
 use crate::writer::{self, Cmd::Queue};
@@ -127,7 +127,7 @@ impl Parser {
 
                             // 0x0 separated key value enumeration: key value\0x0key2 value2
                             Command::KeyValue => {
-                                data_tx.send(Bite(key, id)).unwrap();
+                                data_tx.send(KeyValue(key, id)).unwrap();
                             }
 
                             // Trimmed Json (just the data).
@@ -269,7 +269,7 @@ pub fn next_word<'a>(src: &mut Cursor<&'a [u8]>) -> &'a [u8] {
         return &[];
     }
 
-    while is_whitespace(src.get_ref()[start]) {
+    while is_space(src.get_ref()[start]) {
         start += 1;
 
         if start >= end {
@@ -278,7 +278,7 @@ pub fn next_word<'a>(src: &mut Cursor<&'a [u8]>) -> &'a [u8] {
     }
 
     for i in start..end {
-        if is_whitespace(src.get_ref()[i]) {
+        if is_space(src.get_ref()[i]) {
             end = i;
             break;
         }
@@ -297,7 +297,7 @@ fn remaining<'a>(src: &mut Cursor<&'a [u8]>) -> &'a [u8] {
         return &[];
     }
 
-    while is_whitespace(src.get_ref()[start]) {
+    while is_space(src.get_ref()[start]) {
         start += 1;
 
         if start >= end {
@@ -312,6 +312,6 @@ fn is_newline(c: u8) -> bool {
     c == b'\r' || c == b'\n'
 }
 
-fn is_whitespace(c: u8) -> bool {
-    c == b' ' || c == b'\t' || c == b'\r' || c == b'\n'
+fn is_space(c: u8) -> bool {
+    c == b' '
 }

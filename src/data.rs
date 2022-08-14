@@ -15,7 +15,7 @@ pub enum Cmd {
     Append(String, Vec<u8>, usize),
     Delete(String),
     Get(String, usize),
-    Bite(String, usize),
+    KeyValue(String, usize),
     Jtrim(String, usize),
     Json(String, usize),
 }
@@ -133,7 +133,7 @@ impl Data {
                     self.writer_tx.send(Queue(id, message)).unwrap();
                 }
 
-                Cmd::Bite(key, id) => {
+                Cmd::KeyValue(key, id) => {
                     let map = self.map.lock().unwrap();
                     let range = map.range(key.to_owned()..);
 
