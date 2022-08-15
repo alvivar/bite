@@ -43,8 +43,8 @@ impl Connection {
     pub fn try_read_message(&mut self) -> Response {
         match self.try_read() {
             Ok(mut received) => {
-                // Loop because "received" could have more than one message in the
-                // same read.
+                // Loop because "received" could have more than one message in
+                // the same read.
 
                 self.buffer.append(&mut received);
 
@@ -75,8 +75,8 @@ impl Connection {
 
                     Ordering::Less => {
                         // The message received contains more than one message.
-                        // Let's split, send the first part and deal with the rest
-                        // on the next iteration.
+                        // Let's split, send the first part and deal with the
+                        // rest on the next iteration.
 
                         println!("Size: {}, buffer: {}", size, buffer_len);
                         let split = self.buffer.split_off(size as usize);
@@ -88,9 +88,9 @@ impl Connection {
                     }
 
                     Ordering::Greater => {
-                        // The loop should only happen when we need to unpack more
-                        // than one message received in the same read, else break to
-                        // deal with the buffer or new messages.
+                        // The loop should only happen when we need to unpack
+                        // more than one message received in the same read, else
+                        // break to deal with the buffer or new messages.
 
                         Response::None
                     }
