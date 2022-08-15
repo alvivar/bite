@@ -78,7 +78,6 @@ impl Connection {
                         // Let's split, send the first part and deal with the
                         // rest on the next iteration.
 
-                        println!("Size: {}, buffer: {}", size, buffer_len);
                         let split = self.buffer.split_off(size as usize);
                         self.buffer.drain(0..2); // @todo This fails when buffer_len is bigger than 65535 bytes because of the protocol.
                         let result = self.buffer.to_owned();
