@@ -73,12 +73,13 @@ impl Parser {
                     // We assume multiple commands separated with newlines.
                     let mut cursor = Cursor::new(&data[..]);
                     while let Some(line) = next_line(&mut cursor) {
+                        let utf8 = String::from_utf8_lossy(line);
+                        println!("\n{} ({} bytes): {}", addr, line.len(), utf8);
+
                         let message = parse(line);
                         let command = message.command;
                         let key = message.key;
                         let data = message.data;
-
-                        println!("\n{}: {} {} {:?}", addr, command, key, data);
 
                         match command {
                             // Commands that doesn't make sense without key.
