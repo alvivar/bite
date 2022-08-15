@@ -53,6 +53,7 @@ impl Connection {
                 let buffer_len = self.buffer.len() as u32;
 
                 if buffer_len > 65535 {
+                    self.closed = true;
                     self.buffer.clear();
 
                     return Response::Error(Error::new(

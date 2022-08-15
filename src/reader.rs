@@ -59,8 +59,7 @@ impl Reader {
                                 }
 
                                 conn::Response::Error(err) => {
-                                    println!("Connection #{} error, read failed: {}", id, err);
-                                    // @todo Should we respond to the client with an error code?
+                                    println!("Connection #{} broken, read failed: {}", id, err);
                                     break;
                                 }
                             };
