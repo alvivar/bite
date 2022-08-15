@@ -72,7 +72,7 @@ impl Data {
 
                     let inc = match map.get(&key) {
                         Some(val) => vec_to_u64(val) + 1,
-                        None => 0,
+                        None => 1,
                     };
 
                     let inc_vec = u64_to_vec(inc);
@@ -250,6 +250,10 @@ fn insert(mut json: &mut Value, key: &str, val: Value) {
 }
 
 fn vec_to_u64(vec: &[u8]) -> u64 {
+    if vec.len() != 8 {
+        return 0;
+    }
+
     let vec64 = vec[0..8].try_into().unwrap_or(&[0; 8]);
     u64::from_be_bytes(*vec64)
 }
