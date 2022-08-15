@@ -250,8 +250,10 @@ fn insert(mut json: &mut Value, key: &str, val: Value) {
 }
 
 fn vec_to_u64(vec: &[u8]) -> u64 {
+    // Try to parse from string when the size isn't 64 bits.
     if vec.len() != 8 {
-        return 0;
+        let utf8 = String::from_utf8_lossy(vec);
+        return utf8.parse::<u64>().unwrap_or(0);
     }
 
     let vec64 = vec[0..8].try_into().unwrap_or(&[0; 8]);
