@@ -23,7 +23,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 fn main() -> io::Result<()> {
-    println!("\nBIT:E\n");
+    println!("\nBIT:E");
 
     // The server and the smol Poller.
     let server = TcpListener::bind("0.0.0.0:1984")?;
@@ -93,7 +93,7 @@ fn main() -> io::Result<()> {
                     reader.set_nonblocking(true)?;
                     let writer = reader.try_clone().unwrap();
 
-                    println!("Connection #{} from {}", id_count, addr);
+                    println!("\nConnection #{} from {}", id_count, addr);
 
                     // The server continues listening for more clients, always 0.
                     poller.modify(&server, Event::readable(0))?;

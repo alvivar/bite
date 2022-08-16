@@ -70,7 +70,7 @@ impl Writer {
                             let data = connection.to_send.remove(0);
 
                             if let Err(err) = connection.try_write_message(data) {
-                                println!("Connection #{} broken, write failed: {}", id, err);
+                                println!("\nConnection #{} broken, write failed: {}", id, err);
                             }
                         }
 

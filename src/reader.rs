@@ -59,7 +59,7 @@ impl Reader {
                                 }
 
                                 conn::Response::Error(err) => {
-                                    println!("Connection #{} broken, read failed: {}", id, err);
+                                    println!("\nConnection #{} broken, read failed: {}", id, err);
                                     break;
                                 }
                             };
