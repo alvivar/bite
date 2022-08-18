@@ -1,4 +1,4 @@
-use crate::conn::Connection;
+use crate::connection::Connection;
 use crate::subs::{self, Cmd::DelAll};
 
 use crossbeam_channel::{unbounded, Receiver, Sender};

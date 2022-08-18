@@ -1,12 +1,13 @@
-mod conn;
+mod connection;
 mod data;
 mod db;
 mod parser;
+mod protocol;
 mod reader;
 mod subs;
 mod writer;
 
-use crate::conn::Connection;
+use crate::connection::Connection;
 use crate::data::Data;
 use crate::db::DB;
 use crate::parser::Parser;

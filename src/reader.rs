@@ -1,4 +1,4 @@
-use crate::conn::{self, Connection};
+use crate::connection::{self, Connection};
 use crate::parser::Cmd::Parse;
 use crate::subs::Cmd::DelAll;
 use crate::{parser, subs};
@@ -49,16 +49,16 @@ impl Reader {
                             let mut pending = false;
 
                             let received = match connection.try_read_message() {
-                                conn::Response::None => break,
+                                connection::Response::None => break,
 
-                                conn::Response::Some(received) => received,
+                                connection::Response::Some(received) => received,
 
-                                conn::Response::Pending(received) => {
+                                connection::Response::Pending(received) => {
                                     pending = true;
                                     received
                                 }
 
-                                conn::Response::Error(err) => {
+                                connection::Response::Error(err) => {
                                     println!("\nConnection #{} broken, read failed: {}", id, err);
                                     break;
                                 }

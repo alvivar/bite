@@ -249,8 +249,11 @@ fn insert(mut json: &mut Value, key: &str, val: Value) {
     }
 }
 
+/// Transforms a byte array into a u64. Tries to parse from string when the size
+/// isn't 64 bits, but this means that "12345678" will be considered a u64 and
+/// not a string, because it has a length of 8 bytes. Pretty simple but inexact
+/// rule.
 fn vec_to_u64(vec: &[u8]) -> u64 {
-    // Try to parse from string when the size isn't 64 bits.
     if vec.len() != 8 {
         let utf8 = String::from_utf8_lossy(vec);
         return utf8.parse::<u64>().unwrap_or(0);
