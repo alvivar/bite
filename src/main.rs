@@ -55,7 +55,7 @@ fn main() -> io::Result<()> {
     let reader_parser_tx = parser.tx.clone();
 
     // Subs
-    let mut subs = Subs::new(subs_writer_tx);
+    let mut subs = Subs::new();
     let writer_subs_tx = subs.tx.clone();
     let data_subs_tx = subs.tx.clone();
     let reader_subs_tx = subs.tx.clone();
@@ -73,7 +73,7 @@ fn main() -> io::Result<()> {
     // Threads
     thread::spawn(move || db.handle(3));
     thread::spawn(move || data.handle(db_modified));
-    thread::spawn(move || subs.handle());
+    thread::spawn(move || subs.handle(subs_writer_tx));
     thread::spawn(move || writer.handle(writer_subs_tx));
     thread::spawn(move || reader.handle(reader_parser_tx, reader_subs_tx));
     thread::spawn(move || parser.handle(parser_data_tx, parser_writer_tx, parser_subs_tx));
