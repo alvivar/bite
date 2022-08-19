@@ -77,10 +77,9 @@ impl Parser {
 
                         let max = 1024;
                         if utf8.len() > max {
-                            let utf8 = truncate(&utf8, max);
-                            text = utf8.into();
-                            let end = format!("[..{}]", max);
-                            text.push_str(&end);
+                            text = truncate(&utf8, max).into();
+                            let add = format!("[..{}]", max);
+                            text.push_str(&add);
                         };
 
                         println!("\n{} ({} bytes): {}", addr, line.len(), text);
