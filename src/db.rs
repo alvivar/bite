@@ -66,7 +66,6 @@ impl DB {
             .open(DB_FILE);
 
         let map = self.data.lock().unwrap();
-
         let data: Vec<u8> = bincode::serialize(&*map).unwrap();
         file.unwrap().write_all(&data[..]).unwrap();
     }
