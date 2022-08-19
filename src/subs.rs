@@ -21,13 +21,12 @@ pub struct Sub {
 pub struct Subs {
     key_subs: HashMap<String, Vec<Sub>>,
     id_keys: HashMap<usize, Vec<String>>,
-    writer_tx: Sender<writer::Cmd>,
     pub tx: Sender<Cmd>,
     rx: Receiver<Cmd>,
 }
 
 impl Subs {
-    pub fn new(writer_tx: Sender<writer::Cmd>) -> Subs {
+    pub fn new() -> Subs {
         let key_subs = HashMap::<String, Vec<Sub>>::new();
         let id_keys = HashMap::<usize, Vec<String>>::new();
         let (tx, rx) = unbounded::<Cmd>();
@@ -35,13 +34,12 @@ impl Subs {
         Subs {
             key_subs,
             id_keys,
-            writer_tx,
             tx,
             rx,
         }
     }
 
-    pub fn handle(&mut self) {
+    pub fn handle(&mut self, writer_tx: Sender<writer::Cmd>) {
         loop {
             match self.rx.recv().unwrap() {
                 Cmd::Add(key, id, command) => {
@@ -108,9 +106,7 @@ impl Subs {
                     }
 
                     if !messages.is_empty() {
-                        self.writer_tx
-                            .send(writer::Cmd::QueueAll(messages))
-                            .unwrap();
+                        writer_tx.send(writer::Cmd::QueueAll(messages)).unwrap();
                     }
                 }
             }
