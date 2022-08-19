@@ -2,7 +2,6 @@ mod connection;
 mod data;
 mod db;
 mod parser;
-mod protocol;
 mod reader;
 mod subs;
 mod writer;
