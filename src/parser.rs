@@ -206,12 +206,12 @@ pub fn parse(message: &[u8]) -> Message {
         _ => Command::Nop,
     };
 
-    let key = key.trim_end().to_owned();
+    let key: String = key.trim_end().into();
 
     Message {
         command,
         key,
-        data: data.to_owned(),
+        data: data.into(),
     }
 }
 
