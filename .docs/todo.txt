@@ -1,11 +1,8 @@
 
     Does the protocol need an ID or something? This way clients could now which response belongs to the message.
-    We need a client that's able to test the server, something like nc but considering the protocol.
-
-    Maybe the writer on the subs should be on the handle, instead of new?
     Deal with wrong messages, i.e. messages that does't have the first 2 bytes representing the length of the message, or wrong messages.
 
-    Auth by password
+    Auth by password.
     Wondering if cleaning up sockets when broken, could be optimized by locking the mutexes during the cleaning loop (?)
 
     Maybe unsubscriptions for each subscription?
@@ -38,58 +35,63 @@
     Pop # should return and delete a value
 
 
-    8/1/2022
+08/19/2022
+    x Clean, optimize code, documentation and simplifications.
+    x We need a client that's able to test the server, something like nc but considering the protocol.
+    x Maybe the writer on the subs should be on the handle, instead of new?
+
+8/1/2022
     x BITE is full bytes now!
     x conn.rs Should abstract the buffer (Better idea! Let's created a buffer?)
     x Check out the parser, maybe insted of utf8, the value should be bytes.
 
-    7/21/2022
+7/21/2022
     x Subs should be able to handle a registry of ids vs keys, so DelAll can use that information for clean up.
 
-    7/20/2022
+7/20/2022
     x Sometimes long messages arrived splitted, so, the read loop confuse them as commands, but they belong to the previous cycle.
     x Creating a new thread to handle the message, this way reading is only about the protocol.
     x When reading handle the value as bytes, use utf8 to parse the commands and the key
 
-    May 19, 2022
+May 19, 2022
     x Lots of optimizations and testing
 
-    2022.02.13
+2022.02.13
     x Crossbeam channel!
     x Clean up & Polish +1
     x Parsing words and lines improved using cursors and &[u8] lifetimes
     x Send multiple commands, batch-like (Multiple sets, to receive multiple results)
 
-    2022.02.11
+2022.02.11
     x Explore this: https://github.com/tokio-rs/mini-redis/blob/master/src/frame.rs
     x Optimize parser (?)
 
-    2022.02.09
+2022.02.09
     x Lots of polish
     x Remove writting polling? It's unused
 
-    2022.02.08
+2022.02.08
     x Update the docs with the new commands
     x Refactor so that the main thread only handles connections
     x Reading is his own thread
 
-    2022.02.08
+2022.02.08
     x Writing is directly, no longer with a queue
     x Writer have his own thread
 
-    2021.12.12
+2021.12.12
     x Real license
     x Delete modifies the DB only if modified.
 
     2021.10.04
     x Lost connections cleans the connections in readers, writers and subscriptions
 
-    2021.07.31
+2021.07.31
     x Optimize subscriptions calling by grouping connections by commands when calling the map?
     x Save into the DB.json
     x Sometimes it writes the last message one last time?
 
-    2021.07.27
+2021.07.27
     x Connect data with the subscriptions things
     x Writing data on the socket should be a queue
     x Call subscriptions
@@ -97,33 +99,33 @@
     x Could smol make the application faster?
     x I'm using the Cargo.toml dependencies correctly?
 
-    2021.07.25
+2021.07.25
     x Support the old subscriptions
     x Instead of string, the command on the reading should be an enum
     x It should be possible to have multiple subscriptions
     x You should be able to send multiple subscriptions messages without blocking the thread (right now subscriptions block)
     x Delete op
 
-    2021.05.10
+2021.05.10
     x Revise Key length
     x Revise NOP responses
     x Heartbeat fixed by using a simple protocol that clients need to deal with
     x Why the subs cleaner and the heartbeat cleaner can't be solved with just one thing?
 
-    2021.04.20
+2021.04.20
     x Delete command "d"
 
-    2021.04.18
+2021.04.18
     x ! command will send a subscription without recording in the db
     x + Append command
     x +1 doesn't save on the dictionary
     x Use time and IP on the server log
 
-    2021.04.05
+2021.04.05
     x Update the documentation
     x Replaced the worker threadpool, it doesn't make sense, eventually I'll migrate to async, probably smol
 
-    2021.04.01
+2021.04.01
     x Inc command
     x Is map::Result the correct name/concept? It's a message to clients connections basically
     x Thread that watch for subscription workers with orphan connections
@@ -135,17 +137,17 @@
     x Revision 2021.04.01
     x #b Return command simplified
 
-    2021.02.28
+2021.02.28
     x The test client handles subscriptions also.
     x The subs client test sucks. At least read the input line.
     x s? sets key if empty
     x Subscription should be able to ignore non related subscription, instead of entry api
     x Rethink the #j #js #g api because it makes sense to only receive the last message setted
 
-    2021.02.24
+2021.02.24
     x #jx Needs to be able to receive only the last modification, not the complete json
 
-    2021.02.18
+2021.02.18
     x Subscriptions
     x Handle subscriptions error when sending to already disconnected clients.
     x Stop the subscription thread on disconnection.
@@ -155,7 +157,7 @@
     x s needs to tell the Subscriptions about a key being modified
     x Subscriptions checks for keys being modified and sends the value to the #j client sender
 
-    2021.02.07
+2021.02.07
     x Readme update
     x SET without key, creates an empty key
     x DB should saved based on a dirty flag, every certain second.
@@ -163,7 +165,7 @@
     x Accept that this may not be the time to implement lists
     x Better naming
 
-    2021.02.06
+2021.02.06
     x Probably, values needs to be sanitized, codified when converting to json?
     x Get should read values using json commands
     x Set should transform json commands into a value
@@ -175,44 +177,44 @@
     x GET user.name.len -> 4 <- { "user": { "name": { "len": 4 } } }
     x Macros to deal with infinite json value propagation?
 
-    2021.02.02
+2021.02.02
     x Handle dead threads
 
-    2021.01.30
+2021.01.30
     x New threads should be created, if all of them are busy
 
-    2021.01.30
+2021.01.30
     x Exit correctly by joining handles
     x Saving into the file should have a throtle
     x v3 Implemented [!]
     x How to create a WorkerPool
     x How to create modules or something to divide logic in files
 
-    2021.01.25
+2021.01.25
     x Save to file!
     x WorkerPool prototype
 
-    2021.01.24
+2021.01.24
     x Propagate ip address
     x Handle client disconnect because everything explodes
     x Threads should be able to handle a pool of connections
     x NOP propagates the wrong command as key
 
-    2021.01.23
+2021.01.23
     x Thread pool handles connections and parsing
     x Main thread process IO
     x Multithreaded
 
-    2021.01.22
+2021.01.22
     x Happiness! PROD ready I guess!
     x Needs to send back the message to the client [!]
 
-    2021.01.20
+2021.01.20
     x Server writes over the BTreeMap withing a thread using Arc::new(RwLock::new(key_values)) as pointer, need more info
     x Client clean up, but something is missing
     x GET fails if empty, it should probably set a default
 
-    2021.01.18
+2021.01.18
     x GEt to BTreeMap
     x SET to BTreeMap
     Prototype, single thread, like a chat, simple parsing
