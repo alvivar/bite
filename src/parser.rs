@@ -73,10 +73,10 @@ impl Parser {
                     let utf8 = String::from_utf8_lossy(&data);
                     let mut text = utf8.to_string();
 
-                    let max = 1024;
-                    if utf8.len() > max {
-                        text = truncate(&utf8, max).into();
-                        let add = format!("[..{}]", max);
+                    let limit = 256;
+                    if utf8.len() > limit {
+                        text = truncate(&utf8, limit).into();
+                        let add = format!(" (..{})", limit);
                         text.push_str(&add);
                     };
 
