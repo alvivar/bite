@@ -49,7 +49,7 @@ fn main() -> io::Result<()> {
     let writer_tx = writer.tx.clone();
     let subs_writer_tx = writer.tx.clone();
     let data_writer_tx = writer.tx.clone();
-    let frame_writer_tx = writer.tx.clone();
+    let parser_writer_tx = writer.tx.clone();
 
     // The parser
     let parser = Parser::new();
@@ -60,12 +60,12 @@ fn main() -> io::Result<()> {
     let writer_subs_tx = subs.tx.clone();
     let data_subs_tx = subs.tx.clone();
     let reader_subs_tx = subs.tx.clone();
-    let frame_subs_tx = subs.tx.clone();
+    let parser_subs_tx = subs.tx.clone();
 
     // Data & DB
     let data = Data::new(data_writer_tx, data_subs_tx);
     let data_map = data.map.clone();
-    let frame_data_tx = data.tx.clone();
+    let parser_data_tx = data.tx.clone();
 
     let mut db = DB::new(data_map);
     let db_modified = db.modified.clone();
@@ -77,7 +77,7 @@ fn main() -> io::Result<()> {
     thread::spawn(move || subs.handle());
     thread::spawn(move || writer.handle(writer_subs_tx));
     thread::spawn(move || reader.handle(reader_parser_tx, reader_subs_tx));
-    thread::spawn(move || parser.handle(frame_data_tx, frame_writer_tx, frame_subs_tx));
+    thread::spawn(move || parser.handle(parser_data_tx, parser_writer_tx, parser_subs_tx));
 
     // Connections and events via smol Poller.
     let mut id_count: usize = 1; // 0 belongs to the main TcpListener.
