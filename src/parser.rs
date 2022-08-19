@@ -73,7 +73,17 @@ impl Parser {
                     let mut cursor = Cursor::new(&data[..]);
                     while let Some(line) = next_line(&mut cursor) {
                         let utf8 = String::from_utf8_lossy(line);
-                        println!("\n{} ({} bytes): {}", addr, line.len(), utf8);
+                        let mut text = utf8.to_string();
+
+                        let max = 1024;
+                        if utf8.len() > max {
+                            let utf8 = truncate(&utf8, max);
+                            text = utf8.into();
+                            let end = format!("[..{}]", max);
+                            text.push_str(&end);
+                        };
+
+                        println!("\n{} ({} bytes): {}", addr, line.len(), text);
 
                         let message = parse(line);
                         let command = message.command;
@@ -314,4 +324,11 @@ fn is_newline(c: u8) -> bool {
 
 fn is_space(c: u8) -> bool {
     c == b' '
+}
+
+fn truncate(s: &str, max_chars: usize) -> &str {
+    match s.char_indices().nth(max_chars) {
+        None => s,
+        Some((idx, _)) => &s[..idx],
+    }
 }
