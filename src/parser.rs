@@ -11,8 +11,7 @@ use std::io::Cursor;
 use std::net::SocketAddr;
 
 const OK: &str = "OK";
-const NOP: &str = "NOP";
-const KEY: &str = "KEY?";
+const NO: &str = "NO";
 
 pub enum Cmd {
     Parse(usize, Vec<u8>, SocketAddr),
@@ -84,12 +83,12 @@ impl Parser {
                         match command {
                             // Commands that doesn't make sense without key.
                             _ if key.is_empty() && needs_key(&command) => {
-                                writer_tx.send(Queue(id, KEY.into())).unwrap();
+                                writer_tx.send(Queue(id, NO.into())).unwrap();
                             }
 
                             // Nop
                             Command::Nop => {
-                                writer_tx.send(Queue(id, NOP.into())).unwrap();
+                                writer_tx.send(Queue(id, NO.into())).unwrap();
                             }
 
                             // Set
