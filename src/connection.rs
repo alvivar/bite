@@ -5,10 +5,10 @@ use std::io::ErrorKind::{self, BrokenPipe, Interrupted, WouldBlock, WriteZero};
 use std::io::{self, Error, Read, Write};
 use std::net::{SocketAddr, TcpStream};
 
-pub enum Message {
+pub enum Received {
     None,
-    Some(Vec<u8>),
-    Pending(Vec<u8>),
+    Complete(Vec<u8>),
+    Incomplete(Vec<u8>),
     Error(io::Error),
 }
 
@@ -39,7 +39,7 @@ impl Connection {
     /// Reads the socket acting like a buffer to return complete messages
     /// according to the protocol. You need to call this function in a loop and
     /// retry when Response::Pending is returned.
-    pub fn try_read_message(&mut self) -> Message {
+    pub fn try_read_message(&mut self) -> Received {
         match self.try_read() {
             Ok(mut received) => {
                 // Loop because "received" could have more than one message in
@@ -56,7 +56,7 @@ impl Connection {
                     self.closed = true;
                     self.buffer.clear();
 
-                    return Message::Error(Error::new(
+                    return Received::Error(Error::new(
                         ErrorKind::Unsupported,
                         "Message received is bigger than 65535 bytes and the protocol uses only 2 bytes to represent the size.",
                     ));
@@ -69,7 +69,7 @@ impl Connection {
                         let result = self.buffer.to_owned();
                         self.buffer.clear();
 
-                        Message::Some(result)
+                        Received::Complete(result)
                     }
 
                     Ordering::Less => {
@@ -81,7 +81,7 @@ impl Connection {
                         let result = self.buffer.to_owned();
                         self.buffer = split;
 
-                        Message::Pending(result)
+                        Received::Incomplete(result)
                     }
 
                     Ordering::Greater => {
@@ -89,12 +89,12 @@ impl Connection {
                         // more than one message received in the same read, else
                         // break to deal with the buffer or new messages.
 
-                        Message::None
+                        Received::None
                     }
                 }
             }
 
-            Err(err) => Message::Error(err),
+            Err(err) => Received::Error(err),
         }
     }
 
