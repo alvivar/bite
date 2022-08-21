@@ -70,7 +70,6 @@ impl Parser {
         loop {
             match self.rx.recv().unwrap() {
                 Action::Parse(id, data, addr) => {
-                    // We assume multiple commands separated with newlines.
                     let utf8 = String::from_utf8_lossy(&data);
                     let mut text = utf8.to_string();
 
