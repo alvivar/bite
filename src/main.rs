@@ -10,9 +10,9 @@ use crate::connection::Connection;
 use crate::data::Data;
 use crate::db::DB;
 use crate::parser::Parser;
-use crate::reader::{Cmd::Read, Reader};
+use crate::reader::{Action::Read, Reader};
 use crate::subs::Subs;
-use crate::writer::{Cmd::Write, Writer};
+use crate::writer::{Action::Write, Writer};
 
 use polling::{Event, Poller};
 

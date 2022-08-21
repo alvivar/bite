@@ -1,8 +1,8 @@
 use crate::data;
-use crate::data::Cmd::{Append, Delete, Get, Inc, Json, Jtrim, KeyValue, Set, SetIfNone};
+use crate::data::Action::{Append, Delete, Get, Inc, Json, Jtrim, KeyValue, Set, SetIfNone};
 use crate::subs;
-use crate::subs::Cmd::{Add, Call, Del};
-use crate::writer::{self, Cmd::Queue};
+use crate::subs::Action::{Add, Call, Del};
+use crate::writer::{self, Action::Queue};
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
 
@@ -13,7 +13,7 @@ use std::net::SocketAddr;
 const OK: &str = "OK";
 const NO: &str = "NO";
 
-pub enum Cmd {
+pub enum Action {
     Parse(usize, Vec<u8>, SocketAddr),
 }
 
@@ -49,26 +49,26 @@ impl Display for Command {
 }
 
 pub struct Parser {
-    pub tx: Sender<Cmd>,
-    rx: Receiver<Cmd>,
+    pub tx: Sender<Action>,
+    rx: Receiver<Action>,
 }
 
 impl Parser {
     pub fn new() -> Parser {
-        let (tx, rx) = unbounded::<Cmd>();
+        let (tx, rx) = unbounded::<Action>();
 
         Parser { tx, rx }
     }
 
     pub fn handle(
         &self,
-        data_tx: Sender<data::Cmd>,
-        writer_tx: Sender<writer::Cmd>,
-        subs_tx: Sender<subs::Cmd>,
+        data_tx: Sender<data::Action>,
+        writer_tx: Sender<writer::Action>,
+        subs_tx: Sender<subs::Action>,
     ) {
         loop {
             match self.rx.recv().unwrap() {
-                Cmd::Parse(id, data, addr) => {
+                Action::Parse(id, data, addr) => {
                     // We assume multiple commands separated with newlines.
                     let utf8 = String::from_utf8_lossy(&data);
                     let mut text = utf8.to_string();

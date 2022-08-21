@@ -1,5 +1,5 @@
-use crate::subs::{self, Cmd::Call};
-use crate::writer::{self, Cmd::Queue};
+use crate::subs::{self, Action::Call};
+use crate::writer::{self, Action::Queue};
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use serde_json::{self, json, Value};
@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-pub enum Cmd {
+pub enum Action {
     Set(String, Vec<u8>),
     SetIfNone(String, Vec<u8>),
     Inc(String, usize),
@@ -22,16 +22,16 @@ pub enum Cmd {
 
 pub struct Data {
     pub map: Arc<Mutex<BTreeMap<String, Vec<u8>>>>,
-    writer_tx: Sender<writer::Cmd>,
-    subs_tx: Sender<subs::Cmd>,
-    pub tx: Sender<Cmd>,
-    rx: Receiver<Cmd>,
+    writer_tx: Sender<writer::Action>,
+    subs_tx: Sender<subs::Action>,
+    pub tx: Sender<Action>,
+    rx: Receiver<Action>,
 }
 
 impl Data {
-    pub fn new(writer_tx: Sender<writer::Cmd>, subs_tx: Sender<subs::Cmd>) -> Data {
+    pub fn new(writer_tx: Sender<writer::Action>, subs_tx: Sender<subs::Action>) -> Data {
         let map = Arc::new(Mutex::new(BTreeMap::<String, Vec<u8>>::new()));
-        let (tx, rx) = unbounded::<Cmd>();
+        let (tx, rx) = unbounded::<Action>();
 
         Data {
             map,
@@ -45,7 +45,7 @@ impl Data {
     pub fn handle(&self, db_modified: Arc<AtomicBool>) {
         loop {
             match self.rx.recv().unwrap() {
-                Cmd::Set(key, val) => {
+                Action::Set(key, val) => {
                     let mut map = self.map.lock().unwrap();
 
                     map.insert(key, val);
@@ -53,7 +53,7 @@ impl Data {
                     db_modified.swap(true, Ordering::Relaxed);
                 }
 
-                Cmd::SetIfNone(key, val) => {
+                Action::SetIfNone(key, val) => {
                     let mut map = self.map.lock().unwrap();
 
                     if map.get(&key).is_none() {
@@ -67,7 +67,7 @@ impl Data {
                     }
                 }
 
-                Cmd::Inc(key, id) => {
+                Action::Inc(key, id) => {
                     let mut map = self.map.lock().unwrap();
 
                     let inc = match map.get(&key) {
@@ -88,7 +88,7 @@ impl Data {
                     db_modified.swap(true, Ordering::Relaxed);
                 }
 
-                Cmd::Append(key, mut data, id) => {
+                Action::Append(key, mut data, id) => {
                     let mut map = self.map.lock().unwrap();
 
                     let value = match map.get_mut(&key) {
@@ -114,7 +114,7 @@ impl Data {
                     db_modified.swap(true, Ordering::Relaxed);
                 }
 
-                Cmd::Delete(key) => {
+                Action::Delete(key) => {
                     let mut map = self.map.lock().unwrap();
 
                     if map.remove(&key).is_some() {
@@ -122,7 +122,7 @@ impl Data {
                     }
                 }
 
-                Cmd::Get(key, id) => {
+                Action::Get(key, id) => {
                     let map = self.map.lock().unwrap();
 
                     let message = match map.get(&key) {
@@ -133,7 +133,7 @@ impl Data {
                     self.writer_tx.send(Queue(id, message)).unwrap();
                 }
 
-                Cmd::KeyValue(key, id) => {
+                Action::KeyValue(key, id) => {
                     let map = self.map.lock().unwrap();
                     let range = map.range(key.to_owned()..);
 
@@ -166,7 +166,7 @@ impl Data {
                     self.writer_tx.send(Queue(id, message)).unwrap();
                 }
 
-                Cmd::Jtrim(key, id) => {
+                Action::Jtrim(key, id) => {
                     let map = self.map.lock().unwrap();
                     let range = map.range(key.to_owned()..);
 
@@ -191,7 +191,7 @@ impl Data {
                     self.writer_tx.send(Queue(id, message.into())).unwrap();
                 }
 
-                Cmd::Json(key, id) => {
+                Action::Json(key, id) => {
                     let map = self.map.lock().unwrap();
                     let range = map.range(key.to_owned()..);
 

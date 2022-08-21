@@ -6,7 +6,7 @@ use serde_json::json;
 
 use std::collections::HashMap;
 
-pub enum Cmd {
+pub enum Action {
     Add(String, usize, Command),
     Del(String, usize),
     DelAll(usize),
@@ -21,15 +21,15 @@ pub struct Sub {
 pub struct Subs {
     key_subs: HashMap<String, Vec<Sub>>,
     id_keys: HashMap<usize, Vec<String>>,
-    pub tx: Sender<Cmd>,
-    rx: Receiver<Cmd>,
+    pub tx: Sender<Action>,
+    rx: Receiver<Action>,
 }
 
 impl Subs {
     pub fn new() -> Subs {
         let key_subs = HashMap::<String, Vec<Sub>>::new();
         let id_keys = HashMap::<usize, Vec<String>>::new();
-        let (tx, rx) = unbounded::<Cmd>();
+        let (tx, rx) = unbounded::<Action>();
 
         Subs {
             key_subs,
@@ -39,10 +39,10 @@ impl Subs {
         }
     }
 
-    pub fn handle(&mut self, writer_tx: Sender<writer::Cmd>) {
+    pub fn handle(&mut self, writer_tx: Sender<writer::Action>) {
         loop {
             match self.rx.recv().unwrap() {
-                Cmd::Add(key, id, command) => {
+                Action::Add(key, id, command) => {
                     let keys = self.id_keys.entry(id).or_insert_with(Vec::new);
 
                     if !keys.contains(&key) {
@@ -58,12 +58,12 @@ impl Subs {
                     }
                 }
 
-                Cmd::Del(key, id) => {
+                Action::Del(key, id) => {
                     let subs = self.key_subs.entry(key).or_insert_with(Vec::new);
                     subs.retain(|x| x.id != id);
                 }
 
-                Cmd::DelAll(id) => {
+                Action::DelAll(id) => {
                     if let Some(keys) = self.id_keys.remove(&id) {
                         for key in keys {
                             let subs = self.key_subs.entry(key).or_insert_with(Vec::new);
@@ -72,7 +72,7 @@ impl Subs {
                     }
                 }
 
-                Cmd::Call(key, data) => {
+                Action::Call(key, data) => {
                     let mut messages = Vec::<Message>::new();
 
                     for alt_key in get_key_combinations(key.as_str()) {
@@ -106,7 +106,7 @@ impl Subs {
                     }
 
                     if !messages.is_empty() {
-                        writer_tx.send(writer::Cmd::QueueAll(messages)).unwrap();
+                        writer_tx.send(writer::Action::QueueAll(messages)).unwrap();
                     }
                 }
             }

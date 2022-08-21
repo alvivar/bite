@@ -1,6 +1,6 @@
 use crate::connection::{Connection, Message};
-use crate::parser::Cmd::Parse;
-use crate::subs::Cmd::DelAll;
+use crate::parser::Action::Parse;
+use crate::subs::Action::DelAll;
 use crate::{parser, subs};
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
@@ -9,7 +9,7 @@ use polling::{Event, Poller};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-pub enum Cmd {
+pub enum Action {
     Read(usize),
 }
 
@@ -17,8 +17,8 @@ pub struct Reader {
     poller: Arc<Poller>,
     readers: Arc<Mutex<HashMap<usize, Connection>>>,
     writers: Arc<Mutex<HashMap<usize, Connection>>>,
-    pub tx: Sender<Cmd>,
-    rx: Receiver<Cmd>,
+    pub tx: Sender<Action>,
+    rx: Receiver<Action>,
 }
 
 impl Reader {
@@ -27,7 +27,7 @@ impl Reader {
         readers: Arc<Mutex<HashMap<usize, Connection>>>,
         writers: Arc<Mutex<HashMap<usize, Connection>>>,
     ) -> Reader {
-        let (tx, rx) = unbounded::<Cmd>();
+        let (tx, rx) = unbounded::<Action>();
 
         Reader {
             poller,
@@ -38,10 +38,10 @@ impl Reader {
         }
     }
 
-    pub fn handle(&mut self, parser_tx: Sender<parser::Cmd>, subs_tx: Sender<subs::Cmd>) {
+    pub fn handle(&mut self, parser_tx: Sender<parser::Action>, subs_tx: Sender<subs::Action>) {
         loop {
             match self.rx.recv().unwrap() {
-                Cmd::Read(id) => {
+                Action::Read(id) => {
                     let mut closed = false;
 
                     if let Some(connection) = self.readers.lock().unwrap().get_mut(&id) {

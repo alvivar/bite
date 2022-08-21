@@ -1,5 +1,5 @@
 use crate::connection::Connection;
-use crate::subs::{self, Cmd::DelAll};
+use crate::subs::{self, Action::DelAll};
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use polling::{Event, Poller};
@@ -12,7 +12,7 @@ pub struct Message {
     pub data: Vec<u8>,
 }
 
-pub enum Cmd {
+pub enum Action {
     Queue(usize, Vec<u8>),
     QueueAll(Vec<Message>),
     Write(usize),
@@ -22,8 +22,8 @@ pub struct Writer {
     poller: Arc<Poller>,
     readers: Arc<Mutex<HashMap<usize, Connection>>>,
     writers: Arc<Mutex<HashMap<usize, Connection>>>,
-    pub tx: Sender<Cmd>,
-    rx: Receiver<Cmd>,
+    pub tx: Sender<Action>,
+    rx: Receiver<Action>,
 }
 
 impl Writer {
@@ -32,7 +32,7 @@ impl Writer {
         readers: Arc<Mutex<HashMap<usize, Connection>>>,
         writers: Arc<Mutex<HashMap<usize, Connection>>>,
     ) -> Writer {
-        let (tx, rx) = unbounded::<Cmd>();
+        let (tx, rx) = unbounded::<Action>();
 
         Writer {
             poller,
@@ -43,17 +43,17 @@ impl Writer {
         }
     }
 
-    pub fn handle(&self, subs_tx: Sender<subs::Cmd>) {
+    pub fn handle(&self, subs_tx: Sender<subs::Action>) {
         loop {
             match self.rx.recv().unwrap() {
-                Cmd::Queue(id, message) => {
+                Action::Queue(id, message) => {
                     if let Some(connection) = self.writers.lock().unwrap().get_mut(&id) {
                         connection.to_send.push(message);
                         self.poll_write(connection);
                     }
                 }
 
-                Cmd::QueueAll(messages) => {
+                Action::QueueAll(messages) => {
                     let mut writers = self.writers.lock().unwrap();
                     for message in messages {
                         if let Some(connection) = writers.get_mut(&message.id) {
@@ -63,7 +63,7 @@ impl Writer {
                     }
                 }
 
-                Cmd::Write(id) => {
+                Action::Write(id) => {
                     let mut closed = false;
                     if let Some(connection) = self.writers.lock().unwrap().get_mut(&id) {
                         if !connection.to_send.is_empty() {
