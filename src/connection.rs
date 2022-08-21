@@ -47,8 +47,8 @@ impl Connection {
 
                 self.buffer.append(&mut received);
 
-                // The first 2 bytes represent the message size.
-                let size = get_u32(&self.buffer[..2]);
+                // The bytes representing the message size.
+                let size = get_u32(&self.buffer[4..6]);
                 let buffer_len = self.buffer.len() as u32;
 
                 // Bigger than what can be represented in 2 bytes.
