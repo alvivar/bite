@@ -1,3 +1,5 @@
+use crate::parser;
+
 use std::cmp::Ordering;
 use std::io::ErrorKind::{self, BrokenPipe, Interrupted, WouldBlock, WriteZero};
 use std::io::{self, Error, Read, Write};
@@ -46,7 +48,7 @@ impl Connection {
                 self.buffer.append(&mut received);
 
                 // The first 2 bytes represent the message size.
-                let size = get_size(&self.buffer[..]);
+                let size = parser::get_size(&self.buffer[..]);
                 let buffer_len = self.buffer.len() as u32;
 
                 // Bigger than what can be represented in 2 bytes.
@@ -64,7 +66,6 @@ impl Connection {
                     Ordering::Equal => {
                         // The message is complete, just send it and break.
 
-                        self.buffer.drain(0..2);
                         let result = self.buffer.to_owned();
                         self.buffer.clear();
 
@@ -77,7 +78,6 @@ impl Connection {
                         // rest on the next iteration.
 
                         let split = self.buffer.split_off(size as usize);
-                        self.buffer.drain(0..2); // @todo This fails when buffer_len is bigger than 65535 bytes because of the protocol.
                         let result = self.buffer.to_owned();
                         self.buffer = split;
 
@@ -99,7 +99,7 @@ impl Connection {
     }
 
     pub fn try_write_message(&mut self, data: Vec<u8>) -> io::Result<usize> {
-        let data = insert_size(data);
+        let data = parser::insert_size(data);
         self.try_write(data)
     }
 
@@ -186,21 +186,4 @@ fn write(socket: &mut TcpStream, data: Vec<u8>) -> io::Result<usize> {
         // Other errors we'll consider fatal.
         Err(err) => Err(err),
     }
-}
-
-/// Insert at the beginning 2 bytes representing the size of the message.
-pub fn insert_size(mut bytes: Vec<u8>) -> Vec<u8> {
-    let len = (bytes.len() + 2) as u64;
-    let byte0 = ((len & 0xFF00) >> 8) as u8;
-    let byte1 = (len & 0x00FF) as u8;
-    let size = [byte0, byte1];
-
-    bytes.splice(0..0, size);
-    bytes
-}
-
-/// Returns the first two bytes as a u32 big endian, conceptually the size of
-/// the message.
-pub fn get_size(bytes: &[u8]) -> u32 {
-    (bytes[0] as u32) << 8 | bytes[1] as u32
 }

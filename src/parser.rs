@@ -18,6 +18,7 @@ pub enum Action {
 }
 
 pub struct Message {
+    pub size: u32,
     pub command: Command,
     pub key: String,
     pub data: Vec<u8>,
@@ -190,6 +191,7 @@ impl Parser {
 
 pub fn parse(message: &[u8]) -> Message {
     let mut cursor = Cursor::new(message);
+    let size = get_size(&cursor.get_ref()[..2]);
     let instruction = String::from_utf8_lossy(next_word(&mut cursor));
     let key = String::from_utf8_lossy(next_word(&mut cursor));
     let data = remaining(&mut cursor);
@@ -215,6 +217,7 @@ pub fn parse(message: &[u8]) -> Message {
     let key: String = key.trim_end().into();
 
     Message {
+        size,
         command,
         key,
         data: data.into(),
@@ -237,6 +240,23 @@ pub fn needs_key(command: &Command) -> bool {
         | Command::Unsub
         | Command::SubCall => true,
     }
+}
+
+/// Insert at the beginning 2 bytes representing the size of the message.
+pub fn insert_size(mut bytes: Vec<u8>) -> Vec<u8> {
+    let len = (bytes.len() + 2) as u64;
+    let byte0 = ((len & 0xFF00) >> 8) as u8;
+    let byte1 = (len & 0x00FF) as u8;
+    let size = [byte0, byte1];
+
+    bytes.splice(0..0, size);
+    bytes
+}
+
+/// Returns the first two bytes as a u32 big endian, conceptually the size of
+/// the message.
+pub fn get_size(bytes: &[u8]) -> u32 {
+    (bytes[0] as u32) << 8 | bytes[1] as u32
 }
 
 #[allow(dead_code)]
