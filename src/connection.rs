@@ -98,10 +98,6 @@ impl Connection {
         }
     }
 
-    pub fn try_write_bytes(&mut self, data: Vec<u8>) -> io::Result<usize> {
-        self.try_write(data)
-    }
-
     fn try_read(&mut self) -> io::Result<Vec<u8>> {
         match read(&mut self.socket) {
             Ok(data) => Ok(data),
@@ -114,7 +110,7 @@ impl Connection {
         }
     }
 
-    fn try_write(&mut self, data: Vec<u8>) -> io::Result<usize> {
+    pub fn try_write(&mut self, data: Vec<u8>) -> io::Result<usize> {
         match write(&mut self.socket, data) {
             Ok(count) => Ok(count),
 
