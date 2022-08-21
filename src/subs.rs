@@ -1,5 +1,5 @@
 use crate::parser::Command;
-use crate::writer::{self, Message};
+use crate::writer::{self, WriteOrder};
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use serde_json::json;
@@ -10,7 +10,7 @@ pub enum Action {
     Add(String, usize, Command),
     Del(String, usize),
     DelAll(usize),
-    Call(String, Vec<u8>),
+    Call(String, Vec<u8>, usize),
 }
 
 pub struct Sub {
@@ -72,8 +72,8 @@ impl Subs {
                     }
                 }
 
-                Action::Call(key, data) => {
-                    let mut messages = Vec::<Message>::new();
+                Action::Call(key, data, msg_id) => {
+                    let mut messages = Vec::<WriteOrder>::new();
 
                     for alt_key in get_key_combinations(key.as_str()) {
                         if let Some(subs) = self.key_subs.get(&alt_key) {
@@ -100,7 +100,11 @@ impl Subs {
                                     _ => unreachable!(),
                                 };
 
-                                messages.push(Message { id: sub.id, data });
+                                messages.push(WriteOrder {
+                                    from_id: sub.id,
+                                    msg_id,
+                                    data,
+                                });
                             }
                         }
                     }

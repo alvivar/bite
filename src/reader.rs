@@ -1,4 +1,5 @@
 use crate::connection::{Connection, Received};
+use crate::message::Message;
 use crate::parser::Action::Parse;
 use crate::subs::Action::DelAll;
 use crate::{parser, subs};
@@ -48,7 +49,7 @@ impl Reader {
                         loop {
                             let mut pending = false;
 
-                            let message = match connection.try_read_message() {
+                            let data = match connection.try_read_bytes() {
                                 Received::None => break,
 
                                 Received::Complete(received) => received,
@@ -64,7 +65,8 @@ impl Reader {
                                 }
                             };
 
-                            parser_tx.send(Parse(id, message, connection.addr)).unwrap();
+                            let message = Message::from_protocol(data);
+                            parser_tx.send(Parse(message, connection.addr)).unwrap();
 
                             if !pending {
                                 break;

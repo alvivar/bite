@@ -1,4 +1,4 @@
-use crate::parser;
+use crate::message::get_u32;
 
 use std::cmp::Ordering;
 use std::io::ErrorKind::{self, BrokenPipe, Interrupted, WouldBlock, WriteZero};
@@ -39,7 +39,7 @@ impl Connection {
     /// Reads the socket acting like a buffer to return complete messages
     /// according to the protocol. You need to call this function in a loop and
     /// retry when Response::Pending is returned.
-    pub fn try_read_message(&mut self) -> Received {
+    pub fn try_read_bytes(&mut self) -> Received {
         match self.try_read() {
             Ok(mut received) => {
                 // Loop because "received" could have more than one message in
@@ -48,7 +48,7 @@ impl Connection {
                 self.buffer.append(&mut received);
 
                 // The first 2 bytes represent the message size.
-                let size = parser::get_size(&self.buffer[..]);
+                let size = get_u32(&self.buffer[..2]);
                 let buffer_len = self.buffer.len() as u32;
 
                 // Bigger than what can be represented in 2 bytes.
@@ -98,8 +98,7 @@ impl Connection {
         }
     }
 
-    pub fn try_write_message(&mut self, data: Vec<u8>) -> io::Result<usize> {
-        let data = parser::insert_size(data);
+    pub fn try_write_bytes(&mut self, data: Vec<u8>) -> io::Result<usize> {
         self.try_write(data)
     }
 

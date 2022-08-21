@@ -10,14 +10,14 @@ use std::sync::{Arc, Mutex};
 
 pub enum Action {
     Set(String, Vec<u8>),
-    SetIfNone(String, Vec<u8>),
-    Inc(String, usize),
-    Append(String, Vec<u8>, usize),
+    SetIfNone(String, Vec<u8>, usize),
+    Inc(String, usize, usize),
+    Append(String, Vec<u8>, usize, usize),
     Delete(String),
-    Get(String, usize),
-    KeyValue(String, usize),
-    Jtrim(String, usize),
-    Json(String, usize),
+    Get(String, usize, usize),
+    KeyValue(String, usize, usize),
+    Jtrim(String, usize, usize),
+    Json(String, usize, usize),
 }
 
 pub struct Data {
@@ -53,12 +53,12 @@ impl Data {
                     db_modified.swap(true, Ordering::Relaxed);
                 }
 
-                Action::SetIfNone(key, val) => {
+                Action::SetIfNone(key, val, msg_id) => {
                     let mut map = self.map.lock().unwrap();
 
                     if map.get(&key).is_none() {
                         self.subs_tx
-                            .send(Call(key.to_owned(), val.to_owned()))
+                            .send(Call(key.to_owned(), val.to_owned(), msg_id))
                             .unwrap();
 
                         map.insert(key, val);
@@ -67,7 +67,7 @@ impl Data {
                     }
                 }
 
-                Action::Inc(key, id) => {
+                Action::Inc(key, from_id, msg_id) => {
                     let mut map = self.map.lock().unwrap();
 
                     let inc = match map.get(&key) {
@@ -77,10 +77,12 @@ impl Data {
 
                     let inc_vec = u64_to_vec(inc);
 
-                    self.writer_tx.send(Queue(id, inc_vec.to_owned())).unwrap();
+                    self.writer_tx
+                        .send(Queue(from_id, msg_id, inc_vec.to_owned()))
+                        .unwrap();
 
                     self.subs_tx
-                        .send(Call(key.to_owned(), inc_vec.to_owned()))
+                        .send(Call(key.to_owned(), inc_vec.to_owned(), msg_id))
                         .unwrap();
 
                     map.insert(key, inc_vec);
@@ -88,7 +90,7 @@ impl Data {
                     db_modified.swap(true, Ordering::Relaxed);
                 }
 
-                Action::Append(key, mut data, id) => {
+                Action::Append(key, mut data, from_id, msg_id) => {
                     let mut map = self.map.lock().unwrap();
 
                     let value = match map.get_mut(&key) {
@@ -103,10 +105,12 @@ impl Data {
                         }
                     };
 
-                    self.writer_tx.send(Queue(id, value.to_owned())).unwrap();
+                    self.writer_tx
+                        .send(Queue(from_id, msg_id, value.to_owned()))
+                        .unwrap();
 
                     self.subs_tx
-                        .send(Call(key.to_owned(), value.to_owned()))
+                        .send(Call(key.to_owned(), value.to_owned(), msg_id))
                         .unwrap();
 
                     map.insert(key, value);
@@ -122,7 +126,7 @@ impl Data {
                     }
                 }
 
-                Action::Get(key, id) => {
+                Action::Get(key, from_id, msg_id) => {
                     let map = self.map.lock().unwrap();
 
                     let message = match map.get(&key) {
@@ -130,10 +134,12 @@ impl Data {
                         None => Vec::new(),
                     };
 
-                    self.writer_tx.send(Queue(id, message)).unwrap();
+                    self.writer_tx
+                        .send(Queue(from_id, msg_id, message))
+                        .unwrap();
                 }
 
-                Action::KeyValue(key, id) => {
+                Action::KeyValue(key, from_id, msg_id) => {
                     let map = self.map.lock().unwrap();
                     let range = map.range(key.to_owned()..);
 
@@ -158,15 +164,12 @@ impl Data {
                         }
                     }
 
-                    // The classic, but faulty on index 0.
-                    // if message[message.len() - 1] == b'\0' {
-                    //     message.pop();
-                    // }
-
-                    self.writer_tx.send(Queue(id, message)).unwrap();
+                    self.writer_tx
+                        .send(Queue(from_id, msg_id, message))
+                        .unwrap();
                 }
 
-                Action::Jtrim(key, id) => {
+                Action::Jtrim(key, from_id, msg_id) => {
                     let map = self.map.lock().unwrap();
                     let range = map.range(key.to_owned()..);
 
@@ -188,10 +191,12 @@ impl Data {
                         }
                     };
 
-                    self.writer_tx.send(Queue(id, message.into())).unwrap();
+                    self.writer_tx
+                        .send(Queue(from_id, msg_id, message.into()))
+                        .unwrap();
                 }
 
-                Action::Json(key, id) => {
+                Action::Json(key, from_id, msg_id) => {
                     let map = self.map.lock().unwrap();
                     let range = map.range(key.to_owned()..);
 
@@ -213,7 +218,9 @@ impl Data {
                         }
                     };
 
-                    self.writer_tx.send(Queue(id, message.into())).unwrap();
+                    self.writer_tx
+                        .send(Queue(from_id, msg_id, message.into()))
+                        .unwrap();
                 }
             }
         }

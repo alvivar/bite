@@ -1,6 +1,7 @@
 mod connection;
 mod data;
 mod db;
+mod message;
 mod parser;
 mod reader;
 mod subs;
@@ -111,6 +112,13 @@ fn main() -> io::Result<()> {
                         .lock()
                         .unwrap()
                         .insert(id_count, Connection::new(id_count, writer, addr));
+
+                    // The first message to the client is his id, so it can add
+                    // it on all his messages or it would get disconnected.
+                    let id = id_count.to_be_bytes();
+                    writer_tx
+                        .send(writer::Action::Queue(id_count, 0, id.into()))
+                        .unwrap();
 
                     id_count += 1;
                 }

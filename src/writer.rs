@@ -1,4 +1,5 @@
 use crate::connection::Connection;
+use crate::message::stamp_header;
 use crate::subs::{self, Action::DelAll};
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
@@ -7,15 +8,16 @@ use polling::{Event, Poller};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-pub struct Message {
-    pub id: usize,
-    pub data: Vec<u8>,
+pub enum Action {
+    Queue(usize, usize, Vec<u8>),
+    QueueAll(Vec<WriteOrder>),
+    Write(usize),
 }
 
-pub enum Action {
-    Queue(usize, Vec<u8>),
-    QueueAll(Vec<Message>),
-    Write(usize),
+pub struct WriteOrder {
+    pub from_id: usize,
+    pub msg_id: usize,
+    pub data: Vec<u8>,
 }
 
 pub struct Writer {
@@ -46,18 +48,26 @@ impl Writer {
     pub fn handle(&self, subs_tx: Sender<subs::Action>) {
         loop {
             match self.rx.recv().unwrap() {
-                Action::Queue(id, message) => {
+                Action::Queue(id, msg_id, data) => {
                     if let Some(connection) = self.writers.lock().unwrap().get_mut(&id) {
-                        connection.to_send.push(message);
+                        connection
+                            .to_send
+                            .push(stamp_header(data, id as u32, msg_id as u32));
+
                         self.poll_write(connection);
                     }
                 }
 
-                Action::QueueAll(messages) => {
+                Action::QueueAll(orders) => {
                     let mut writers = self.writers.lock().unwrap();
-                    for message in messages {
-                        if let Some(connection) = writers.get_mut(&message.id) {
-                            connection.to_send.push(message.data);
+                    for order in orders {
+                        if let Some(connection) = writers.get_mut(&order.msg_id) {
+                            connection.to_send.push(stamp_header(
+                                order.data,
+                                order.from_id as u32,
+                                order.msg_id as u32,
+                            ));
+
                             self.poll_write(connection);
                         }
                     }
@@ -69,7 +79,7 @@ impl Writer {
                         if !connection.to_send.is_empty() {
                             let data = connection.to_send.remove(0);
 
-                            if let Err(err) = connection.try_write_message(data) {
+                            if let Err(err) = connection.try_write_bytes(data) {
                                 println!("\nConnection #{} broken, write failed: {}", id, err);
                             }
                         }

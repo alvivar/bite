@@ -1,5 +1,6 @@
 use crate::data;
 use crate::data::Action::{Append, Delete, Get, Inc, Json, Jtrim, KeyValue, Set, SetIfNone};
+use crate::message::Message;
 use crate::subs;
 use crate::subs::Action::{Add, Call, Del};
 use crate::writer::{self, Action::Queue};
@@ -14,11 +15,10 @@ const OK: &str = "OK";
 const NO: &str = "NO";
 
 pub enum Action {
-    Parse(usize, Vec<u8>, SocketAddr),
+    Parse(Message, SocketAddr),
 }
 
-pub struct Message {
-    pub size: u32,
+pub struct Parsed {
     pub command: Command,
     pub key: String,
     pub data: Vec<u8>,
@@ -69,8 +69,8 @@ impl Parser {
     ) {
         loop {
             match self.rx.recv().unwrap() {
-                Action::Parse(id, data, addr) => {
-                    let utf8 = String::from_utf8_lossy(&data);
+                Action::Parse(message, addr) => {
+                    let utf8 = String::from_utf8_lossy(&message.data);
                     let mut text = utf8.to_string();
 
                     let limit = 256;
@@ -80,100 +80,105 @@ impl Parser {
                         text.push_str(&add);
                     };
 
-                    println!("\n{} ({} bytes): {}", addr, data.len(), text);
+                    println!("\n{} ({} bytes): {}", addr, message.data.len(), text);
 
-                    let message = parse(&data);
-                    let command = message.command;
-                    let key = message.key;
-                    let data = message.data;
+                    let from_id = message.from as usize;
+                    let msg_id = message.id as usize;
+
+                    let parsed = parse(&message.data);
+                    let command = parsed.command;
+                    let key = parsed.key;
+                    let data = parsed.data;
 
                     match command {
                         // Commands that doesn't make sense without key.
                         _ if key.is_empty() && needs_key(&command) => {
-                            writer_tx.send(Queue(id, NO.into())).unwrap();
+                            writer_tx.send(Queue(from_id, msg_id, data)).unwrap();
                         }
 
                         // Nop
                         Command::Nop => {
-                            writer_tx.send(Queue(id, NO.into())).unwrap();
+                            writer_tx.send(Queue(from_id, msg_id, NO.into())).unwrap();
                         }
 
                         // Set
                         Command::Set => {
-                            writer_tx.send(Queue(id, OK.into())).unwrap();
-                            subs_tx.send(Call(key.to_owned(), data.to_owned())).unwrap();
+                            writer_tx.send(Queue(from_id, msg_id, OK.into())).unwrap();
+                            subs_tx
+                                .send(Call(key.to_owned(), data.to_owned(), msg_id))
+                                .unwrap();
                             data_tx.send(Set(key, data)).unwrap();
                         }
 
                         // Set only if the key doesn't exists.
                         Command::SetIfNone => {
-                            writer_tx.send(Queue(id, OK.into())).unwrap();
-                            data_tx.send(SetIfNone(key, data)).unwrap();
+                            writer_tx.send(Queue(from_id, msg_id, OK.into())).unwrap();
+                            data_tx.send(SetIfNone(key, data, msg_id)).unwrap();
                         }
 
                         // Makes the value an integer and increase it in 1.
                         Command::Inc => {
-                            data_tx.send(Inc(key, id)).unwrap();
+                            data_tx.send(Inc(key, from_id, msg_id)).unwrap();
                         }
 
                         // Appends the value.
                         Command::Append => {
-                            data_tx.send(Append(key, data, id)).unwrap();
+                            data_tx.send(Append(key, data, from_id, msg_id)).unwrap();
                         }
 
                         // Delete!
                         Command::Delete => {
-                            writer_tx.send(Queue(id, OK.into())).unwrap();
+                            writer_tx.send(Queue(from_id, msg_id, OK.into())).unwrap();
                             data_tx.send(Delete(key)).unwrap();
                         }
 
                         // Get
                         Command::Get => {
-                            data_tx.send(Get(key, id)).unwrap();
+                            data_tx.send(Get(key, from_id, msg_id)).unwrap();
                         }
 
                         // 0x0 separated key value enumeration: key value\0x0key2 value2
                         Command::KeyValue => {
-                            data_tx.send(KeyValue(key, id)).unwrap();
+                            data_tx.send(KeyValue(key, from_id, msg_id)).unwrap();
                         }
 
                         // Trimmed Json (just the data).
                         Command::Jtrim => {
-                            data_tx.send(Jtrim(key, id)).unwrap();
+                            data_tx.send(Jtrim(key, from_id, msg_id)).unwrap();
                         }
 
                         // Json (full path).
                         Command::Json => {
-                            data_tx.send(Json(key, id)).unwrap();
+                            data_tx.send(Json(key, from_id, msg_id)).unwrap();
                         }
 
                         // A generic "bite" subscription. Subscribers also receive their key: "key value"
                         // Also a first message if value is available.
                         Command::SubGet | Command::SubKeyValue | Command::SubJson => {
-                            writer_tx.send(Queue(id, OK.into())).unwrap();
+                            writer_tx.send(Queue(from_id, msg_id, OK.into())).unwrap();
 
-                            subs_tx.send(Add(key.to_owned(), id, command)).unwrap();
+                            subs_tx.send(Add(key.to_owned(), from_id, command)).unwrap();
 
                             if !data.is_empty() {
-                                subs_tx.send(Call(key, data)).unwrap()
+                                subs_tx.send(Call(key, data, msg_id)).unwrap()
                             }
                         }
 
                         // A unsubscription and a last message if value is available.
                         Command::Unsub => {
-                            writer_tx.send(Queue(id, OK.into())).unwrap();
+                            writer_tx.send(Queue(from_id, msg_id, OK.into())).unwrap();
 
                             if !data.is_empty() {
-                                subs_tx.send(Call(key.to_owned(), data)).unwrap();
+                                subs_tx.send(Call(key.to_owned(), data, msg_id)).unwrap();
                             }
 
-                            subs_tx.send(Del(key, id)).unwrap();
+                            subs_tx.send(Del(key, from_id)).unwrap();
                         }
 
                         // Calls key subscribers with the new value without data modifications.
                         Command::SubCall => {
-                            writer_tx.send(Queue(id, OK.into())).unwrap();
-                            subs_tx.send(Call(key, data)).unwrap();
+                            writer_tx.send(Queue(from_id, msg_id, OK.into())).unwrap();
+                            subs_tx.send(Call(key, data, msg_id)).unwrap();
                         }
                     }
                 }
@@ -188,9 +193,8 @@ impl Parser {
 /// This text: + hello world is a pretty old meme
 /// Returns: Message { Command::Append, "hello", "world is a pretty old meme" }
 
-pub fn parse(message: &[u8]) -> Message {
+pub fn parse(message: &[u8]) -> Parsed {
     let mut cursor = Cursor::new(message);
-    let size = get_size(&cursor.get_ref()[..2]);
     let instruction = String::from_utf8_lossy(next_word(&mut cursor));
     let key = String::from_utf8_lossy(next_word(&mut cursor));
     let data = remaining(&mut cursor);
@@ -215,8 +219,7 @@ pub fn parse(message: &[u8]) -> Message {
 
     let key: String = key.trim_end().into();
 
-    Message {
-        size,
+    Parsed {
         command,
         key,
         data: data.into(),
@@ -239,23 +242,6 @@ pub fn needs_key(command: &Command) -> bool {
         | Command::Unsub
         | Command::SubCall => true,
     }
-}
-
-/// Insert at the beginning 2 bytes representing the size of the message.
-pub fn insert_size(mut bytes: Vec<u8>) -> Vec<u8> {
-    let len = (bytes.len() + 2) as u64;
-    let byte0 = ((len & 0xFF00) >> 8) as u8;
-    let byte1 = (len & 0x00FF) as u8;
-    let size = [byte0, byte1];
-
-    bytes.splice(0..0, size);
-    bytes
-}
-
-/// Returns the first two bytes as a u32 big endian, conceptually the size of
-/// the message.
-pub fn get_size(bytes: &[u8]) -> u32 {
-    (bytes[0] as u32) << 8 | bytes[1] as u32
 }
 
 #[allow(dead_code)]
