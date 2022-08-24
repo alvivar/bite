@@ -9,12 +9,12 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 pub enum Action {
-    Queue(usize, usize, Vec<u8>),
-    QueueAll(Vec<WriteOrder>),
+    Queue(Order),
+    QueueAll(Vec<Order>),
     Write(usize),
 }
 
-pub struct WriteOrder {
+pub struct Order {
     pub from_id: usize,
     pub msg_id: usize,
     pub data: Vec<u8>,
@@ -48,11 +48,13 @@ impl Writer {
     pub fn handle(&self, subs_tx: Sender<subs::Action>) {
         loop {
             match self.rx.recv().unwrap() {
-                Action::Queue(id, msg_id, data) => {
-                    if let Some(connection) = self.writers.lock().unwrap().get_mut(&id) {
-                        connection
-                            .to_send
-                            .push(stamp_header(data, id as u32, msg_id as u32));
+                Action::Queue(order) => {
+                    if let Some(connection) = self.writers.lock().unwrap().get_mut(&order.from_id) {
+                        connection.to_send.push(stamp_header(
+                            order.data,
+                            order.from_id as u32,
+                            order.msg_id as u32,
+                        ));
 
                         self.poll_write(connection);
                     }

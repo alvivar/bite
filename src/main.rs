@@ -13,6 +13,8 @@ use crate::db::DB;
 use crate::parser::Parser;
 use crate::reader::{Action::Read, Reader};
 use crate::subs::Subs;
+use crate::writer::Action::Queue;
+use crate::writer::Order;
 use crate::writer::{Action::Write, Writer};
 
 use polling::{Event, Poller};
@@ -115,11 +117,15 @@ fn main() -> io::Result<()> {
 
                     // The first message to the client is his id, so it can add
                     // it on all his messages or it would get disconnected.
-                    let id = id_count.to_be_bytes();
-                    writer_tx
-                        .send(writer::Action::Queue(id_count, 0, id.into()))
-                        .unwrap();
+                    let order = Order {
+                        from_id: id_count,
+                        msg_id: 0,
+                        data: id_count.to_be_bytes().into(),
+                    };
 
+                    writer_tx.send(Queue(order)).unwrap();
+
+                    // Next.
                     id_count += 1;
                 }
 

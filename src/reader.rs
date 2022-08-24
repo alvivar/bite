@@ -1,5 +1,5 @@
-use crate::connection::{Connection, Received};
-use crate::message::Message;
+use crate::connection::Connection;
+use crate::message::{Message, Messages, Received};
 use crate::parser::Action::Parse;
 use crate::subs::Action::DelAll;
 use crate::{parser, subs};
@@ -18,6 +18,7 @@ pub struct Reader {
     poller: Arc<Poller>,
     readers: Arc<Mutex<HashMap<usize, Connection>>>,
     writers: Arc<Mutex<HashMap<usize, Connection>>>,
+    messages: Messages,
     pub tx: Sender<Action>,
     rx: Receiver<Action>,
 }
@@ -29,11 +30,13 @@ impl Reader {
         writers: Arc<Mutex<HashMap<usize, Connection>>>,
     ) -> Reader {
         let (tx, rx) = unbounded::<Action>();
+        let messages = Messages::new();
 
         Reader {
             poller,
             readers,
             writers,
+            messages,
             tx,
             rx,
         }
@@ -47,9 +50,21 @@ impl Reader {
 
                     if let Some(connection) = self.readers.lock().unwrap().get_mut(&id) {
                         loop {
+                            // Loop because "received" could have more than one
+                            // message in the same read.
+
                             let mut pending = false;
 
-                            let data = match connection.try_read_bytes() {
+                            let data = match connection.try_read() {
+                                Ok(received) => received,
+
+                                Err(err) => {
+                                    println!("\nConnection #{} closed, read failed: {}", id, err);
+                                    break;
+                                }
+                            };
+
+                            let received = match self.messages.feed(data) {
                                 Received::None => break,
 
                                 Received::Complete(received) => received,
@@ -65,7 +80,7 @@ impl Reader {
                                 }
                             };
 
-                            let message = Message::from_protocol(data);
+                            let message = Message::from_protocol(received);
                             parser_tx.send(Parse(message, connection.addr)).unwrap();
 
                             if !pending {

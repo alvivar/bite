@@ -1,5 +1,5 @@
 use crate::subs::{self, Action::Call};
-use crate::writer::{self, Action::Queue};
+use crate::writer::{self, Action::Queue, Order};
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use serde_json::{self, json, Value};
@@ -78,7 +78,11 @@ impl Data {
                     let inc_vec = u64_to_vec(inc);
 
                     self.writer_tx
-                        .send(Queue(from_id, msg_id, inc_vec.to_owned()))
+                        .send(Queue(Order {
+                            from_id,
+                            msg_id,
+                            data: inc_vec.to_owned(),
+                        }))
                         .unwrap();
 
                     self.subs_tx
@@ -106,7 +110,11 @@ impl Data {
                     };
 
                     self.writer_tx
-                        .send(Queue(from_id, msg_id, value.to_owned()))
+                        .send(Queue(Order {
+                            from_id,
+                            msg_id,
+                            data: value.to_owned(),
+                        }))
                         .unwrap();
 
                     self.subs_tx
@@ -135,7 +143,11 @@ impl Data {
                     };
 
                     self.writer_tx
-                        .send(Queue(from_id, msg_id, message))
+                        .send(Queue(Order {
+                            from_id,
+                            msg_id,
+                            data: message,
+                        }))
                         .unwrap();
                 }
 
@@ -165,7 +177,11 @@ impl Data {
                     }
 
                     self.writer_tx
-                        .send(Queue(from_id, msg_id, message))
+                        .send(Queue(Order {
+                            from_id,
+                            msg_id,
+                            data: message,
+                        }))
                         .unwrap();
                 }
 
@@ -192,7 +208,11 @@ impl Data {
                     };
 
                     self.writer_tx
-                        .send(Queue(from_id, msg_id, message.into()))
+                        .send(Queue(Order {
+                            from_id,
+                            msg_id,
+                            data: message.into(),
+                        }))
                         .unwrap();
                 }
 
@@ -219,7 +239,11 @@ impl Data {
                     };
 
                     self.writer_tx
-                        .send(Queue(from_id, msg_id, message.into()))
+                        .send(Queue(Order {
+                            from_id: from_id,
+                            msg_id: msg_id,
+                            data: message.into(),
+                        }))
                         .unwrap();
                 }
             }

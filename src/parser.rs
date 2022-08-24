@@ -3,6 +3,7 @@ use crate::data::Action::{Append, Delete, Get, Inc, Json, Jtrim, KeyValue, Set, 
 use crate::message::Message;
 use crate::subs;
 use crate::subs::Action::{Add, Call, Del};
+use crate::writer::Order;
 use crate::writer::{self, Action::Queue};
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
@@ -93,26 +94,53 @@ impl Parser {
                     match command {
                         // Commands that doesn't make sense without key.
                         _ if key.is_empty() && needs_key(&command) => {
-                            writer_tx.send(Queue(from_id, msg_id, data)).unwrap();
+                            writer_tx
+                                .send(Queue(Order {
+                                    from_id,
+                                    msg_id,
+                                    data: NO.into(),
+                                }))
+                                .unwrap();
                         }
 
                         // Nop
                         Command::Nop => {
-                            writer_tx.send(Queue(from_id, msg_id, NO.into())).unwrap();
+                            writer_tx
+                                .send(Queue(Order {
+                                    from_id,
+                                    msg_id,
+                                    data: NO.into(),
+                                }))
+                                .unwrap();
                         }
 
                         // Set
                         Command::Set => {
-                            writer_tx.send(Queue(from_id, msg_id, OK.into())).unwrap();
+                            writer_tx
+                                .send(Queue(Order {
+                                    from_id,
+                                    msg_id,
+                                    data: OK.into(),
+                                }))
+                                .unwrap();
+
                             subs_tx
                                 .send(Call(key.to_owned(), data.to_owned(), msg_id))
                                 .unwrap();
+
                             data_tx.send(Set(key, data)).unwrap();
                         }
 
                         // Set only if the key doesn't exists.
                         Command::SetIfNone => {
-                            writer_tx.send(Queue(from_id, msg_id, OK.into())).unwrap();
+                            writer_tx
+                                .send(Queue(Order {
+                                    from_id,
+                                    msg_id,
+                                    data: OK.into(),
+                                }))
+                                .unwrap();
+
                             data_tx.send(SetIfNone(key, data, msg_id)).unwrap();
                         }
 
@@ -128,7 +156,14 @@ impl Parser {
 
                         // Delete!
                         Command::Delete => {
-                            writer_tx.send(Queue(from_id, msg_id, OK.into())).unwrap();
+                            writer_tx
+                                .send(Queue(Order {
+                                    from_id,
+                                    msg_id,
+                                    data: OK.into(),
+                                }))
+                                .unwrap();
+
                             data_tx.send(Delete(key)).unwrap();
                         }
 
@@ -155,7 +190,13 @@ impl Parser {
                         // A generic "bite" subscription. Subscribers also receive their key: "key value"
                         // Also a first message if value is available.
                         Command::SubGet | Command::SubKeyValue | Command::SubJson => {
-                            writer_tx.send(Queue(from_id, msg_id, OK.into())).unwrap();
+                            writer_tx
+                                .send(Queue(Order {
+                                    from_id,
+                                    msg_id,
+                                    data: OK.into(),
+                                }))
+                                .unwrap();
 
                             subs_tx.send(Add(key.to_owned(), from_id, command)).unwrap();
 
@@ -166,7 +207,13 @@ impl Parser {
 
                         // A unsubscription and a last message if value is available.
                         Command::Unsub => {
-                            writer_tx.send(Queue(from_id, msg_id, OK.into())).unwrap();
+                            writer_tx
+                                .send(Queue(Order {
+                                    from_id,
+                                    msg_id,
+                                    data: OK.into(),
+                                }))
+                                .unwrap();
 
                             if !data.is_empty() {
                                 subs_tx.send(Call(key.to_owned(), data, msg_id)).unwrap();
@@ -177,7 +224,14 @@ impl Parser {
 
                         // Calls key subscribers with the new value without data modifications.
                         Command::SubCall => {
-                            writer_tx.send(Queue(from_id, msg_id, OK.into())).unwrap();
+                            writer_tx
+                                .send(Queue(Order {
+                                    from_id,
+                                    msg_id,
+                                    data: OK.into(),
+                                }))
+                                .unwrap();
+
                             subs_tx.send(Call(key, data, msg_id)).unwrap();
                         }
                     }
