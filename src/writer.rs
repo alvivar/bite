@@ -63,7 +63,7 @@ impl Writer {
                 Action::QueueAll(orders) => {
                     let mut writers = self.writers.lock().unwrap();
                     for order in orders {
-                        if let Some(connection) = writers.get_mut(&order.msg_id) {
+                        if let Some(connection) = writers.get_mut(&order.from_id) {
                             connection.to_send.push(stamp_header(
                                 order.data,
                                 order.from_id as u32,
