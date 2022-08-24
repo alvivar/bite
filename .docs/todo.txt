@@ -1,4 +1,7 @@
 
+    When the server sends the id at the beginning, it should be a u32 instead of u64.
+    Explore the casting between u32 and related values.
+
     Does the protocol need an ID or something? This way clients could now which response belongs to the message.
     Deal with wrong messages, i.e. messages that does't have the first 2 bytes representing the length of the message, or wrong messages.
 
