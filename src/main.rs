@@ -117,13 +117,13 @@ fn main() -> io::Result<()> {
 
                     // The first message to the client is his id, so it can add
                     // it on all his messages or it would get disconnected.
-                    let order = Order {
-                        from_id: id_count,
-                        msg_id: 0,
-                        data: id_count.to_be_bytes().into(),
-                    };
-
-                    writer_tx.send(Queue(order)).unwrap();
+                    writer_tx
+                        .send(Queue(Order {
+                            from_id: id_count,
+                            msg_id: 0,
+                            data: id_count.to_be_bytes().into(),
+                        }))
+                        .unwrap();
 
                     // Next.
                     id_count += 1;

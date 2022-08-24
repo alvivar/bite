@@ -53,8 +53,6 @@ impl Reader {
                             // Loop because "received" could have more than one
                             // message in the same read.
 
-                            let mut pending = false;
-
                             let data = match connection.try_read() {
                                 Ok(received) => received,
 
@@ -64,12 +62,13 @@ impl Reader {
                                 }
                             };
 
+                            let mut pending = false;
                             let received = match self.messages.feed(data) {
                                 Received::None => break,
 
                                 Received::Complete(received) => received,
 
-                                Received::Incomplete(received) => {
+                                Received::Pending(received) => {
                                     pending = true;
                                     received
                                 }
@@ -80,8 +79,9 @@ impl Reader {
                                 }
                             };
 
-                            let message = Message::from_protocol(received);
-                            parser_tx.send(Parse(message, connection.addr)).unwrap();
+                            parser_tx
+                                .send(Parse(Message::from_protocol(received), connection.addr))
+                                .unwrap();
 
                             if !pending {
                                 break;

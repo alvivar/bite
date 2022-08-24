@@ -4,7 +4,7 @@ use std::io::{self, Error, ErrorKind};
 pub enum Received {
     None,
     Complete(Vec<u8>),
-    Incomplete(Vec<u8>),
+    Pending(Vec<u8>),
     Error(io::Error),
 }
 
@@ -78,7 +78,7 @@ impl Messages {
                 let result = self.buffer.to_owned();
                 self.buffer = split;
 
-                Received::Incomplete(result)
+                Received::Pending(result)
             }
 
             Ordering::Greater => {

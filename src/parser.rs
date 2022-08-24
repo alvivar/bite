@@ -27,7 +27,7 @@ pub struct Parsed {
 
 #[derive(PartialEq, Debug)]
 pub enum Command {
-    Nop,
+    No,
     Set,
     SetIfNone,
     Inc,
@@ -103,8 +103,8 @@ impl Parser {
                                 .unwrap();
                         }
 
-                        // Nop
-                        Command::Nop => {
+                        // No
+                        Command::No => {
                             writer_tx
                                 .send(Queue(Order {
                                     from_id,
@@ -268,7 +268,7 @@ pub fn parse(message: &[u8]) -> Parsed {
         "#j" => Command::SubJson,
         "#-" => Command::Unsub,
         "!" => Command::SubCall,
-        _ => Command::Nop,
+        _ => Command::No,
     };
 
     let key: String = key.trim_end().into();
@@ -282,7 +282,7 @@ pub fn parse(message: &[u8]) -> Parsed {
 
 pub fn needs_key(command: &Command) -> bool {
     match command {
-        Command::Nop | Command::KeyValue | Command::Jtrim | Command::Json => false,
+        Command::No | Command::KeyValue | Command::Jtrim | Command::Json => false,
 
         Command::Set
         | Command::SetIfNone

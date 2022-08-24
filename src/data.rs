@@ -102,6 +102,7 @@ impl Data {
                             value.append(&mut data);
                             value.to_owned()
                         }
+
                         None => {
                             let mut value = Vec::new();
                             value.append(&mut data);
@@ -240,8 +241,8 @@ impl Data {
 
                     self.writer_tx
                         .send(Queue(Order {
-                            from_id: from_id,
-                            msg_id: msg_id,
+                            from_id,
+                            msg_id,
                             data: message.into(),
                         }))
                         .unwrap();
