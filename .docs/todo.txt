@@ -1,4 +1,5 @@
 
+    Fails when the value received is less than the protocol.
     When the server sends the id at the beginning, it should be a u32 instead of u64.
     Explore the casting between u32 and related values.
 
