@@ -75,13 +75,22 @@ impl Reader {
 
                                 Received::Error(err) => {
                                     println!("\nConnection #{} closed, read failed: {}", id, err);
+                                    connection.closed = true;
                                     break;
                                 }
                             };
 
-                            parser_tx
-                                .send(Parse(Message::from_protocol(received), connection.addr))
-                                .unwrap();
+                            let message = match Message::from_protocol(received) {
+                                Ok(message) => message,
+
+                                Err(err) => {
+                                    println!("\nConnection #{} closed, read failed: {}", id, err);
+                                    connection.closed = true;
+                                    break;
+                                }
+                            };
+
+                            parser_tx.send(Parse(message, connection.addr)).unwrap();
 
                             if !pending {
                                 break;

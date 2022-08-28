@@ -16,18 +16,26 @@ pub struct Message {
 }
 
 impl Message {
-    pub fn from_protocol(mut data: Vec<u8>) -> Message {
+    pub fn from_protocol(mut data: Vec<u8>) -> io::Result<Message> {
+        if data.len() < 6 {
+            return Err(smaller_size_than_protocol());
+        }
+
+        if data.len() > 65535 {
+            return Err(bigger_size_than_protocol());
+        }
+
         let from = get_u32(&data[0..2]);
         let id = get_u32(&data[2..4]);
         let size = get_u32(&data[4..6]);
         data.drain(0..6);
 
-        Message {
+        Ok(Message {
             from,
             id,
             size,
             data,
-        }
+        })
     }
 }
 
