@@ -48,7 +48,7 @@ impl Connection {
     }
 }
 
-// Both functions below were taken and modified from the Tokio/mio client server
+// Both functions below were taken and modified from Tokio/mio client server
 // example.
 
 fn read(socket: &mut TcpStream) -> io::Result<Vec<u8>> {
