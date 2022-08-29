@@ -18,7 +18,7 @@ pub struct Reader {
     poller: Arc<Poller>,
     readers: Arc<Mutex<HashMap<usize, Connection>>>,
     writers: Arc<Mutex<HashMap<usize, Connection>>>,
-    messages: Messages,
+    messages: HashMap<usize, Messages>,
     pub tx: Sender<Action>,
     rx: Receiver<Action>,
 }
@@ -30,7 +30,7 @@ impl Reader {
         writers: Arc<Mutex<HashMap<usize, Connection>>>,
     ) -> Reader {
         let (tx, rx) = unbounded::<Action>();
-        let messages = Messages::new();
+        let messages = HashMap::<usize, Messages>::new();
 
         Reader {
             poller,
@@ -63,7 +63,9 @@ impl Reader {
                             };
 
                             let mut pending = false;
-                            let received = match self.messages.feed(data) {
+                            let messages = self.messages.entry(id).or_insert(Messages::new());
+
+                            let received = match messages.feed(data) {
                                 Received::None => break,
 
                                 Received::Complete(received) => received,
@@ -76,6 +78,7 @@ impl Reader {
                                 Received::Error(err) => {
                                     println!("\nConnection #{} closed, read failed: {}", id, err);
                                     connection.closed = true;
+                                    self.messages.remove(&id);
                                     break;
                                 }
                             };
