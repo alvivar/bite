@@ -1,10 +1,11 @@
 
-    Fails when the value received is less than the protocol.
+    Deal with validating the id of the client.
+    Should we validate the end of a message for more safety or maybe a crc somewhere?
+    Should we validate a timeout for the client, or that's already built inside Tcp stuff and need configuration?
+    Think about an evil client trying to saturate the connections or fucking up the server.
+
     When the server sends the id at the beginning, it should be a u32 instead of u64.
     Explore the casting between u32 and related values.
-
-    Does the protocol need an ID or something? This way clients could now which response belongs to the message.
-    Deal with wrong messages, i.e. messages that does't have the first 2 bytes representing the length of the message, or wrong messages.
 
     Auth by password.
     Wondering if cleaning up sockets when broken, could be optimized by locking the mutexes during the cleaning loop (?)
@@ -38,6 +39,14 @@
     Push # value should insert into a list, transform normal values
     Pop # should return and delete a value
 
+
+8/29/2022
+    x Lots of fixes and stability.
+    x BITENC is a client made for testing in another repo, with tests that test all commands and some extra stuff.
+    x Incredible refactor to support a protocol with client id, message id and size.
+    x Fails when the value received is less than the protocol.
+    x Does the protocol need an ID or something? This way clients could now which response belongs to the message.
+    x Deal with messages that does't have the 2 bytes representing the length of the message
 
 08/19/2022
     x Clean, optimize code, documentation and simplifications.
