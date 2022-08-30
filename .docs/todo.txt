@@ -1,4 +1,6 @@
 
+    Update the documentation to make sense!
+
     Deal with validating the id of the client.
     Should we validate the end of a message for more safety or maybe a crc somewhere?
     Should we validate a timeout for the client, or that's already built inside Tcp stuff and need configuration?
