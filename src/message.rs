@@ -50,7 +50,7 @@ impl Messages {
 
     /// Appends the data acting like a buffer to return complete messages
     /// assumming is part of the protocol. You need to call this function in a
-    /// loop and retry when Response::Incomplete is returned.
+    /// loop and retry when Received::Pending is returned.
     pub fn feed(&mut self, mut data: Vec<u8>) -> Received {
         self.buffer.append(&mut data);
         let buffer_len = self.buffer.len() as u32;
