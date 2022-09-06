@@ -1,6 +1,7 @@
 # BITE
 
-Key-Value database with subscriptions, for real time multiplayer applications.
+Key-Value database with subscriptions, aimed to real time multiplayer
+applications.
 
 ## Tutorial
 
@@ -53,7 +54,7 @@ as parent/children.
     s data.author.name Andrés Villalobos
     s data.author.twitter matnesis
 
-This way you can use **b** to get a list of keys and values from the children of
+This way you can use **k** to get a list of keys and values from the children of
 a particular key, separated by the byte 0.
 
     b data.author
@@ -84,7 +85,7 @@ A classic detail, is that you can construct JSON with **js**.
 
 Use **j** to get the json without the full path.
 
-    J data
+    j data
     >
     {
         "author": {
@@ -95,7 +96,7 @@ Use **j** to get the json without the full path.
         "why": "Simplest database ever"
     }
 
-    J data.why
+    j data.why
     > "Simplest database ever"
 
 Everything will be stored sorted on **data/DB.json**.
