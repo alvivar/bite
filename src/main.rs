@@ -121,7 +121,7 @@ fn main() -> io::Result<()> {
                         .send(Queue(Order {
                             from_id: id_count,
                             msg_id: 0,
-                            data: id_count.to_be_bytes().into(),
+                            data: [].into(),
                         }))
                         .unwrap();
 
