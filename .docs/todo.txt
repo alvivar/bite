@@ -1,5 +1,5 @@
 
-    Probably, we don't need a float for the first message.
+    Deal with ids, because we can't have more than 65535 of them.
 
     Update the documentation to make sense!
 
@@ -43,6 +43,9 @@
     Push # value should insert into a list, transform normal values
     Pop # should return and delete a value
 
+
+9/5/2022
+    x Probably, we don't need a float for the first message.
 
 8/29/2022
     x Lots of fixes and stability.
