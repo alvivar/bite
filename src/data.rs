@@ -12,7 +12,7 @@ pub enum Action {
     Set(String, Vec<u8>),
     SetIfNone(String, Vec<u8>, usize),
     Inc(String, usize, usize),
-    Append(String, Vec<u8>, usize, usize),
+    Append(String, Vec<u8>, usize),
     Delete(String),
     Get(String, usize, usize),
     KeyValue(String, usize, usize),
@@ -94,32 +94,24 @@ impl Data {
                     db_modified.swap(true, Ordering::Relaxed);
                 }
 
-                Action::Append(key, mut data, from_id, msg_id) => {
+                Action::Append(key, data, msg_id) => {
                     let mut map = self.map.lock().unwrap();
 
                     let value = match map.get_mut(&key) {
                         Some(value) => {
-                            value.append(&mut data);
+                            value.extend(data.to_owned());
                             value.to_owned()
                         }
 
                         None => {
                             let mut value = Vec::new();
-                            value.append(&mut data);
+                            value.extend(data.to_owned());
                             value
                         }
                     };
 
-                    self.writer_tx
-                        .send(Queue(Order {
-                            from_id,
-                            msg_id,
-                            data: value.to_owned(),
-                        }))
-                        .unwrap();
-
                     self.subs_tx
-                        .send(Call(key.to_owned(), value.to_owned(), msg_id))
+                        .send(Call(key.to_owned(), data, msg_id))
                         .unwrap();
 
                     map.insert(key, value);

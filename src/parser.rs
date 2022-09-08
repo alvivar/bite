@@ -151,7 +151,15 @@ impl Parser {
 
                         // Appends the value.
                         Command::Append => {
-                            data_tx.send(Append(key, data, from_id, msg_id)).unwrap();
+                            writer_tx
+                                .send(Queue(Order {
+                                    from_id,
+                                    msg_id,
+                                    data: OK.into(),
+                                }))
+                                .unwrap();
+
+                            data_tx.send(Append(key, data, msg_id)).unwrap();
                         }
 
                         // Delete!

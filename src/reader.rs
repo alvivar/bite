@@ -63,7 +63,7 @@ impl Reader {
                             };
 
                             let mut pending = false;
-                            let messages = self.messages.entry(id).or_insert(Messages::new());
+                            let messages = self.messages.entry(id).or_insert_with(Messages::new);
 
                             let received = match messages.feed(data) {
                                 Received::None => break,
