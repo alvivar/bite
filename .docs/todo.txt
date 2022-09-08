@@ -1,16 +1,14 @@
 
     Append + should return OK, instead of the new value, because eventually I want to use it for streaming.
 
+    Deal with validating the id of the client.
     Deal with ids, because we can't have more than 65535 of them.
 
-    Update the documentation to make sense!
-
-    Deal with validating the id of the client.
     Should we validate the end of a message for more safety or maybe a crc somewhere?
     Should we validate a timeout for the client, or that's already built inside Tcp stuff and need configuration?
     Think about an evil client trying to saturate the connections or fucking up the server.
 
-    When the server sends the id at the beginning, it should be a u32 instead of u64.
+
     Explore the casting between u32 and related values.
 
     Auth by password.
@@ -45,6 +43,10 @@
     Push # value should insert into a list, transform normal values
     Pop # should return and delete a value
 
+
+9/7/2022
+    x When the server sends the id at the beginning, it should be a u32 instead of u64.
+    x Update the documentation to make sense!
 
 9/5/2022
     x Probably, we don't need a float for the first message.
