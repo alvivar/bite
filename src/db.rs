@@ -7,7 +7,7 @@ use std::thread::sleep;
 use std::time::Duration;
 
 const DB_PATH: &str = "./data";
-const DB_FILE: &str = "./data/DB.bin";
+const DB_FILE: &str = "./data/db.bin";
 
 pub struct DB {
     data: Arc<Mutex<BTreeMap<String, Vec<u8>>>>,
@@ -28,7 +28,8 @@ impl DB {
             if self.modified.load(Ordering::Relaxed) {
                 self.modified.swap(false, Ordering::Relaxed);
                 self.save_to_file();
-                println!("\nDB.bin saved");
+
+                println!("\n{} saved", DB_FILE.split('/').last().unwrap());
             }
         }
     }
