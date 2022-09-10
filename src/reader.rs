@@ -57,7 +57,11 @@ impl Reader {
                                 Ok(received) => received,
 
                                 Err(err) => {
+                                    // connection.closed = true;
+                                    // ^ This is already hapenning inside try_read() on errors.
+
                                     println!("\nConnection #{} closed, read failed: {}", id, err);
+
                                     break;
                                 }
                             };
@@ -76,19 +80,31 @@ impl Reader {
                                 }
 
                                 Received::Error(err) => {
-                                    println!("\nConnection #{} closed, read failed: {}", id, err);
                                     connection.closed = true;
-                                    self.messages.remove(&id);
+
+                                    println!("\nConnection #{} closed, feed failed: {}", id, err);
+
                                     break;
                                 }
                             };
 
                             let message = match Message::from_protocol(received) {
+                                Ok(message) if message.from != id as u32 => {
+                                    connection.closed = true;
+
+                                    let err = format!("message client id #{} is wrong", message.id);
+                                    println!("\nConnection #{} closed, bad message: {}", id, err);
+
+                                    break;
+                                }
+
                                 Ok(message) => message,
 
                                 Err(err) => {
-                                    println!("\nConnection #{} closed, read failed: {}", id, err);
                                     connection.closed = true;
+
+                                    println!("\nConnection #{} closed, bad message: {}", id, err);
+
                                     break;
                                 }
                             };
@@ -110,6 +126,7 @@ impl Reader {
                     }
 
                     if closed {
+                        self.messages.remove(&id);
                         let readers = self.readers.lock().unwrap().remove(&id).unwrap();
                         let writers = self.writers.lock().unwrap().remove(&id).unwrap();
                         self.poller.delete(&readers.socket).unwrap();
