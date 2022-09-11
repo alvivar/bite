@@ -33,7 +33,7 @@ fn main() -> io::Result<()> {
     server.set_nonblocking(true)?;
 
     let poller = Poller::new()?;
-    poller.add(&server, Event::readable(0))?;
+    poller.add(&server, Event::readable(0))?; // 0 is the server.
     let poller = Arc::new(poller);
 
     // The connections
