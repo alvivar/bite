@@ -25,11 +25,12 @@ impl DB {
         loop {
             sleep(Duration::new(throttle, 0));
 
-            if self.modified.load(Ordering::Relaxed) {
-                self.modified.swap(false, Ordering::Relaxed);
-
-                self.save_to_file();
+            if !self.modified.load(Ordering::Relaxed) {
+                continue;
             }
+
+            self.modified.swap(false, Ordering::Relaxed);
+            self.save_to_file();
         }
     }
 
