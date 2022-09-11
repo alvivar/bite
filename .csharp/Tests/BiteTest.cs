@@ -13,8 +13,8 @@ public class BiteTest : MonoBehaviour
 
     private Bite bite;
 
-    void OnEnable() { Connect(); }
-    void OnDisable() { bite.Shutdown(); }
+    public void OnEnable() { Connect(); }
+    public void OnDisable() { bite.Shutdown(); }
 
     [ContextMenu("Test")]
     public void Connect()

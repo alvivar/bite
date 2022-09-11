@@ -17,7 +17,7 @@ namespace BiteClient
         private Receiver receiver;
 
         private int clientId;
-        private static int sentId;
+        private static int messageId;
 
         internal Bite(string host, int port)
         {
@@ -42,8 +42,8 @@ namespace BiteClient
             if (!Connected)
                 throw new SocketException((int)SocketError.NotConnected);
 
-            sentId += 1;
-            var frame = new Frame().FromProtocol((int)clientId, sentId, data);
+            messageId += 1;
+            var frame = new Frame().FromProtocol((int)clientId, messageId, data);
             sender.Send(frame);
 
             if (action != null)
@@ -52,8 +52,7 @@ namespace BiteClient
 
         internal void Send(string text, Action<Frame> action = null)
         {
-            var bytes = Encoding.ASCII.GetBytes(text);
-            Send(bytes, action);
+            Send(Encoding.ASCII.GetBytes(text), action);
         }
 
         /// Naturally throws an ThreadAbortException.

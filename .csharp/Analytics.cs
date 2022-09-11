@@ -34,8 +34,8 @@ public class Analytics : MonoBehaviour
     [Header("Optional")]
     public Transform position;
 
-    private bool connected = false;
     private bool lastPositionLoaded = false;
+    private bool allowUpdate = false;
 
     private Bite bite;
 
@@ -45,7 +45,15 @@ public class Analytics : MonoBehaviour
         key = $"{keyName}.{id}";
 
         bite = new Bite(host, port);
-        bite.Send($"! ping {id}", r => FirstConnection());
+        bite.OnConnected += frame => bite.Send($"! ping {id}", frame =>
+        {
+            allowUpdate = true;
+
+            LoadDataFromServer();
+            LoadOrSetStartedEpoch();
+
+            Debug.Log($"Analytics connected");
+        });
     }
 
     private void OnDestroy()
@@ -54,35 +62,27 @@ public class Analytics : MonoBehaviour
             bite.Shutdown();
     }
 
-    private void Update()
-    {
-        // Wait for connection.
-        if (!connected)
-            return;
+    // private void Update()
+    // {
+    //     // Wait for connection.
+    //     if (!allowUpdate)
+    //         return;
 
-        // Server tick
-        if (clock > Time.time)
-            return;
-        clock = Time.time + tick;
+    //     // Server tick
+    //     if (clock > Time.time)
+    //         return;
+    //     clock = Time.time + tick;
 
-        // Statistics
-        SaveTimePlayed(tick);
-        SaveLastEpoch();
-        SaveLastPosition();
-    }
+    //     // Statistics
+    //     SaveTimePlayed(tick);
+    //     SaveLastEpoch();
+    //     SaveLastPosition();
+    // }
 
     public void SetName(string name)
     {
         data.name = name;
         bite.Send($"s {key}.name {data.name}");
-    }
-
-    private void FirstConnection()
-    {
-        connected = true;
-        LoadDataFromServer();
-        LoadOrSetStartedEpoch();
-        Debug.Log($"Analytics connected");
     }
 
     private void LoadDataFromServer()
