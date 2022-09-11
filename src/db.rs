@@ -27,9 +27,8 @@ impl DB {
 
             if self.modified.load(Ordering::Relaxed) {
                 self.modified.swap(false, Ordering::Relaxed);
-                self.save_to_file();
 
-                println!("\n{} saved", DB_FILE.split('/').last().unwrap());
+                self.save_to_file();
             }
         }
     }
@@ -46,16 +45,18 @@ impl DB {
         let mut content = Vec::<u8>::new();
         file.unwrap().read_to_end(&mut content).unwrap();
 
-        if !content.is_empty() {
-            let mut map = self.data.lock().unwrap();
-
-            let data = match bincode::deserialize::<BTreeMap<String, Vec<u8>>>(&content[..]) {
-                Ok(data) => data,
-                Err(_) => BTreeMap::<String, Vec<u8>>::new(),
-            };
-
-            *map = data;
+        if content.is_empty() {
+            return;
         }
+
+        let mut map = self.data.lock().unwrap();
+
+        let data = match bincode::deserialize::<BTreeMap<String, Vec<u8>>>(&content[..]) {
+            Ok(data) => data,
+            Err(_) => BTreeMap::<String, Vec<u8>>::new(),
+        };
+
+        *map = data;
     }
 
     pub fn save_to_file(&self) {
@@ -69,5 +70,7 @@ impl DB {
         let map = self.data.lock().unwrap();
         let data: Vec<u8> = bincode::serialize(&*map).unwrap();
         file.unwrap().write_all(&data[..]).unwrap();
+
+        println!("\n{} saved", DB_FILE.split('/').last().unwrap());
     }
 }
