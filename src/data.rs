@@ -10,9 +10,9 @@ use std::sync::{Arc, Mutex};
 
 pub enum Action {
     Set(String, Vec<u8>),
-    SetIfNone(String, Vec<u8>, usize),
+    SetIfNone(String, Vec<u8>, usize, usize),
     Inc(String, usize, usize),
-    Append(String, Vec<u8>, usize),
+    Append(String, Vec<u8>, usize, usize),
     Delete(String),
     Get(String, usize, usize),
     KeyValue(String, usize, usize),
@@ -53,12 +53,12 @@ impl Data {
                     db_modified.swap(true, Ordering::Relaxed);
                 }
 
-                Action::SetIfNone(key, val, msg_id) => {
+                Action::SetIfNone(key, val, from_id, msg_id) => {
                     let mut map = self.map.lock().unwrap();
 
                     if map.get(&key).is_none() {
                         self.subs_tx
-                            .send(Call(key.to_owned(), val.to_owned(), msg_id))
+                            .send(Call(key.to_owned(), val.to_owned(), from_id, msg_id))
                             .unwrap();
 
                         map.insert(key, val);
@@ -80,13 +80,14 @@ impl Data {
                     self.writer_tx
                         .send(Queue(Order {
                             from_id,
+                            to_id: from_id,
                             msg_id,
                             data: inc_vec.to_owned(),
                         }))
                         .unwrap();
 
                     self.subs_tx
-                        .send(Call(key.to_owned(), inc_vec.to_owned(), msg_id))
+                        .send(Call(key.to_owned(), inc_vec.to_owned(), from_id, msg_id))
                         .unwrap();
 
                     map.insert(key, inc_vec);
@@ -94,7 +95,7 @@ impl Data {
                     db_modified.swap(true, Ordering::Relaxed);
                 }
 
-                Action::Append(key, data, msg_id) => {
+                Action::Append(key, data, from_id, msg_id) => {
                     let mut map = self.map.lock().unwrap();
 
                     let value = match map.get_mut(&key) {
@@ -111,7 +112,7 @@ impl Data {
                     };
 
                     self.subs_tx
-                        .send(Call(key.to_owned(), data, msg_id))
+                        .send(Call(key.to_owned(), data, from_id, msg_id))
                         .unwrap();
 
                     map.insert(key, value);
@@ -138,6 +139,7 @@ impl Data {
                     self.writer_tx
                         .send(Queue(Order {
                             from_id,
+                            to_id: from_id,
                             msg_id,
                             data: message,
                         }))
@@ -172,6 +174,7 @@ impl Data {
                     self.writer_tx
                         .send(Queue(Order {
                             from_id,
+                            to_id: from_id,
                             msg_id,
                             data: message,
                         }))
@@ -203,6 +206,7 @@ impl Data {
                     self.writer_tx
                         .send(Queue(Order {
                             from_id,
+                            to_id: from_id,
                             msg_id,
                             data: message.into(),
                         }))
@@ -234,6 +238,7 @@ impl Data {
                     self.writer_tx
                         .send(Queue(Order {
                             from_id,
+                            to_id: from_id,
                             msg_id,
                             data: message.into(),
                         }))

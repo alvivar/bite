@@ -119,10 +119,10 @@ fn get_header(from: u32, id: u32, size: u32) -> [u8; 6] {
     [byte0, byte1, byte2, byte3, byte4, byte5]
 }
 
-pub fn stamp_header(mut bytes: Vec<u8>, from: u32, id: u32) -> Vec<u8> {
-    let size = (bytes.len() + 6) as u32;
-    bytes.splice(0..0, get_header(from, id, size));
-    bytes
+pub fn stamp_header(mut data: Vec<u8>, from: u32, id: u32) -> Vec<u8> {
+    let size = (data.len() + 6) as u32;
+    data.splice(0..0, get_header(from, id, size));
+    data
 }
 
 fn smaller_size_than_protocol() -> io::Error {

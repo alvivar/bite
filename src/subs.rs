@@ -11,7 +11,7 @@ pub enum Action {
     Add(String, usize, Command),
     Del(String, usize),
     DelAll(usize),
-    Call(String, Vec<u8>, usize),
+    Call(String, Vec<u8>, usize, usize),
 }
 
 pub struct Sub {
@@ -73,7 +73,7 @@ impl Subs {
                     }
                 }
 
-                Action::Call(key, data, msg_id) => {
+                Action::Call(key, data, from_id, msg_id) => {
                     let mut messages = Vec::<Order>::new();
 
                     for alt_key in get_key_combinations(key.as_str()) {
@@ -102,7 +102,8 @@ impl Subs {
                                 };
 
                                 messages.push(Order {
-                                    from_id: sub.id,
+                                    from_id,
+                                    to_id: sub.id,
                                     msg_id,
                                     data,
                                 });

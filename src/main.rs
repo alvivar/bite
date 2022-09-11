@@ -140,6 +140,7 @@ fn main() -> io::Result<()> {
                     writer_tx
                         .send(Queue(Order {
                             from_id: client_id,
+                            to_id: client_id,
                             msg_id: 0,
                             data: [].into(),
                         }))

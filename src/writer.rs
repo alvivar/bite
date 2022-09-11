@@ -16,6 +16,7 @@ pub enum Action {
 
 pub struct Order {
     pub from_id: usize,
+    pub to_id: usize,
     pub msg_id: usize,
     pub data: Vec<u8>,
 }
@@ -52,7 +53,7 @@ impl Writer {
         loop {
             match self.rx.recv().unwrap() {
                 Action::Queue(order) => {
-                    if let Some(connection) = self.writers.lock().unwrap().get_mut(&order.from_id) {
+                    if let Some(connection) = self.writers.lock().unwrap().get_mut(&order.to_id) {
                         connection.to_send.push(stamp_header(
                             order.data,
                             order.from_id as u32,
@@ -66,7 +67,7 @@ impl Writer {
                 Action::QueueAll(orders) => {
                     let mut writers = self.writers.lock().unwrap();
                     for order in orders {
-                        if let Some(connection) = writers.get_mut(&order.from_id) {
+                        if let Some(connection) = writers.get_mut(&order.to_id) {
                             connection.to_send.push(stamp_header(
                                 order.data,
                                 order.from_id as u32,
