@@ -25,12 +25,9 @@ impl DB {
         loop {
             sleep(Duration::new(throttle, 0));
 
-            if !self.modified.load(Ordering::Relaxed) {
-                continue;
+            if self.modified.swap(false, Ordering::Relaxed) {
+                self.save_to_file();
             }
-
-            self.modified.swap(false, Ordering::Relaxed);
-            self.save_to_file();
         }
     }
 
@@ -50,14 +47,13 @@ impl DB {
             return;
         }
 
-        let mut map = self.data.lock().unwrap();
-
-        let data = match bincode::deserialize::<BTreeMap<String, Vec<u8>>>(&content[..]) {
-            Ok(data) => data,
-            Err(_) => BTreeMap::<String, Vec<u8>>::new(),
+        match bincode::deserialize::<BTreeMap<String, Vec<u8>>>(&content[..]) {
+            Ok(data) => {
+                let mut map = self.data.lock().unwrap();
+                *map = data
+            }
+            Err(_) => return,
         };
-
-        *map = data;
     }
 
     pub fn save_to_file(&self) {
