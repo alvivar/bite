@@ -24,6 +24,7 @@ pub struct Writer {
     poller: Arc<Poller>,
     readers: Arc<Mutex<HashMap<usize, Connection>>>,
     writers: Arc<Mutex<HashMap<usize, Connection>>>,
+    lost: Arc<Mutex<Vec<usize>>>,
     pub tx: Sender<Action>,
     rx: Receiver<Action>,
 }
@@ -33,6 +34,7 @@ impl Writer {
         poller: Arc<Poller>,
         readers: Arc<Mutex<HashMap<usize, Connection>>>,
         writers: Arc<Mutex<HashMap<usize, Connection>>>,
+        lost: Arc<Mutex<Vec<usize>>>,
     ) -> Writer {
         let (tx, rx) = unbounded::<Action>();
 
@@ -40,6 +42,7 @@ impl Writer {
             poller,
             writers,
             readers,
+            lost,
             tx,
             rx,
         }
@@ -100,6 +103,7 @@ impl Writer {
                         let writers = self.writers.lock().unwrap().remove(&id).unwrap();
                         self.poller.delete(&readers.socket).unwrap();
                         self.poller.delete(&writers.socket).unwrap();
+                        self.lost.lock().unwrap().push(id);
                         subs_tx.send(DelAll(id)).unwrap();
                     }
                 }

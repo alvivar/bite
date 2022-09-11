@@ -18,6 +18,7 @@ pub struct Reader {
     poller: Arc<Poller>,
     readers: Arc<Mutex<HashMap<usize, Connection>>>,
     writers: Arc<Mutex<HashMap<usize, Connection>>>,
+    lost: Arc<Mutex<Vec<usize>>>,
     messages: HashMap<usize, Messages>,
     pub tx: Sender<Action>,
     rx: Receiver<Action>,
@@ -28,14 +29,16 @@ impl Reader {
         poller: Arc<Poller>,
         readers: Arc<Mutex<HashMap<usize, Connection>>>,
         writers: Arc<Mutex<HashMap<usize, Connection>>>,
+        lost: Arc<Mutex<Vec<usize>>>,
     ) -> Reader {
-        let (tx, rx) = unbounded::<Action>();
         let messages = HashMap::<usize, Messages>::new();
+        let (tx, rx) = unbounded::<Action>();
 
         Reader {
             poller,
             readers,
             writers,
+            lost,
             messages,
             tx,
             rx,
@@ -131,6 +134,7 @@ impl Reader {
                         let writers = self.writers.lock().unwrap().remove(&id).unwrap();
                         self.poller.delete(&readers.socket).unwrap();
                         self.poller.delete(&writers.socket).unwrap();
+                        self.lost.lock().unwrap().push(id);
                         subs_tx.send(DelAll(id)).unwrap();
                     }
                 }

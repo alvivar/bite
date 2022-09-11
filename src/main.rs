@@ -41,13 +41,26 @@ fn main() -> io::Result<()> {
     let readers = Arc::new(Mutex::new(readers));
     let writers = HashMap::<usize, Connection>::new();
     let writers = Arc::new(Mutex::new(writers));
+    let lost = Arc::new(Mutex::new(Vec::<usize>::new()));
 
     // The reader
-    let mut reader = Reader::new(poller.clone(), readers.clone(), writers.clone());
+    let mut reader = Reader::new(
+        poller.clone(),
+        readers.clone(),
+        writers.clone(),
+        lost.clone(),
+    );
+
     let reader_tx = reader.tx.clone();
 
     // The writer
-    let writer = Writer::new(poller.clone(), readers.clone(), writers.clone());
+    let writer = Writer::new(
+        poller.clone(),
+        readers.clone(),
+        writers.clone(),
+        lost.clone(),
+    );
+
     let writer_tx = writer.tx.clone();
     let subs_writer_tx = writer.tx.clone();
     let data_writer_tx = writer.tx.clone();
@@ -74,7 +87,7 @@ fn main() -> io::Result<()> {
     db.load_from_file();
 
     // Threads
-    thread::spawn(move || db.handle(3));
+    thread::spawn(move || db.handle(4));
     thread::spawn(move || data.handle(db_modified));
     thread::spawn(move || subs.handle(subs_writer_tx));
     thread::spawn(move || writer.handle(writer_subs_tx));
@@ -96,37 +109,41 @@ fn main() -> io::Result<()> {
                     reader.set_nonblocking(true)?;
                     let writer = reader.try_clone().unwrap();
 
-                    println!("\nConnection #{} from {}", id_count, addr);
+                    // The client id
+                    let mut client_id = id_count;
+                    match lost.lock().unwrap().pop() {
+                        Some(lost) => client_id = lost,
+                        None => id_count += 1,
+                    }
+
+                    println!("\nConnection #{} from {}", client_id, addr);
 
                     // The server continues listening for more clients, always 0.
                     poller.modify(&server, Event::readable(0))?;
 
                     // Register the reader socket for reading events.
-                    poller.add(&reader, Event::readable(id_count))?;
+                    poller.add(&reader, Event::readable(client_id))?;
                     readers
                         .lock()
                         .unwrap()
-                        .insert(id_count, Connection::new(id_count, reader, addr));
+                        .insert(client_id, Connection::new(client_id, reader, addr));
 
                     // Save the writer socket for later use.
-                    poller.add(&writer, Event::none(id_count))?;
+                    poller.add(&writer, Event::none(client_id))?;
                     writers
                         .lock()
                         .unwrap()
-                        .insert(id_count, Connection::new(id_count, writer, addr));
+                        .insert(client_id, Connection::new(client_id, writer, addr));
 
                     // The first message to the client is his id, so it can add
                     // it on all his messages or it would get disconnected.
                     writer_tx
                         .send(Queue(Order {
-                            from_id: id_count,
+                            from_id: client_id,
                             msg_id: 0,
                             data: [].into(),
                         }))
                         .unwrap();
-
-                    // Next.
-                    id_count += 1;
                 }
 
                 id if ev.readable => reader_tx.send(Read(id)).unwrap(),
