@@ -74,7 +74,7 @@ impl Parser {
                     let utf8 = String::from_utf8_lossy(&message.data);
                     let mut text = utf8.to_string();
 
-                    let limit = 256;
+                    let limit = 128;
                     if utf8.len() > limit {
                         text = truncate(&utf8, limit).into();
                         let add = format!(" (..{})", limit);
