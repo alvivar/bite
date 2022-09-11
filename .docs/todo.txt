@@ -39,6 +39,7 @@
 
 
 9/10/2022
+    x Subscribers receive the game header from the sender, now we have a to_id and from_id to differentiate.
     x Deal with losts ids, because we can't have more than 65535 of them and this is a weakness.
     x Deal with validating the id of the client.
 
