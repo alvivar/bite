@@ -260,8 +260,8 @@ impl Parser {
     }
 }
 
-/// Returns a Message with the first character found as command,
-/// the next word as key, and the rest as value.
+/// Returns a Message with the first characters found as command, the next word
+/// as key, and the rest as value.
 
 /// This text: + hello world is a pretty old meme
 /// Returns: Message { Command::Append, "hello", "world is a pretty old meme" }
