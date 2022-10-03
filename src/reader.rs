@@ -130,10 +130,10 @@ impl Reader {
 
                     if closed {
                         self.messages.remove(&id);
-                        let readers = self.readers.lock().unwrap().remove(&id).unwrap();
-                        let writers = self.writers.lock().unwrap().remove(&id).unwrap();
-                        self.poller.delete(&readers.socket).unwrap();
-                        self.poller.delete(&writers.socket).unwrap();
+                        let reader = self.readers.lock().unwrap().remove(&id).unwrap();
+                        let writer = self.writers.lock().unwrap().remove(&id).unwrap();
+                        self.poller.delete(&reader.socket).unwrap();
+                        self.poller.delete(&writer.socket).unwrap();
                         self.lost.lock().unwrap().push(id);
                         subs_tx.send(DelAll(id)).unwrap();
                     }
