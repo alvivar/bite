@@ -23,6 +23,6 @@ You also have a **System.Action<Byte[]>** to subscribe.
 
 Bonus: There are some static utility to deal with string to ints, floats or longs.
 
-    int i = Bite.Int("Try or default ->", 1984);
+    int i = Bitf.Int("Try or default ->", 1984);
 
 Check out the **Unity** [**Analytics.cs**](https://github.com/alvivar/bite/blob/master/.csharp/Analytics.cs) example!
