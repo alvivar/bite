@@ -20,16 +20,31 @@ use crate::writer::{Action::Write, Writer};
 use polling::{Event, Poller};
 
 use std::collections::HashMap;
+use std::env;
 use std::io;
 use std::net::TcpListener;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
 fn main() -> io::Result<()> {
-    println!("\nBIT:E");
+    println!("\nBIT:E\n");
+
+    // Address by config if needed.
+    let server = match env::var("SERVER") {
+        Ok(var) => {
+            println!("Running at {}", var);
+            var
+        }
+        Err(_) => {
+            println!("Running at 0.0.0.0:1984");
+            println!("To change the address use the SERVER environment variable.");
+            println!("BASH i.e: export SERVER=0.0.0.0:1984");
+            "0.0.0.0:1984".to_owned()
+        }
+    };
 
     // The server and the smol Poller.
-    let server = TcpListener::bind("0.0.0.0:1984")?;
+    let server = TcpListener::bind(server)?;
     server.set_nonblocking(true)?;
 
     let poller = Poller::new()?;
