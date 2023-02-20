@@ -64,7 +64,7 @@ impl Reader {
                                     // connection.closed = true;
                                     // ^ This is already hapenning inside try_read() on errors.
 
-                                    println!("\nConnection #{} closed, read failed: {}", id, err);
+                                    println!("\nConnection #{id} closed, read failed: {err}");
 
                                     break;
                                 }
@@ -93,7 +93,7 @@ impl Reader {
                                 Received::Error(err) => {
                                     connection.closed = true;
 
-                                    println!("\nConnection #{} closed, feed failed: {}", id, err);
+                                    println!("\nConnection #{id} closed, feed failed: {err}");
 
                                     break;
                                 }
@@ -104,7 +104,7 @@ impl Reader {
                                     connection.closed = true;
 
                                     let err = format!("message client id #{} is wrong", message.id);
-                                    println!("\nConnection #{} closed, bad message: {}", id, err);
+                                    println!("\nConnection #{id} closed, bad message: {err}");
 
                                     break;
                                 }
@@ -114,7 +114,7 @@ impl Reader {
                                 Err(err) => {
                                     connection.closed = true;
 
-                                    println!("\nConnection #{} closed, bad message: {}", id, err);
+                                    println!("\nConnection #{id} closed, bad message: {err}");
 
                                     break;
                                 }

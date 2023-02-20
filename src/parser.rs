@@ -77,11 +77,11 @@ impl Parser {
                     let limit = 128;
                     if utf8.len() > limit {
                         text = truncate(&utf8, limit).into();
-                        let add = format!(" (..{})", limit);
+                        let add = format!(" (..{limit})");
                         text.push_str(&add);
                     };
 
-                    println!("\n{} ({} bytes): {}", addr, message.data.len(), text);
+                    println!("\n{addr} ({} bytes): {text}", message.data.len());
 
                     let from_id = message.from as usize;
                     let msg_id = message.id as usize;

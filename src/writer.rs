@@ -87,7 +87,7 @@ impl Writer {
                             let data = connection.send_queue.remove(0);
 
                             if let Err(err) = connection.try_write(data) {
-                                println!("\nConnection #{} broken, write failed: {}", id, err);
+                                println!("\nConnection #{id} broken, write failed: {err}");
                             }
 
                             connection.last_write = Instant::now();

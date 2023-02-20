@@ -34,7 +34,7 @@ fn main() -> io::Result<()> {
     // Address by config if needed.
     let server = match env::var("SERVER") {
         Ok(var) => {
-            println!("Running at {}", var);
+            println!("Running at {var}");
             var
         }
         Err(_) => {
@@ -138,7 +138,7 @@ fn main() -> io::Result<()> {
                         None => id_count += 1,
                     }
 
-                    println!("\nConnection #{} from {}", client_id, addr);
+                    println!("\nConnection #{client_id} from {addr}");
 
                     // The server continues listening for more clients, always 0.
                     poller.modify(&server, Event::readable(0))?;

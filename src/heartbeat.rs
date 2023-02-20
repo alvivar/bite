@@ -41,7 +41,7 @@ impl Heartbeat {
                         conn.closed = true;
                         conn.socket.shutdown(Shutdown::Both).unwrap();
 
-                        println!("Shutting down Reader #{}, timed out", id);
+                        println!("Shutting down Reader #{id}, timed out");
                     }
                 }
             }
@@ -51,8 +51,8 @@ impl Heartbeat {
 
                 let mut messages = Vec::<Order>::new();
                 let mut writers = self.writers.lock().unwrap();
-                for (id, conn) in writers.iter_mut() {
-                    if conn.last_write.elapsed().as_secs() > WRITE_TICK {
+                for (id, connection) in writers.iter_mut() {
+                    if connection.last_write.elapsed().as_secs() > WRITE_TICK {
                         messages.push(Order {
                             from_id: 0,
                             to_id: *id,
@@ -60,7 +60,7 @@ impl Heartbeat {
                             data: "PING".into(),
                         });
 
-                        println!("PING sent to Writer #{}", id);
+                        println!("PING sent to Writer #{id}");
                     }
                 }
 

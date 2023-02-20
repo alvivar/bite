@@ -47,13 +47,10 @@ impl DB {
             return;
         }
 
-        match bincode::deserialize::<BTreeMap<String, Vec<u8>>>(&content[..]) {
-            Ok(data) => {
-                let mut map = self.data.lock().unwrap();
-                *map = data
-            }
-            Err(_) => return,
-        };
+        if let Ok(data) = bincode::deserialize::<BTreeMap<String, Vec<u8>>>(&content[..]) {
+            let mut map = self.data.lock().unwrap();
+            *map = data;
+        }
     }
 
     pub fn save_to_file(&self) {
@@ -68,6 +65,7 @@ impl DB {
         let data: Vec<u8> = bincode::serialize(&*map).unwrap();
         file.unwrap().write_all(&data[..]).unwrap();
 
-        println!("\n{} saved", DB_FILE.split('/').last().unwrap());
+        let filename = DB_FILE.split('/').last().unwrap();
+        println!("\n{filename} saved");
     }
 }

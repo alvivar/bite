@@ -190,7 +190,7 @@ impl Data {
                         .map(|(k, v)| (k.as_str(), v))
                         .collect();
 
-                    let json = kv_to_json(&*key_value);
+                    let json = kv_to_json(&key_value);
 
                     // [!] Returns the pointer.
                     // Always returns everything when the key is empty.
@@ -222,7 +222,7 @@ impl Data {
                         .map(|(k, v)| (k.as_str(), v))
                         .collect();
 
-                    let json = kv_to_json(&*kv);
+                    let json = kv_to_json(&kv);
 
                     // [!] Returns the json, but only if the pointer is real.
                     // Always returns everything when the key is empty.
