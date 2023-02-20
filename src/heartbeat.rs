@@ -41,6 +41,7 @@ impl Heartbeat {
                     println!("\nShutting down Reader #{id}, timed out");
                 }
             }
+            drop(readers);
 
             // Writers
 
@@ -60,6 +61,7 @@ impl Heartbeat {
                     println!("\nPING sent to Writer #{id}");
                 }
             }
+            drop(writers);
 
             if !messages.is_empty() {
                 writer_tx.send(QueueAll(messages)).unwrap();
