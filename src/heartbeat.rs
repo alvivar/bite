@@ -7,10 +7,10 @@ use std::collections::HashMap;
 use std::net::Shutdown;
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-const READ_TICK: u64 = 10;
-const WRITE_TICK: u64 = 30;
+const TIMEOUT_30: u64 = 30;
+const TIMEOUT_60: u64 = 60;
 
 pub struct Heartbeat {
     readers: Arc<Mutex<HashMap<usize, Connection>>>,
@@ -26,47 +26,43 @@ impl Heartbeat {
     }
 
     pub fn handle(&self, writer_tx: Sender<writer::Action>) {
-        let mut read_ticker = Instant::now();
-        let mut write_ticker = Instant::now();
-
         loop {
-            sleep(Duration::from_secs(READ_TICK + 1));
+            // Readers
 
-            if read_ticker.elapsed().as_secs() > READ_TICK {
-                read_ticker = Instant::now();
+            sleep(Duration::from_secs(TIMEOUT_30));
 
-                let mut readers = self.readers.lock().unwrap();
-                for (id, conn) in readers.iter_mut() {
-                    if conn.pending_read && conn.last_read.elapsed().as_secs() > READ_TICK {
-                        conn.closed = true;
-                        conn.socket.shutdown(Shutdown::Both).unwrap();
+            let mut readers = self.readers.lock().unwrap();
+            for (id, connection) in readers.iter_mut() {
+                let elapsed = connection.last_read.elapsed().as_secs();
+                if connection.pending_read && elapsed > TIMEOUT_30 {
+                    connection.closed = true;
+                    connection.socket.shutdown(Shutdown::Both).unwrap();
 
-                        println!("Shutting down Reader #{id}, timed out");
-                    }
+                    println!("\nShutting down Reader #{id}, timed out");
                 }
             }
 
-            if write_ticker.elapsed().as_secs() > WRITE_TICK {
-                write_ticker = Instant::now();
+            // Writers
 
-                let mut messages = Vec::<Order>::new();
-                let mut writers = self.writers.lock().unwrap();
-                for (id, connection) in writers.iter_mut() {
-                    if connection.last_write.elapsed().as_secs() > WRITE_TICK {
-                        messages.push(Order {
-                            from_id: 0,
-                            to_id: *id,
-                            msg_id: 0,
-                            data: "PING".into(),
-                        });
+            sleep(Duration::from_secs(TIMEOUT_30));
 
-                        println!("PING sent to Writer #{id}");
-                    }
+            let mut messages = Vec::<Order>::new();
+            let mut writers = self.writers.lock().unwrap();
+            for (id, connection) in writers.iter_mut() {
+                if connection.last_write.elapsed().as_secs() > TIMEOUT_60 {
+                    messages.push(Order {
+                        from_id: 0,
+                        to_id: *id,
+                        msg_id: 0,
+                        data: [].into(),
+                    });
+
+                    println!("\nPING sent to Writer #{id}");
                 }
+            }
 
-                if !messages.is_empty() {
-                    writer_tx.send(QueueAll(messages)).unwrap();
-                }
+            if !messages.is_empty() {
+                writer_tx.send(QueueAll(messages)).unwrap();
             }
         }
     }
