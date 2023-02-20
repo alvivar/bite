@@ -7,6 +7,7 @@ use polling::{Event, Poller};
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 pub enum Action {
     Queue(Order),
@@ -25,7 +26,7 @@ pub struct Writer {
     poller: Arc<Poller>,
     readers: Arc<Mutex<HashMap<usize, Connection>>>,
     writers: Arc<Mutex<HashMap<usize, Connection>>>,
-    lost: Arc<Mutex<Vec<usize>>>,
+    used_ids: Arc<Mutex<Vec<usize>>>,
     pub tx: Sender<Action>,
     rx: Receiver<Action>,
 }
@@ -35,7 +36,7 @@ impl Writer {
         poller: Arc<Poller>,
         readers: Arc<Mutex<HashMap<usize, Connection>>>,
         writers: Arc<Mutex<HashMap<usize, Connection>>>,
-        lost: Arc<Mutex<Vec<usize>>>,
+        used_ids: Arc<Mutex<Vec<usize>>>,
     ) -> Writer {
         let (tx, rx) = unbounded::<Action>();
 
@@ -43,7 +44,7 @@ impl Writer {
             poller,
             writers,
             readers,
-            lost,
+            used_ids,
             tx,
             rx,
         }
@@ -54,7 +55,7 @@ impl Writer {
             match self.rx.recv().unwrap() {
                 Action::Queue(order) => {
                     if let Some(connection) = self.writers.lock().unwrap().get_mut(&order.to_id) {
-                        connection.to_send.push(stamp_header(
+                        connection.send_queue.push(stamp_header(
                             order.data,
                             order.from_id as u32,
                             order.msg_id as u32,
@@ -68,7 +69,7 @@ impl Writer {
                     let mut writers = self.writers.lock().unwrap();
                     for order in orders {
                         if let Some(connection) = writers.get_mut(&order.to_id) {
-                            connection.to_send.push(stamp_header(
+                            connection.send_queue.push(stamp_header(
                                 order.data,
                                 order.from_id as u32,
                                 order.msg_id as u32,
@@ -82,17 +83,19 @@ impl Writer {
                 Action::Write(id) => {
                     let mut closed = false;
                     if let Some(connection) = self.writers.lock().unwrap().get_mut(&id) {
-                        if !connection.to_send.is_empty() {
-                            let data = connection.to_send.remove(0);
+                        while !connection.send_queue.is_empty() {
+                            let data = connection.send_queue.remove(0);
 
                             if let Err(err) = connection.try_write(data) {
                                 println!("\nConnection #{} broken, write failed: {}", id, err);
                             }
+
+                            connection.last_write = Instant::now();
                         }
 
                         if connection.closed {
                             closed = true;
-                        } else if !connection.to_send.is_empty() {
+                        } else if !connection.send_queue.is_empty() {
                             self.poll_write(connection);
                         } else {
                             self.poll_clean(connection);
@@ -104,7 +107,7 @@ impl Writer {
                         let writer = self.writers.lock().unwrap().remove(&id).unwrap();
                         self.poller.delete(&reader.socket).unwrap();
                         self.poller.delete(&writer.socket).unwrap();
-                        self.lost.lock().unwrap().push(id);
+                        self.used_ids.lock().unwrap().push(id);
                         subs_tx.send(DelAll(id)).unwrap();
                     }
                 }

@@ -9,6 +9,7 @@ use polling::{Event, Poller};
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 pub enum Action {
     Read(usize),
@@ -18,7 +19,7 @@ pub struct Reader {
     poller: Arc<Poller>,
     readers: Arc<Mutex<HashMap<usize, Connection>>>,
     writers: Arc<Mutex<HashMap<usize, Connection>>>,
-    lost: Arc<Mutex<Vec<usize>>>,
+    used_ids: Arc<Mutex<Vec<usize>>>,
     messages: HashMap<usize, Messages>,
     pub tx: Sender<Action>,
     rx: Receiver<Action>,
@@ -29,7 +30,7 @@ impl Reader {
         poller: Arc<Poller>,
         readers: Arc<Mutex<HashMap<usize, Connection>>>,
         writers: Arc<Mutex<HashMap<usize, Connection>>>,
-        lost: Arc<Mutex<Vec<usize>>>,
+        used_ids: Arc<Mutex<Vec<usize>>>,
     ) -> Reader {
         let messages = HashMap::<usize, Messages>::new();
         let (tx, rx) = unbounded::<Action>();
@@ -38,7 +39,7 @@ impl Reader {
             poller,
             readers,
             writers,
-            lost,
+            used_ids,
             messages,
             tx,
             rx,
@@ -75,10 +76,17 @@ impl Reader {
                             let received = match messages.feed(data) {
                                 Received::None => break,
 
-                                Received::Complete(received) => received,
+                                Received::Complete(received) => {
+                                    connection.pending_read = false;
+                                    connection.last_read = Instant::now();
+                                    received
+                                }
 
                                 Received::Pending(received) => {
                                     pending = true;
+                                    connection.pending_read = true;
+                                    connection.last_read = Instant::now();
+
                                     received
                                 }
 
@@ -134,7 +142,7 @@ impl Reader {
                         let writer = self.writers.lock().unwrap().remove(&id).unwrap();
                         self.poller.delete(&reader.socket).unwrap();
                         self.poller.delete(&writer.socket).unwrap();
-                        self.lost.lock().unwrap().push(id);
+                        self.used_ids.lock().unwrap().push(id);
                         subs_tx.send(DelAll(id)).unwrap();
                     }
                 }

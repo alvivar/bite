@@ -1,6 +1,7 @@
 mod connection;
 mod data;
 mod db;
+mod heartbeat;
 mod message;
 mod parser;
 mod reader;
@@ -10,6 +11,7 @@ mod writer;
 use crate::connection::Connection;
 use crate::data::Data;
 use crate::db::DB;
+use crate::heartbeat::Heartbeat;
 use crate::parser::Parser;
 use crate::reader::{Action::Read, Reader};
 use crate::subs::Subs;
@@ -39,7 +41,7 @@ fn main() -> io::Result<()> {
             println!("Running at 0.0.0.0:1984");
             println!("To change the address use the SERVER environment variable.");
             println!("BASH i.e: export SERVER=0.0.0.0:1984");
-            "0.0.0.0:1984".to_owned()
+            "0.0.0.0:1984".into()
         }
     };
 
@@ -56,14 +58,14 @@ fn main() -> io::Result<()> {
     let readers = Arc::new(Mutex::new(readers));
     let writers = HashMap::<usize, Connection>::new();
     let writers = Arc::new(Mutex::new(writers));
-    let lost = Arc::new(Mutex::new(Vec::<usize>::new()));
+    let used_ids = Arc::new(Mutex::new(Vec::<usize>::new()));
 
     // The reader
     let mut reader = Reader::new(
         poller.clone(),
         readers.clone(),
         writers.clone(),
-        lost.clone(),
+        used_ids.clone(),
     );
 
     let reader_tx = reader.tx.clone();
@@ -73,13 +75,14 @@ fn main() -> io::Result<()> {
         poller.clone(),
         readers.clone(),
         writers.clone(),
-        lost.clone(),
+        used_ids.clone(),
     );
 
     let writer_tx = writer.tx.clone();
     let subs_writer_tx = writer.tx.clone();
     let data_writer_tx = writer.tx.clone();
     let parser_writer_tx = writer.tx.clone();
+    let heartbeat_writer_tx = writer.tx.clone();
 
     // The parser
     let parser = Parser::new();
@@ -101,6 +104,9 @@ fn main() -> io::Result<()> {
     let db_modified = db.modified.clone();
     db.load_from_file();
 
+    // Heartbeat
+    let heartbeat = Heartbeat::new(readers.clone(), writers.clone());
+
     // Threads
     thread::spawn(move || db.handle(4));
     thread::spawn(move || data.handle(db_modified));
@@ -108,6 +114,7 @@ fn main() -> io::Result<()> {
     thread::spawn(move || writer.handle(writer_subs_tx));
     thread::spawn(move || reader.handle(reader_parser_tx, reader_subs_tx));
     thread::spawn(move || parser.handle(parser_data_tx, parser_writer_tx, parser_subs_tx));
+    thread::spawn(move || heartbeat.handle(heartbeat_writer_tx));
 
     // Connections and events via smol Poller.
     let mut id_count: usize = 1; // 0 belongs to the main TcpListener.
@@ -126,8 +133,8 @@ fn main() -> io::Result<()> {
 
                     // The client id
                     let mut client_id = id_count;
-                    match lost.lock().unwrap().pop() {
-                        Some(lost) => client_id = lost,
+                    match used_ids.lock().unwrap().pop() {
+                        Some(id) => client_id = id,
                         None => id_count += 1,
                     }
 

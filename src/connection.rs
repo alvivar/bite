@@ -1,24 +1,31 @@
 use std::io::ErrorKind::{BrokenPipe, Interrupted, WouldBlock, WriteZero};
 use std::io::{self, Read, Write};
 use std::net::{SocketAddr, TcpStream};
+use std::time::Instant;
 
 pub struct Connection {
     pub id: usize,
     pub socket: TcpStream,
     pub addr: SocketAddr,
-    pub to_send: Vec<Vec<u8>>,
+    pub send_queue: Vec<Vec<u8>>,
+    pub pending_read: bool,
+    pub last_read: Instant,
+    pub last_write: Instant,
     pub closed: bool,
 }
 
 impl Connection {
     pub fn new(id: usize, socket: TcpStream, addr: SocketAddr) -> Connection {
-        let to_send = Vec::<Vec<u8>>::new();
+        let send_queue = Vec::<Vec<u8>>::new();
 
         Connection {
             id,
             socket,
             addr,
-            to_send,
+            send_queue,
+            pending_read: false,
+            last_read: Instant::now(),
+            last_write: Instant::now(),
             closed: false,
         }
     }
