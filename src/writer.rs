@@ -83,7 +83,7 @@ impl Writer {
                 Action::Write(id) => {
                     let mut closed = false;
                     if let Some(connection) = self.writers.lock().unwrap().get_mut(&id) {
-                        while !connection.send_queue.is_empty() {
+                        if !connection.send_queue.is_empty() {
                             let data = connection.send_queue.remove(0);
 
                             if let Err(err) = connection.try_write(data) {
