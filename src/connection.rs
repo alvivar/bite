@@ -1,7 +1,9 @@
-use std::io::ErrorKind::{BrokenPipe, Interrupted, WouldBlock, WriteZero};
+use std::io::ErrorKind::{BrokenPipe, Interrupted, WouldBlock};
 use std::io::{self, Read, Write};
 use std::net::{SocketAddr, TcpStream};
 use std::time::Instant;
+
+const BUFFER_SIZE: usize = 8192;
 
 pub struct Connection {
     pub id: usize,
@@ -55,15 +57,13 @@ impl Connection {
     }
 }
 
-// Both functions below were taken and modified from Tokio/mio client server
-// example.
-
 fn read(socket: &mut TcpStream) -> io::Result<Vec<u8>> {
-    let mut received = vec![0; 8192];
-    let mut bytes_read = 0;
+    let mut buffer = Vec::with_capacity(BUFFER_SIZE);
 
     loop {
-        match socket.read(&mut received[bytes_read..]) {
+        let mut chunk = vec![0; BUFFER_SIZE];
+
+        match socket.read(&mut chunk) {
             Ok(0) => {
                 // Reading 0 bytes means the other side has closed the
                 // connection or is done writing, then so are we.
@@ -71,9 +71,10 @@ fn read(socket: &mut TcpStream) -> io::Result<Vec<u8>> {
             }
 
             Ok(n) => {
-                bytes_read += n;
-                if bytes_read == received.len() {
-                    received.resize(received.len() + 1024, 0);
+                buffer.extend_from_slice(&chunk[..n]);
+
+                if n < BUFFER_SIZE {
+                    break;
                 }
             }
 
@@ -81,7 +82,7 @@ fn read(socket: &mut TcpStream) -> io::Result<Vec<u8>> {
             // connection is not actually ready to perform this I/O operation.
             Err(ref err) if err.kind() == WouldBlock => break,
 
-            // Got interrupted (how rude!), we'll try again.
+            // Got interrupted, we'll try again.
             Err(ref err) if err.kind() == Interrupted => continue,
 
             // Other errors we'll consider fatal.
@@ -89,28 +90,33 @@ fn read(socket: &mut TcpStream) -> io::Result<Vec<u8>> {
         }
     }
 
-    received.truncate(bytes_read);
-
-    Ok(received)
+    Ok(buffer)
 }
 
 fn write(socket: &mut TcpStream, data: Vec<u8>) -> io::Result<usize> {
-    match socket.write(&data) {
-        // We want to write the entire `DATA` buffer in a single go. If we write
-        // less we'll return a short write error (same as `io::Write::write_all`
-        // does).
-        Ok(n) if n < data.len() => Err(WriteZero.into()),
+    let mut total_written = 0;
 
-        Ok(n) => Ok(n),
+    while total_written < data.len() {
+        match socket.write(&data[total_written..]) {
+            Ok(0) => {
+                // Writing 0 bytes means the other side has closed the
+                // connection or is done writing, then so are we.
+                return Err(BrokenPipe.into());
+            }
 
-        // Would block "errors" are the OS's way of saying that the connection
-        // is not actually ready to perform this I/O operation.
-        Err(ref err) if err.kind() == WouldBlock => Err(WouldBlock.into()),
+            Ok(n) => total_written += n,
 
-        // Got interrupted (how rude!), we'll try again.
-        Err(ref err) if err.kind() == Interrupted => write(socket, data),
+            // Would block "errors" are the OS's way of saying that the
+            // connection is not actually ready to perform this I/O operation.
+            Err(ref err) if err.kind() == WouldBlock => return Err(WouldBlock.into()),
 
-        // Other errors we'll consider fatal.
-        Err(err) => Err(err),
+            // Got interrupted, we'll try again.
+            Err(ref err) if err.kind() == Interrupted => continue,
+
+            // Other errors we'll consider fatal.
+            Err(err) => return Err(err),
+        }
     }
+
+    Ok(total_written)
 }
