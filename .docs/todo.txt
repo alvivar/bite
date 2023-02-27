@@ -1,4 +1,6 @@
 
+    Use to_vec instead of to_owned on Vec types.
+
     Think about an evil client trying to saturate the connections or fucking up the server.
     Should we validate the end of a message for more safety or maybe a crc somewhere?
     Should we validate a timeout for the client, or that's already built inside Tcp stuff and need configuration?
