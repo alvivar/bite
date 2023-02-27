@@ -3,10 +3,10 @@ use crate::message::{Message, Messages, Received};
 use crate::parser::Action::Parse;
 use crate::{cleaner, parser};
 
-use crossbeam_channel::{unbounded, Receiver, Sender};
 use polling::{Event, Poller};
 
 use std::collections::HashMap;
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -25,7 +25,7 @@ pub struct Reader {
 impl Reader {
     pub fn new(poller: Arc<Poller>, readers: Arc<Mutex<HashMap<usize, Connection>>>) -> Reader {
         let messages = HashMap::<usize, Messages>::new();
-        let (tx, rx) = unbounded::<Action>();
+        let (tx, rx) = channel::<Action>();
 
         Reader {
             poller,

@@ -2,10 +2,10 @@ use crate::parser::Command;
 use crate::writer::Action::QueueAll;
 use crate::writer::{self, Order};
 
-use crossbeam_channel::{unbounded, Receiver, Sender};
 use serde_json::json;
 
 use std::collections::HashMap;
+use std::sync::mpsc::{channel, Receiver, Sender};
 
 pub enum Action {
     Add(String, usize, Command),
@@ -30,7 +30,7 @@ impl Subs {
     pub fn new() -> Subs {
         let key_subs = HashMap::<String, Vec<Sub>>::new();
         let id_keys = HashMap::<usize, Vec<String>>::new();
-        let (tx, rx) = unbounded::<Action>();
+        let (tx, rx) = channel::<Action>();
 
         Subs {
             key_subs,

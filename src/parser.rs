@@ -6,11 +6,10 @@ use crate::subs::Action::{Add, Call, Del};
 use crate::writer::Order;
 use crate::writer::{self, Action::Queue};
 
-use crossbeam_channel::{unbounded, Receiver, Sender};
-
 use core::fmt::{Debug, Display, Formatter, Result};
 use std::io::Cursor;
 use std::net::SocketAddr;
+use std::sync::mpsc::{channel, Receiver, Sender};
 
 const OK: &str = "OK";
 const NO: &str = "NO";
@@ -57,7 +56,7 @@ pub struct Parser {
 
 impl Parser {
     pub fn new() -> Parser {
-        let (tx, rx) = unbounded::<Action>();
+        let (tx, rx) = channel::<Action>();
 
         Parser { tx, rx }
     }

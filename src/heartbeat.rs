@@ -1,10 +1,9 @@
 use crate::connection::Connection;
 use crate::writer::{self, Action::QueueAll, Order};
 
-use crossbeam_channel::Sender;
-
 use std::collections::HashMap;
 use std::net::Shutdown;
+use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;

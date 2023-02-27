@@ -2,10 +2,10 @@ use crate::cleaner;
 use crate::connection::Connection;
 use crate::message::stamp_header;
 
-use crossbeam_channel::{unbounded, Receiver, Sender};
 use polling::{Event, Poller};
 
 use std::collections::HashMap;
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -31,7 +31,7 @@ pub struct Writer {
 
 impl Writer {
     pub fn new(poller: Arc<Poller>, writers: Arc<Mutex<HashMap<usize, Connection>>>) -> Writer {
-        let (tx, rx) = unbounded::<Action>();
+        let (tx, rx) = channel::<Action>();
 
         Writer {
             poller,

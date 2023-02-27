@@ -1,11 +1,11 @@
 use crate::subs::{self, Action::Call};
 use crate::writer::{self, Action::Queue, Order};
 
-use crossbeam_channel::{unbounded, Receiver, Sender};
 use serde_json::{self, json, Value};
 
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 
 pub enum Action {
@@ -31,7 +31,7 @@ pub struct Data {
 impl Data {
     pub fn new(writer_tx: Sender<writer::Action>, subs_tx: Sender<subs::Action>) -> Data {
         let map = Arc::new(Mutex::new(BTreeMap::<String, Vec<u8>>::new()));
-        let (tx, rx) = unbounded::<Action>();
+        let (tx, rx) = channel::<Action>();
 
         Data {
             map,

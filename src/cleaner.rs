@@ -1,10 +1,10 @@
 use crate::connection::Connection;
 use crate::subs::{self, Action::DelAll};
 
-use crossbeam_channel::{unbounded, Receiver, Sender};
 use polling::Poller;
 
 use std::collections::{HashMap, VecDeque};
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 
 pub enum Action {
@@ -27,7 +27,7 @@ impl Cleaner {
         writers: Arc<Mutex<HashMap<usize, Connection>>>,
         used_ids: Arc<Mutex<VecDeque<usize>>>,
     ) -> Cleaner {
-        let (tx, rx) = unbounded::<Action>();
+        let (tx, rx) = channel::<Action>();
 
         Cleaner {
             poller,
