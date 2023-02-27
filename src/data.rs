@@ -46,9 +46,7 @@ impl Data {
         loop {
             match self.rx.recv().unwrap() {
                 Action::Set(key, val) => {
-                    let mut map = self.map.lock().unwrap();
-
-                    map.insert(key, val);
+                    self.map.lock().unwrap().insert(key, val);
 
                     db_modified.swap(true, Ordering::Relaxed);
                 }
@@ -56,26 +54,35 @@ impl Data {
                 Action::SetIfNone(key, val, from_id, msg_id) => {
                     let mut map = self.map.lock().unwrap();
 
-                    if map.get(&key).is_none() {
-                        self.subs_tx
-                            .send(Call(key.to_owned(), val.to_owned(), from_id, msg_id))
-                            .unwrap();
+                    match map.contains_key(&key) {
+                        true => continue,
 
-                        map.insert(key, val);
+                        false => {
+                            map.insert(key.to_owned(), val.to_owned());
+                            drop(map);
 
-                        db_modified.swap(true, Ordering::Relaxed);
+                            self.subs_tx.send(Call(key, val, from_id, msg_id)).unwrap();
+
+                            db_modified.swap(true, Ordering::Relaxed);
+                        }
                     }
                 }
 
                 Action::Inc(key, from_id, msg_id) => {
-                    let mut map = self.map.lock().unwrap();
+                    let inc_vec = {
+                        let mut map = self.map.lock().unwrap();
 
-                    let inc = match map.get(&key) {
-                        Some(val) => vec_to_u64(val) + 1,
-                        None => 1,
+                        let inc = match map.get(&key) {
+                            Some(val) => vec_to_u64(val) + 1,
+                            None => 1,
+                        };
+
+                        let inc_vec = u64_to_vec(inc);
+
+                        map.insert(key.to_owned(), inc_vec.to_owned());
+
+                        inc_vec
                     };
-
-                    let inc_vec = u64_to_vec(inc);
 
                     self.writer_tx
                         .send(Queue(Order {
@@ -87,10 +94,8 @@ impl Data {
                         .unwrap();
 
                     self.subs_tx
-                        .send(Call(key.to_owned(), inc_vec.to_owned(), from_id, msg_id))
+                        .send(Call(key, inc_vec, from_id, msg_id))
                         .unwrap();
-
-                    map.insert(key, inc_vec);
 
                     db_modified.swap(true, Ordering::Relaxed);
                 }
@@ -100,40 +105,35 @@ impl Data {
 
                     let value = match map.get_mut(&key) {
                         Some(value) => {
-                            value.extend(data.to_owned());
+                            value.extend(data.to_vec());
                             value.to_owned()
                         }
 
                         None => {
                             let mut value = Vec::new();
-                            value.extend(data.to_owned());
+                            value.extend(data.to_vec());
                             value
                         }
                     };
 
-                    self.subs_tx
-                        .send(Call(key.to_owned(), data, from_id, msg_id))
-                        .unwrap();
+                    map.insert(key.to_owned(), value);
+                    drop(map);
 
-                    map.insert(key, value);
+                    self.subs_tx.send(Call(key, data, from_id, msg_id)).unwrap();
 
                     db_modified.swap(true, Ordering::Relaxed);
                 }
 
                 Action::Delete(key) => {
-                    let mut map = self.map.lock().unwrap();
-
-                    if map.remove(&key).is_some() {
+                    if self.map.lock().unwrap().remove(&key).is_some() {
                         db_modified.swap(true, Ordering::Relaxed);
                     }
                 }
 
                 Action::Get(key, from_id, msg_id) => {
-                    let map = self.map.lock().unwrap();
-
-                    let message = match map.get(&key) {
-                        Some(value) => value.to_owned(),
-                        None => Vec::new(),
+                    let message = match self.map.lock().unwrap().get(&key) {
+                        Some(value) => value.to_vec(),
+                        None => [].into(),
                     };
 
                     self.writer_tx
