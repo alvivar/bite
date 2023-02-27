@@ -1,6 +1,6 @@
+use crate::cleaner;
 use crate::connection::Connection;
 use crate::message::stamp_header;
-use crate::subs::{self, Action::DelAll};
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use polling::{Event, Poller};
@@ -24,33 +24,24 @@ pub struct Order {
 
 pub struct Writer {
     poller: Arc<Poller>,
-    readers: Arc<Mutex<HashMap<usize, Connection>>>,
     writers: Arc<Mutex<HashMap<usize, Connection>>>,
-    used_ids: Arc<Mutex<Vec<usize>>>,
     pub tx: Sender<Action>,
     rx: Receiver<Action>,
 }
 
 impl Writer {
-    pub fn new(
-        poller: Arc<Poller>,
-        readers: Arc<Mutex<HashMap<usize, Connection>>>,
-        writers: Arc<Mutex<HashMap<usize, Connection>>>,
-        used_ids: Arc<Mutex<Vec<usize>>>,
-    ) -> Writer {
+    pub fn new(poller: Arc<Poller>, writers: Arc<Mutex<HashMap<usize, Connection>>>) -> Writer {
         let (tx, rx) = unbounded::<Action>();
 
         Writer {
             poller,
             writers,
-            readers,
-            used_ids,
             tx,
             rx,
         }
     }
 
-    pub fn handle(&self, subs_tx: Sender<subs::Action>) {
+    pub fn handle(&self, cleaner_tx: Sender<cleaner::Action>) {
         loop {
             match self.rx.recv().unwrap() {
                 Action::Queue(order) => {
@@ -83,6 +74,10 @@ impl Writer {
                 Action::Write(id) => {
                     let mut closed = false;
                     if let Some(connection) = self.writers.lock().unwrap().get_mut(&id) {
+                        if connection.closed {
+                            return;
+                        }
+
                         if !connection.send_queue.is_empty() {
                             let data = connection.send_queue.remove(0);
 
@@ -103,12 +98,7 @@ impl Writer {
                     }
 
                     if closed {
-                        let reader = self.readers.lock().unwrap().remove(&id).unwrap();
-                        let writer = self.writers.lock().unwrap().remove(&id).unwrap();
-                        self.poller.delete(&reader.socket).unwrap();
-                        self.poller.delete(&writer.socket).unwrap();
-                        self.used_ids.lock().unwrap().push(id);
-                        subs_tx.send(DelAll(id)).unwrap();
+                        cleaner_tx.send(cleaner::Action::Drop(id)).unwrap();
                     }
                 }
             }

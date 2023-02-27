@@ -1,3 +1,4 @@
+mod cleaner;
 mod connection;
 mod data;
 mod db;
@@ -8,6 +9,7 @@ mod reader;
 mod subs;
 mod writer;
 
+use crate::cleaner::Cleaner;
 use crate::connection::Connection;
 use crate::data::Data;
 use crate::db::DB;
@@ -15,9 +17,8 @@ use crate::heartbeat::Heartbeat;
 use crate::parser::Parser;
 use crate::reader::{Action::Read, Reader};
 use crate::subs::Subs;
-use crate::writer::Action::Queue;
-use crate::writer::Order;
-use crate::writer::{Action::Write, Writer};
+use crate::writer::Action::{Queue, Write};
+use crate::writer::{Order, Writer};
 
 use polling::{Event, Poller};
 
@@ -33,17 +34,17 @@ fn main() -> io::Result<()> {
 
     // Address by config if needed.
     let server = match env::var("SERVER") {
-        Ok(var) => {
-            println!("Running at {var}");
-            var
-        }
+        Ok(var) => var,
         Err(_) => {
-            println!("Running at 0.0.0.0:1984");
             println!("To change the address use the SERVER environment variable.");
             println!("BASH i.e: export SERVER=0.0.0.0:1984");
-            "0.0.0.0:1984".into()
+            // "0.0.0.0:1984".into()
+
+            "127.0.0.1:1984".into()
         }
     };
+
+    println!("\nRunning at {server}");
 
     // The server and the smol Poller.
     let server = TcpListener::bind(server)?;
@@ -61,22 +62,12 @@ fn main() -> io::Result<()> {
     let used_ids = Arc::new(Mutex::new(Vec::<usize>::new()));
 
     // The reader
-    let mut reader = Reader::new(
-        poller.clone(),
-        readers.clone(),
-        writers.clone(),
-        used_ids.clone(),
-    );
+    let mut reader = Reader::new(poller.clone(), readers.clone());
 
     let reader_tx = reader.tx.clone();
 
     // The writer
-    let writer = Writer::new(
-        poller.clone(),
-        readers.clone(),
-        writers.clone(),
-        used_ids.clone(),
-    );
+    let writer = Writer::new(poller.clone(), readers.clone());
 
     let writer_tx = writer.tx.clone();
     let subs_writer_tx = writer.tx.clone();
@@ -90,10 +81,9 @@ fn main() -> io::Result<()> {
 
     // Subs
     let mut subs = Subs::new();
-    let writer_subs_tx = subs.tx.clone();
     let data_subs_tx = subs.tx.clone();
-    let reader_subs_tx = subs.tx.clone();
     let parser_subs_tx = subs.tx.clone();
+    let cleaner_subs_tx = subs.tx.clone();
 
     // Data & DB
     let data = Data::new(data_writer_tx, data_subs_tx);
@@ -104,6 +94,16 @@ fn main() -> io::Result<()> {
     let db_modified = db.modified.clone();
     db.load_from_file();
 
+    // Cleaner
+    let cleaner = Cleaner::new(
+        poller.clone(),
+        readers.clone(),
+        writers.clone(),
+        used_ids.clone(),
+    );
+    let reader_cleaner_tx = cleaner.tx.clone();
+    let writer_cleaner_tx = cleaner.tx.clone();
+
     // Heartbeat
     let heartbeat = Heartbeat::new(readers.clone(), writers.clone());
 
@@ -111,10 +111,11 @@ fn main() -> io::Result<()> {
     thread::spawn(move || db.handle(4));
     thread::spawn(move || data.handle(db_modified));
     thread::spawn(move || subs.handle(subs_writer_tx));
-    thread::spawn(move || writer.handle(writer_subs_tx));
-    thread::spawn(move || reader.handle(reader_parser_tx, reader_subs_tx));
     thread::spawn(move || parser.handle(parser_data_tx, parser_writer_tx, parser_subs_tx));
+    // thread::spawn(move || cleaner.handle(cleaner_subs_tx));
     thread::spawn(move || heartbeat.handle(heartbeat_writer_tx));
+    thread::spawn(move || reader.handle(reader_parser_tx, reader_cleaner_tx));
+    thread::spawn(move || writer.handle(writer_cleaner_tx));
 
     // Connections and events via smol Poller.
     let mut id_count: usize = 1; // 0 belongs to the main TcpListener.
@@ -132,11 +133,13 @@ fn main() -> io::Result<()> {
                     let writer = reader.try_clone().unwrap();
 
                     // The client id
-                    let mut client_id = id_count;
-                    match used_ids.lock().unwrap().pop() {
-                        Some(id) => client_id = id,
-                        None => id_count += 1,
-                    }
+                    let client_id = match used_ids.lock().unwrap().pop() {
+                        Some(id) => id,
+                        None => {
+                            id_count += 1;
+                            id_count
+                        }
+                    };
 
                     println!("\nConnection #{client_id} from {addr}");
 

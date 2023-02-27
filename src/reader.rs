@@ -1,8 +1,7 @@
 use crate::connection::Connection;
 use crate::message::{Message, Messages, Received};
 use crate::parser::Action::Parse;
-use crate::subs::Action::DelAll;
-use crate::{parser, subs};
+use crate::{cleaner, parser};
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use polling::{Event, Poller};
@@ -18,41 +17,40 @@ pub enum Action {
 pub struct Reader {
     poller: Arc<Poller>,
     readers: Arc<Mutex<HashMap<usize, Connection>>>,
-    writers: Arc<Mutex<HashMap<usize, Connection>>>,
-    used_ids: Arc<Mutex<Vec<usize>>>,
     messages: HashMap<usize, Messages>,
     pub tx: Sender<Action>,
     rx: Receiver<Action>,
 }
 
 impl Reader {
-    pub fn new(
-        poller: Arc<Poller>,
-        readers: Arc<Mutex<HashMap<usize, Connection>>>,
-        writers: Arc<Mutex<HashMap<usize, Connection>>>,
-        used_ids: Arc<Mutex<Vec<usize>>>,
-    ) -> Reader {
+    pub fn new(poller: Arc<Poller>, readers: Arc<Mutex<HashMap<usize, Connection>>>) -> Reader {
         let messages = HashMap::<usize, Messages>::new();
         let (tx, rx) = unbounded::<Action>();
 
         Reader {
             poller,
             readers,
-            writers,
-            used_ids,
             messages,
             tx,
             rx,
         }
     }
 
-    pub fn handle(&mut self, parser_tx: Sender<parser::Action>, subs_tx: Sender<subs::Action>) {
+    pub fn handle(
+        &mut self,
+        parser_tx: Sender<parser::Action>,
+        cleaner_tx: Sender<cleaner::Action>,
+    ) {
         loop {
             match self.rx.recv().unwrap() {
                 Action::Read(id) => {
                     let mut closed = false;
 
                     if let Some(connection) = self.readers.lock().unwrap().get_mut(&id) {
+                        if connection.closed {
+                            return;
+                        }
+
                         loop {
                             // Loop because "received" could have more than one
                             // message in the same read.
@@ -138,12 +136,7 @@ impl Reader {
 
                     if closed {
                         self.messages.remove(&id);
-                        let reader = self.readers.lock().unwrap().remove(&id).unwrap();
-                        let writer = self.writers.lock().unwrap().remove(&id).unwrap();
-                        self.poller.delete(&reader.socket).unwrap();
-                        self.poller.delete(&writer.socket).unwrap();
-                        self.used_ids.lock().unwrap().push(id);
-                        subs_tx.send(DelAll(id)).unwrap();
+                        cleaner_tx.send(cleaner::Action::Drop(id)).unwrap();
                     }
                 }
             }
