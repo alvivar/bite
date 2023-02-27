@@ -43,13 +43,15 @@ impl Cleaner {
         loop {
             match self.rx.recv().unwrap() {
                 Action::Drop(id) => {
-                    if let Some(reader) = self.readers.lock().unwrap().remove(&id) {
+                    let reader = self.readers.lock().unwrap().remove(&id);
+                    if let Some(reader) = reader {
                         self.poller.delete(&reader.socket).unwrap();
                         self.used_ids.lock().unwrap().push_back(id);
                         subs_tx.send(DelAll(id)).unwrap();
                     }
 
-                    if let Some(writer) = self.writers.lock().unwrap().remove(&id) {
+                    let writer = self.writers.lock().unwrap().remove(&id);
+                    if let Some(writer) = writer {
                         self.poller.delete(&writer.socket).unwrap();
                     }
                 }
