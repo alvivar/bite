@@ -1,4 +1,5 @@
 
+    What about using / instead of . for the key?
     Use to_vec instead of to_owned on Vec types.
 
     Think about an evil client trying to saturate the connections or fucking up the server.
