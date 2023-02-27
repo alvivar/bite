@@ -129,7 +129,8 @@ fn main() -> io::Result<()> {
                     let writer = reader.try_clone().unwrap();
 
                     // Reusing ids.
-                    let client_id = if let Some(id) = used_ids.lock().unwrap().pop_front() {
+                    let used_id = used_ids.lock().unwrap().pop_front();
+                    let client_id = if let Some(id) = used_id {
                         id
                     } else {
                         let id = id_count;

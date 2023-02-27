@@ -102,21 +102,8 @@ impl Data {
 
                 Action::Append(key, data, from_id, msg_id) => {
                     let mut map = self.map.lock().unwrap();
-
-                    let value = match map.get_mut(&key) {
-                        Some(value) => {
-                            value.extend(data.to_vec());
-                            value.to_owned()
-                        }
-
-                        None => {
-                            let mut value = Vec::new();
-                            value.extend(data.to_vec());
-                            value
-                        }
-                    };
-
-                    map.insert(key.to_owned(), value);
+                    let value = map.entry(key.to_owned()).or_insert_with(Vec::new);
+                    value.extend_from_slice(&data);
                     drop(map);
 
                     self.subs_tx.send(Call(key, data, from_id, msg_id)).unwrap();

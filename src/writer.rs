@@ -52,7 +52,7 @@ impl Writer {
                             order.msg_id as u32,
                         ));
 
-                        self.poll_write(connection);
+                        self.poll_writable(connection);
                     }
                 }
 
@@ -66,7 +66,7 @@ impl Writer {
                                 order.msg_id as u32,
                             ));
 
-                            self.poll_write(connection);
+                            self.poll_writable(connection);
                         }
                     }
                 }
@@ -87,9 +87,9 @@ impl Writer {
                         if connection.closed {
                             closed = true;
                         } else if !connection.send_queue.is_empty() {
-                            self.poll_write(connection);
+                            self.poll_writable(connection);
                         } else {
-                            self.poll_clean(connection);
+                            self.poll_none(connection);
                         }
                     }
 
@@ -101,13 +101,13 @@ impl Writer {
         }
     }
 
-    fn poll_write(&self, connection: &mut Connection) {
+    fn poll_writable(&self, connection: &mut Connection) {
         self.poller
             .modify(&connection.socket, Event::writable(connection.id))
             .unwrap();
     }
 
-    fn poll_clean(&self, connection: &mut Connection) {
+    fn poll_none(&self, connection: &mut Connection) {
         self.poller
             .modify(&connection.socket, Event::none(connection.id))
             .unwrap();

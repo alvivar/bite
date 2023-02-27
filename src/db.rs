@@ -48,8 +48,7 @@ impl DB {
         }
 
         if let Ok(data) = bincode::deserialize::<BTreeMap<String, Vec<u8>>>(&content[..]) {
-            let mut map = self.data.lock().unwrap();
-            *map = data;
+            *self.data.lock().unwrap() = data;
         }
     }
 
@@ -61,8 +60,7 @@ impl DB {
             .truncate(true)
             .open(DB_FILE);
 
-        let map = self.data.lock().unwrap();
-        let data: Vec<u8> = bincode::serialize(&*map).unwrap();
+        let data: Vec<u8> = bincode::serialize(&*self.data.lock().unwrap()).unwrap();
         file.unwrap().write_all(&data[..]).unwrap();
 
         let filename = DB_FILE.split('/').last().unwrap();
