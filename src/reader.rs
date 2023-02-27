@@ -47,10 +47,6 @@ impl Reader {
                     let mut closed = false;
 
                     if let Some(connection) = self.readers.lock().unwrap().get_mut(&id) {
-                        if connection.closed {
-                            return;
-                        }
-
                         loop {
                             // Loop because "received" could have more than one
                             // message in the same read.

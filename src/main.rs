@@ -22,7 +22,7 @@ use crate::writer::{Order, Writer};
 
 use polling::{Event, Poller};
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::env;
 use std::io;
 use std::net::TcpListener;
@@ -38,9 +38,7 @@ fn main() -> io::Result<()> {
         Err(_) => {
             println!("To change the address use the SERVER environment variable.");
             println!("BASH i.e: export SERVER=0.0.0.0:1984");
-            // "0.0.0.0:1984".into()
-
-            "127.0.0.1:1984".into()
+            "0.0.0.0:1984".into()
         }
     };
 
@@ -59,16 +57,14 @@ fn main() -> io::Result<()> {
     let readers = Arc::new(Mutex::new(readers));
     let writers = HashMap::<usize, Connection>::new();
     let writers = Arc::new(Mutex::new(writers));
-    let used_ids = Arc::new(Mutex::new(Vec::<usize>::new()));
+    let used_ids = Arc::new(Mutex::new(VecDeque::<usize>::new()));
 
     // The reader
     let mut reader = Reader::new(poller.clone(), readers.clone());
-
     let reader_tx = reader.tx.clone();
 
     // The writer
     let writer = Writer::new(poller.clone(), writers.clone());
-
     let writer_tx = writer.tx.clone();
     let subs_writer_tx = writer.tx.clone();
     let data_writer_tx = writer.tx.clone();
@@ -108,14 +104,14 @@ fn main() -> io::Result<()> {
     let heartbeat = Heartbeat::new(readers.clone(), writers.clone());
 
     // Threads
-    thread::spawn(move || db.handle(4));
-    thread::spawn(move || data.handle(db_modified));
-    thread::spawn(move || subs.handle(subs_writer_tx));
-    thread::spawn(move || parser.handle(parser_data_tx, parser_writer_tx, parser_subs_tx));
-    // thread::spawn(move || cleaner.handle(cleaner_subs_tx));
-    thread::spawn(move || heartbeat.handle(heartbeat_writer_tx));
     thread::spawn(move || reader.handle(reader_parser_tx, reader_cleaner_tx));
     thread::spawn(move || writer.handle(writer_cleaner_tx));
+    thread::spawn(move || parser.handle(parser_data_tx, parser_writer_tx, parser_subs_tx));
+    thread::spawn(move || subs.handle(subs_writer_tx));
+    thread::spawn(move || data.handle(db_modified));
+    thread::spawn(move || db.handle(4));
+    thread::spawn(move || cleaner.handle(cleaner_subs_tx));
+    thread::spawn(move || heartbeat.handle(heartbeat_writer_tx));
 
     // Connections and events via smol Poller.
     let mut id_count: usize = 1; // 0 belongs to the main TcpListener.
@@ -132,13 +128,13 @@ fn main() -> io::Result<()> {
                     reader.set_nonblocking(true)?;
                     let writer = reader.try_clone().unwrap();
 
-                    // The client id
-                    let client_id = match used_ids.lock().unwrap().pop() {
-                        Some(id) => id,
-                        None => {
-                            id_count += 1;
-                            id_count
-                        }
+                    // Reusing ids.
+                    let client_id = if let Some(id) = used_ids.lock().unwrap().pop_front() {
+                        id
+                    } else {
+                        let id = id_count;
+                        id_count += 1;
+                        id
                     };
 
                     println!("\nConnection #{client_id} from {addr}");

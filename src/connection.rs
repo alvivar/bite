@@ -3,7 +3,7 @@ use std::io::{self, Read, Write};
 use std::net::{SocketAddr, TcpStream};
 use std::time::Instant;
 
-const BUFFER_SIZE: usize = 8192;
+const BUFFER_SIZE: usize = 4096;
 
 pub struct Connection {
     pub id: usize,
