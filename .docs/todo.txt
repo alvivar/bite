@@ -1,4 +1,5 @@
 
+    Remove println! from the code.
     Think about how condvars could be used to improve the performance of the server.
     What about using / instead of . for the key?
     Use to_vec instead of to_owned on Vec types.
