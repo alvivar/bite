@@ -152,7 +152,7 @@ impl Data {
 
                     let key_value: Vec<_> = range
                         .take_while(|(k, _)| k.starts_with(&key))
-                        .map(|(k, v)| (k.as_str(), v.to_owned()))
+                        .map(|(k, v)| (k.as_str(), v.to_vec()))
                         .collect();
 
                     let mut message = Vec::<u8>::new();
@@ -192,7 +192,7 @@ impl Data {
 
                     let json = kv_to_json(&key_value);
 
-                    // [!] Returns the pointer.
+                    // Returns the pointer.
                     // Always returns everything when the key is empty.
                     let pointr = format!("/{}", key.replace('.', "/"));
                     let message = match json.pointer(pointr.as_str()) {
@@ -217,14 +217,14 @@ impl Data {
                     let map = self.map.lock().unwrap();
                     let range = map.range(key.to_owned()..);
 
-                    let kv: Vec<_> = range
+                    let key_value: Vec<_> = range
                         .take_while(|(k, _)| k.starts_with(&key))
                         .map(|(k, v)| (k.as_str(), v))
                         .collect();
 
-                    let json = kv_to_json(&kv);
+                    let json = kv_to_json(&key_value);
 
-                    // [!] Returns the json, but only if the pointer is real.
+                    // Returns the json, but only if the pointer is real.
                     // Always returns everything when the key is empty.
                     let pointr = format!("/{}", key.replace('.', "/"));
                     let message = match json.pointer(pointr.as_str()) {
