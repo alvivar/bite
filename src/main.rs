@@ -67,7 +67,7 @@ fn main() -> io::Result<()> {
     let reader_tx = reader.tx.clone();
 
     // The writer
-    let writer = Writer::new(poller.clone(), readers.clone());
+    let writer = Writer::new(poller.clone(), writers.clone());
 
     let writer_tx = writer.tx.clone();
     let subs_writer_tx = writer.tx.clone();
