@@ -80,7 +80,7 @@ impl Parser {
                         text.push_str(&add);
                     };
 
-                    println!("\n{addr} ({} bytes): {text}", message.data.len());
+                    info!("{addr} ({} bytes): {text}", message.data.len());
 
                     let from_id = message.from as usize;
                     let msg_id = message.id as usize;

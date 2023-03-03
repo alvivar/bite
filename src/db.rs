@@ -64,6 +64,6 @@ impl DB {
         file.unwrap().write_all(&data[..]).unwrap();
 
         let filename = DB_FILE.split('/').last().unwrap();
-        println!("\n{filename} saved");
+        info!("{filename} saved");
     }
 }

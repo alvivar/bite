@@ -37,7 +37,7 @@ impl Heartbeat {
                     connection.closed = true;
                     connection.socket.shutdown(Shutdown::Both).unwrap();
 
-                    println!("\nShutting down Reader #{id}, timed out");
+                    info!("Shutting down Reader #{id}, timed out");
                 }
             }
 
@@ -58,7 +58,7 @@ impl Heartbeat {
                         data: [].into(),
                     });
 
-                    println!("\nPING sent to Writer #{id}");
+                    info!("PING sent to Writer #{id}");
                 }
             }
 

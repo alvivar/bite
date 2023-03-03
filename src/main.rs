@@ -22,6 +22,10 @@ use crate::writer::{Order, Writer};
 
 use polling::{Event, Poller};
 
+#[macro_use]
+extern crate log;
+extern crate pretty_env_logger;
+
 use std::collections::{HashMap, VecDeque};
 use std::env;
 use std::io;
@@ -30,19 +34,17 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 fn main() -> io::Result<()> {
-    println!("\nBIT:E\n");
+    pretty_env_logger::init();
+
+    info!("BIT:E");
 
     // Address by config if needed.
     let server = match env::var("SERVER") {
         Ok(var) => var,
-        Err(_) => {
-            println!("To change the address use the SERVER environment variable.");
-            println!("BASH i.e: export SERVER=0.0.0.0:1984");
-            "0.0.0.0:1984".into()
-        }
+        Err(_) => "0.0.0.0:1984".into(),
     };
 
-    println!("\nRunning at {server}");
+    info!("Running at {server} | To change the address use the SERVER environment variable");
 
     // The server and the smol Poller.
     let server = TcpListener::bind(server)?;
@@ -138,7 +140,7 @@ fn main() -> io::Result<()> {
                         id
                     };
 
-                    println!("\nConnection #{client_id} from {addr}");
+                    info!("Connection #{client_id} from {addr}");
 
                     // The server continues listening for more clients, always 0.
                     poller.modify(&server, Event::readable(0))?;
