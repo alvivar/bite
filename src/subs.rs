@@ -1,11 +1,11 @@
+use std::collections::HashMap;
+use std::sync::mpsc::{channel, Receiver, Sender};
+
 use crate::parser::Command;
 use crate::writer::Action::QueueAll;
 use crate::writer::{self, Order};
 
 use serde_json::json;
-
-use std::collections::HashMap;
-use std::sync::mpsc::{channel, Receiver, Sender};
 
 pub enum Action {
     Add(String, usize, Command),

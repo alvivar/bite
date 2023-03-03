@@ -1,3 +1,10 @@
+use std::collections::{HashMap, VecDeque};
+use std::env;
+use std::io;
+use std::net::TcpListener;
+use std::sync::{Arc, Mutex};
+use std::thread;
+
 mod cleaner;
 mod connection;
 mod data;
@@ -25,13 +32,6 @@ use polling::{Event, Poller};
 #[macro_use]
 extern crate log;
 extern crate pretty_env_logger;
-
-use std::collections::{HashMap, VecDeque};
-use std::env;
-use std::io;
-use std::net::TcpListener;
-use std::sync::{Arc, Mutex};
-use std::thread;
 
 fn main() -> io::Result<()> {
     pretty_env_logger::init();

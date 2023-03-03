@@ -1,13 +1,13 @@
+use std::collections::HashMap;
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::{Arc, Mutex};
+use std::time::Instant;
+
 use crate::cleaner;
 use crate::connection::Connection;
 use crate::message::stamp_header;
 
 use polling::{Event, Poller};
-
-use std::collections::HashMap;
-use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::{Arc, Mutex};
-use std::time::Instant;
 
 pub enum Action {
     Queue(Order),

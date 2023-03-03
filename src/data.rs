@@ -1,12 +1,12 @@
-use crate::subs::{self, Action::Call};
-use crate::writer::{self, Action::Queue, Order};
-
-use serde_json::{self, json, Value};
-
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
+
+use crate::subs::{self, Action::Call};
+use crate::writer::{self, Action::Queue, Order};
+
+use serde_json::{self, json, Value};
 
 pub enum Action {
     Set(String, Vec<u8>),

@@ -1,12 +1,12 @@
-use crate::connection::Connection;
-use crate::writer::{self, Action::QueueAll, Order};
-
 use std::collections::HashMap;
 use std::net::Shutdown;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
+
+use crate::connection::Connection;
+use crate::writer::{self, Action::QueueAll, Order};
 
 const TIMEOUT_30: u64 = 30;
 const TIMEOUT_60: u64 = 60;
