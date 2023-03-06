@@ -1,17 +1,14 @@
 
-    Remove println! from the code.
     Think about how condvars could be used to improve the performance of the server.
     What about using / instead of . for the key?
     Use to_vec instead of to_owned on Vec types.
 
-    Think about an evil client trying to saturate the connections or fucking up the server.
     Should we validate the end of a message for more safety or maybe a crc somewhere?
     Should we validate a timeout for the client, or that's already built inside Tcp stuff and need configuration?
 
     Explore the casting between u32 and related values.
 
     Auth by password.
-    Wondering if cleaning up sockets when broken, could be optimized by locking the mutexes during the cleaning loop (?)
 
     Maybe unsubscriptions for each subscription?
     Maybe you should be able to subscribe to all the content when you don't specify the key?
@@ -26,10 +23,8 @@
 
     Gracefully shutdown on Docker, Ctrl + C
 
-    Use a decent log system instead of println?
     Use Error as results instead of unwrap
     DB file name by environment
-    IP and port by environment
 
     Heroku script
 
@@ -42,6 +37,15 @@
     Push # value should insert into a list, transform normal values
     Pop # should return and delete a value
 
+
+5 March 2023
+    x IP and port by environment
+    x Use a decent log system instead of println?
+    x Remove println! from the code.
+    x Lots but lots of optimizations related to locks and mutexes.
+    x Lots of clean up and documentation.
+    x Think about an evil client trying to saturate the connections or fucking up the server.
+    x Hearbeat: Wondering if cleaning up sockets when broken, could be optimized by locking the mutexes during the cleaning loop (?)
 
 9/10/2022
     x Subscribers receive the game header from the sender, now we have a to_id and from_id to differentiate.
