@@ -58,7 +58,7 @@ impl Heartbeat {
                         data: [].into(),
                     });
 
-                    info!("PING sent to Writer #{id}");
+                    info!("PING sent to Connection #{id}");
                 }
             }
 
