@@ -8,6 +8,7 @@ use std::time::Duration;
 
 const DB_PATH: &str = "./data";
 const DB_FILE: &str = "./data/db.bin";
+const DB_NAME: &str = "db.bin";
 
 pub struct DB {
     data: Arc<Mutex<BTreeMap<String, Vec<u8>>>>,
@@ -63,7 +64,6 @@ impl DB {
         let data: Vec<u8> = bincode::serialize(&*self.data.lock().unwrap()).unwrap();
         file.unwrap().write_all(&data[..]).unwrap();
 
-        let filename = DB_FILE.split('/').last().unwrap();
-        info!("{filename} saved");
+        info!("{DB_NAME} saved");
     }
 }
