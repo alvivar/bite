@@ -1,12 +1,17 @@
-version: '3.3'
+version: '3.8'
 services:
     bite:
         container_name: bite
-        build: ./
+        build:
+            context: ./
+            dockerfile: Dockerfile
         ports:
             - '1984:1984'
         volumes:
-            - ./data:/data
+            - type: bind
+              source: ./data
+              target: /data
         environment:
             - RUST_LOG=info
-        restart: on-failure
+            - SERVER=0.0.0.0:1984
+        restart: unless-stopped
