@@ -4,7 +4,8 @@ use std::net::SocketAddr;
 use std::sync::mpsc::{channel, Receiver, Sender};
 
 use crate::data;
-use crate::data::Action::{Append, Delete, Get, Inc, Json, Jtrim, KeyValue, Set, SetIfNone};
+use crate::data::Action::{Append, Delete, Get, Inc, Json, Jtrim, KeyValue};
+use crate::data::Action::{Set, SetIfNone, SetList};
 use crate::message::Message;
 use crate::subs;
 use crate::subs::Action::{Add, Call, Del};
@@ -29,6 +30,7 @@ pub enum Command {
     No,
     Set,
     SetIfNone,
+    SetList,
     Inc,
     Append,
     Delete,
@@ -145,6 +147,19 @@ impl Parser {
                                 .unwrap();
 
                             data_tx.send(SetIfNone(key, data, from_id, msg_id)).unwrap();
+                        }
+
+                        Command::SetList => {
+                            writer_tx
+                                .send(Queue(Order {
+                                    from_id,
+                                    to_id: from_id,
+                                    msg_id,
+                                    data: OK.into(),
+                                }))
+                                .unwrap();
+
+                            data_tx.send(SetList(key, data)).unwrap();
                         }
 
                         // Makes the value an integer and increase it in 1.
@@ -274,6 +289,7 @@ pub fn parse(message: &[u8]) -> Parsed {
     let command = match instruction.to_lowercase().trim_end() {
         "s" => Command::Set,
         "s?" => Command::SetIfNone,
+        "sl" => Command::SetList,
         "+1" => Command::Inc,
         "+" => Command::Append,
         "d" => Command::Delete,
@@ -304,6 +320,7 @@ pub fn needs_key(command: &Command) -> bool {
 
         Command::Set
         | Command::SetIfNone
+        | Command::SetList
         | Command::Inc
         | Command::Append
         | Command::Delete
@@ -373,7 +390,7 @@ pub fn next_word<'a>(src: &mut Cursor<&'a [u8]>) -> &'a [u8] {
     &src.get_ref()[start..end]
 }
 
-fn remaining<'a>(src: &mut Cursor<&'a [u8]>) -> &'a [u8] {
+pub fn remaining<'a>(src: &mut Cursor<&'a [u8]>) -> &'a [u8] {
     let mut start = src.position() as usize;
     let end = src.get_ref().len();
 

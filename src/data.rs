@@ -1,8 +1,10 @@
 use std::collections::BTreeMap;
+use std::io::Cursor;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 
+use crate::parser::{next_word, remaining};
 use crate::subs::{self, Action::Call};
 use crate::writer::{self, Action::Queue, Order};
 
@@ -11,6 +13,7 @@ use serde_json::{self, json, Value};
 pub enum Action {
     Set(String, Vec<u8>),
     SetIfNone(String, Vec<u8>, usize, usize),
+    SetList(String, Vec<u8>),
     Inc(String, usize, usize),
     Append(String, Vec<u8>, usize, usize),
     Delete(String),
@@ -66,6 +69,25 @@ impl Data {
                             db_modified.swap(true, Ordering::Relaxed);
                         }
                     }
+                }
+
+                // The first char of the key will be used as separator:
+                // sl , somekey A, other.key B, key C, 1.2 D
+                Action::SetList(key, val) => {
+                    let separator = key.chars().next().unwrap() as u8;
+                    let set_list = val.split(|x| *x == separator);
+
+                    let mut map = self.map.lock().unwrap();
+                    for key_val in set_list {
+                        let mut cursor = Cursor::new(key_val);
+                        let key = String::from_utf8_lossy(next_word(&mut cursor));
+                        let val = remaining(&mut cursor);
+
+                        map.insert(key.into(), val.into());
+                    }
+                    drop(map);
+
+                    db_modified.swap(true, Ordering::Relaxed);
                 }
 
                 Action::Inc(key, from_id, msg_id) => {
@@ -245,13 +267,13 @@ pub fn kv_to_json(kv: &[(&str, &Vec<u8>)]) -> Value {
     // kv.iter().map(|(k, v)| k.split(".").map(|name| {}));
 
     for (k, v) in kv.iter().rev() {
-        insert(&mut merged_json, k, json!(v));
+        json_insert(&mut merged_json, k, json!(v));
     }
 
     merged_json
 }
 
-fn insert(mut json: &mut Value, key: &str, val: Value) {
+fn json_insert(mut json: &mut Value, key: &str, val: Value) {
     for k in key.split('.') {
         json = json
             .as_object_mut()
