@@ -26,47 +26,50 @@ impl Heartbeat {
 
     pub fn handle(&self, writer_tx: Sender<writer::Action>) {
         loop {
-            // Readers
+            self.handle_unfinished_readers();
+            self.handle_idle_writers(&writer_tx);
+        }
+    }
 
-            sleep(Duration::from_secs(TIMEOUT_30));
+    fn handle_unfinished_readers(&self) {
+        sleep(Duration::from_secs(TIMEOUT_30));
 
-            let mut readers = self.readers.lock().unwrap();
-            for (id, connection) in readers.iter_mut() {
-                let elapsed = connection.last_read.elapsed().as_secs();
-                if connection.pending_read && elapsed > TIMEOUT_30 {
-                    connection.closed = true;
-                    connection.socket.shutdown(Shutdown::Both).unwrap();
+        let mut readers = self.readers.lock().unwrap();
 
-                    info!("Shutting down Reader #{id}, timed out");
-                }
+        for (id, connection) in readers.iter_mut() {
+            let elapsed = connection.last_read.elapsed().as_secs();
+            if connection.pending_read && elapsed > TIMEOUT_30 {
+                connection.closed = true;
+                connection.socket.shutdown(Shutdown::Both).unwrap();
+
+                info!("Shutting down Reader #{id}, timed out");
             }
+        }
+    }
 
-            drop(readers);
+    fn handle_idle_writers(&self, writer_tx: &Sender<writer::Action>) {
+        sleep(Duration::from_secs(TIMEOUT_30));
 
-            // Writers
+        let mut messages = Vec::<Order>::new();
+        let mut writers = self.writers.lock().unwrap();
 
-            sleep(Duration::from_secs(TIMEOUT_30));
+        for (id, connection) in writers.iter_mut() {
+            if connection.last_write.elapsed().as_secs() > TIMEOUT_60 {
+                messages.push(Order {
+                    from_id: 0,
+                    to_id: *id,
+                    msg_id: 0,
+                    data: [].into(),
+                });
 
-            let mut messages = Vec::<Order>::new();
-            let mut writers = self.writers.lock().unwrap();
-            for (id, connection) in writers.iter_mut() {
-                if connection.last_write.elapsed().as_secs() > TIMEOUT_60 {
-                    messages.push(Order {
-                        from_id: 0,
-                        to_id: *id,
-                        msg_id: 0,
-                        data: [].into(),
-                    });
-
-                    info!("PING sent to Connection #{id}");
-                }
+                info!("PING sent to Connection #{id}");
             }
+        }
 
-            drop(writers);
+        drop(writers);
 
-            if !messages.is_empty() {
-                writer_tx.send(QueueAll(messages)).unwrap();
-            }
+        if !messages.is_empty() {
+            writer_tx.send(QueueAll(messages)).unwrap();
         }
     }
 }

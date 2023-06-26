@@ -65,11 +65,11 @@ impl Messages {
             return Received::Error(bigger_size_than_protocol());
         }
 
-        // The bytes representing the message size.
+        // The message size.
         let size = get_u32(&self.buffer[4..6]);
         match size.cmp(&buffer_len) {
             Ordering::Equal => {
-                // The message is complete, just send it and break.
+                // Message complete, just send it and break.
 
                 let result = self.buffer.to_owned();
                 self.buffer.clear();
