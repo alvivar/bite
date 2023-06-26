@@ -1,0 +1,107 @@
+
+    1984
+        pos
+            x 100
+            y 200
+            z 300
+    1985
+        pos
+            x 100
+            y 200
+            z 300
+
+>
+
+    list , s key value, otherkey othervalue, anotherkey anothervalue
+
+    list , g key, key2, key3
+
+    list 0102
+
+    s key b100, key2 200, key3 400
+
+    g adros.name, adros.age, adros.likes
+    Andrés Villalobos
+    36
+    Bananas, Apples, Oranges
+
+    g name age likes f adros
+
+    s name age likes f adros
+
+    s
+    adros.name Andrés Villalobos
+    adros.age 36
+    adros.likes Bananas, Apples, Oranges
+
+
+    s { adros: { "name": "Andrés Villalobos", "age": 36, "likes": "Bananas, Apples, Oranges" } }
+    g { adros: { name, age, likes } }
+
+
+    s adros: name "Andrés Villalobos", age 36, likes "Bananas, Apples, Oranges"
+
+    g adros
+
+    s adros .name "Andrés Villalobos", .age 36, .likes "Bananas, Apples, Oranges"
+
+    s {
+        adros: {
+            name: "Andrés Villalobos",
+            age: 39,
+            likes: "Bananas, Apples, Oranges"
+        },
+        malavasi: {
+            name: "Don Malavasi",
+            age: 36,
+            likes: "Carne"
+        }
+    }
+
+    g {
+        adros: {
+            name,
+            age,
+            likes
+        },
+    }
+
+    s player.1984
+        x 100
+        y 200
+        z 300
+
+    s player.1984
+        user Andrés Villalobos
+        email andresalvivar@gmail.com
+        score
+            last 339
+            max
+
+    s
+    player.1984.pos
+        x 100
+        y 200
+        z 300
+
+    s player.pos.1984
+        x 100
+        y 200
+        z 300
+
+    #k player.pos
+        x
+        y
+
+    #k player.1984
+
+    g player.1984
+
+    s pos.1984 .x 100 .y 200 .z 300
+
+    s text.1984 .chat Yo no sé ustedes perritos, pero que será esto
+
+    s fingers.1984
+        1 1, 2 0, 3 1, 4 0, 5 1
+
+    s game.state

@@ -1,4 +1,9 @@
 
+    What happens when someone wants to set a variable with lots of spaces at the beginning of the value?
+    Use only one space on the parser to allow spaces as values
+
+    s <key1> <value1>, <key2> <value2>, <key3> <value3>
+
     Document the environment variables required to run the server.
 
     Think about how condvars could be used to improve the performance of the server.
