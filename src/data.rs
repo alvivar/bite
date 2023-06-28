@@ -71,8 +71,8 @@ impl Data {
                     }
                 }
 
-                // The first char of the key will be used as separator:
-                // sl , somekey A, other.key B, key C, 1.2 D
+                // Experimental: The first char of the key will be used as
+                // separator: sl , somekey A, other.key B, key C, 1.2 D
                 Action::SetList(key, val) => {
                     let separator = key.chars().next().unwrap() as u8;
                     let set_list = val.split(|x| *x == separator);
