@@ -34,10 +34,8 @@
     adros.age 36
     adros.likes Bananas, Apples, Oranges
 
-
     s { adros: { "name": "Andrés Villalobos", "age": 36, "likes": "Bananas, Apples, Oranges" } }
     g { adros: { name, age, likes } }
-
 
     s adros: name "Andrés Villalobos", age 36, likes "Bananas, Apples, Oranges"
 
