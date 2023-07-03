@@ -1,4 +1,6 @@
 
+    Use a temporary map to store the values and then extend the original map, this way we don't need to lock the original map.
+
     What happens when someone wants to set a variable with lots of spaces at the beginning of the value?
     Use only one space on the parser to allow spaces as values
 
