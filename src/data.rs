@@ -13,7 +13,7 @@ use serde_json::{self, json, Value};
 pub enum Action {
     Set(String, Vec<u8>),
     SetIfNone(String, Vec<u8>, usize, usize),
-    SetList(String, Vec<u8>),
+    SetList(String, Vec<u8>, usize, usize),
     Inc(String, usize, usize),
     Append(String, Vec<u8>, usize, usize),
     Delete(String),
@@ -73,7 +73,7 @@ impl Data {
 
                 // Experimental: The first char of the key will be used as
                 // separator: sl , somekey A, other.key B, key C, 1.2 D
-                Action::SetList(key, val) => {
+                Action::SetList(key, val, from_id, msg_id) => {
                     let separator = key.chars().next().unwrap() as u8;
                     let set_list = val.split(|x| *x == separator);
 
@@ -83,7 +83,11 @@ impl Data {
                         let key = String::from_utf8_lossy(next_word(&mut cursor));
                         let val = remaining(&mut cursor);
 
-                        map.insert(key.into(), val.into());
+                        map.insert(key.to_string(), val.to_owned());
+
+                        self.subs_tx
+                            .send(Call(key.into(), val.into(), from_id, msg_id))
+                            .unwrap();
                     }
                     drop(map);
 
