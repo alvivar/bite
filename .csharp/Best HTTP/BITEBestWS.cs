@@ -1,107 +1,146 @@
-using UnityEngine;
-using System;
-using BestHTTP.WebSocket;
-using BITEClient;
-using System.Text;
+// using BestHTTP.WebSocket;
+// using BITE;
+// using System;
+// using System.Collections.Generic;
+// using System.Text;
+// using UnityEngine;
 
-public class BITEBestWS : MonoBehaviour
+// public class BITEBestWS : MonoBehaviour
+// {
+//     public Action<Frame> OnFrameReceived;
 
-{
-    // private string address = "ws://127.0.0.1:1983/ws";
-    private string address = "ws://167.99.58.31:1991/ws";
-    private int serverClientId = -1;
-    private int messageId = 0;
+//     public int QueueLength { get { return frameQueue.Bytes.Length; } }
 
-    private WebSocket webSocket;
-    private Frames frames = new Frames();
+//     [Header("Config")]
+//     public string ip = "167.99.58.31"; // 127.0.0.1
+//     public int port = 1991; // 1983
 
-    public void Start()
-    {
-        // Create the WebSocket instance
-        this.webSocket = new WebSocket(new Uri(address));
+//     [Header("Info")]
+//     public bool connected = false;
+//     public int id = -1;
+//     public int messageCount = 0;
 
-        // Subscribe to the WS events
-        this.webSocket.OnOpen += OnOpen;
-        this.webSocket.OnMessage += OnMessageReceived;
-        this.webSocket.OnBinary += OnBinaryReceived;
-        this.webSocket.OnClosed += OnClosed;
-        this.webSocket.OnError += OnError;
+//     private Dictionary<int, Action<Frame>> callbacks = new Dictionary<int, Action<Frame>>();
+//     private Frames framesReceived = new Frames();
+//     private Frame frameQueue = new Frame();
+//     private WebSocket webSocket;
 
-        // Start connecting to the server
-        this.webSocket.Open();
-    }
+//     public void Start()
+//     {
+//         var address = $"ws://{ip}:{port}/ws";
+//         webSocket = new WebSocket(new Uri(address));
 
-    void OnDestroy()
-    {
-        if (this.webSocket != null)
-        {
-            this.webSocket.Close();
-            this.webSocket = null;
-        }
-    }
+//         webSocket.OnOpen += OnOpen;
+//         webSocket.OnMessage += OnMessageReceived;
+//         webSocket.OnBinary += OnBinaryReceived;
+//         webSocket.OnClosed += OnClosed;
+//         webSocket.OnError += OnError;
 
-    [ContextMenu("Close")]
-    public void Close()
-    {
-        this.webSocket.Close(1000, "Bye!");
-    }
+//         webSocket.Open();
+//     }
 
-    [ContextMenu("Send Test Messages")]
-    public void SentTestMessages()
-    {
-        var date = DateTime.Now;
+//     void OnDestroy()
+//     {
+//         if (webSocket != null)
+//         {
+//             webSocket.Close();
+//             webSocket = null;
+//         }
+//     }
 
-        for (int i = 0; i < 1000; i++)
-        {
-            Send($"#g bite.best.ws.date.{i}");
-            Send($"s bite.best.ws.date.{i} {date}");
-            Send($"g bite.best.ws.date.{i}");
-            Send($"d bite.best.ws.date.{i}");
-        }
-    }
+//     void OnOpen(WebSocket ws)
+//     {
+//         Debug.Log("BITE WS Opened!");
+//     }
 
-    public void Send(string message)
-    {
-        var data = Encoding.UTF8.GetBytes(message);
-        var frame = new Frame().FromProtocol(serverClientId, ++messageId, data);
-        this.webSocket.Send(frame.Bytes);
-    }
+//     void OnMessageReceived(WebSocket ws, string message)
+//     {
+//         Debug.Log($"BITE WS Message Received ({message.Length}): {message}");
+//     }
 
-    void OnOpen(WebSocket ws)
-    {
-        Debug.Log("BITE WS Opened!");
-    }
+//     void OnBinaryReceived(WebSocket ws, byte[] message)
+//     {
+//         framesReceived.Feed(message);
+//         while (framesReceived.ProcessingCompleteFrames()) ;
+//         while (framesReceived.HasCompleteFrame)
+//         {
+//             connected = true;
 
-    void OnMessageReceived(WebSocket ws, string message)
-    {
-        Debug.Log($"BITE WS Message Received ({message.Length}): {message}");
-    }
+//             var frame = framesReceived.Dequeue();
 
-    void OnBinaryReceived(WebSocket ws, byte[] message)
-    {
-        frames.Feed(message);
-        while (frames.ProcessingCompleteFrames()) ;
-        while (frames.HasCompleteFrame)
-        {
-            var frame = frames.Dequeue();
+//             // The first message is the id.
+//             if (id == -1)
+//                 id = frame.ClientId;
 
-            // The first message is the id.
-            if (serverClientId == -1)
-                serverClientId = frame.ClientId;
+//             OnFrameReceived?.Invoke(frame);
 
-            Debug.Log($"BITE WS Binary Received ({message.Length}), {message} Frame: {frame.ClientId} {frame.MessageId} {frame.Size} {frame.Text}");
-        }
-    }
+//             if (callbacks.ContainsKey(frame.MessageId))
+//             {
+//                 callbacks[frame.MessageId](frame);
+//                 callbacks.Remove(frame.MessageId);
+//             }
+//         }
+//     }
 
-    void OnClosed(WebSocket ws, UInt16 code, string message)
-    {
-        Debug.Log($"BITE WS Closed: {code} {message}");
-        webSocket = null;
-    }
+//     void OnClosed(WebSocket ws, UInt16 code, string message)
+//     {
+//         Debug.Log($"BITE WS Closed: {code} {message}");
+//         webSocket = null;
+//         connected = false;
+//     }
 
-    void OnError(WebSocket ws, string error)
-    {
-        Debug.Log($"BITE WS Error: {error}");
-        webSocket = null;
-    }
-}
+//     void OnError(WebSocket ws, string error)
+//     {
+//         Debug.Log($"BITE WS Error: {error}");
+//         webSocket = null;
+//         connected = false;
+//     }
+
+//     public void Send(string message, Action<Frame> callback = null)
+//     {
+//         var data = Encoding.UTF8.GetBytes(message);
+//         var frame = new Frame().FeedProtocol(id, ++messageCount, data);
+//         webSocket.Send(frame.Bytes);
+
+//         if (callback != null)
+//             callbacks[messageCount] = callback;
+//     }
+
+//     public void Queue(string message, Action<Frame> callback = null)
+//     {
+//         var data = Encoding.UTF8.GetBytes(message);
+//         frameQueue.FeedProtocol(id, ++messageCount, data);
+
+//         if (callback != null)
+//             callbacks[messageCount] = callback;
+//     }
+
+//     public void SendQueued()
+//     {
+//         if (frameQueue.Bytes.Length < 1)
+//             return;
+
+//         webSocket.Send(frameQueue.Bytes);
+//         frameQueue = new Frame();
+//     }
+
+//     [ContextMenu("Close")]
+//     public void Close()
+//     {
+//         webSocket.Close(1000, "Bye!");
+//     }
+
+//     [ContextMenu("Send Test Messages")]
+//     public void SentTestMessages()
+//     {
+//         var date = DateTime.Now;
+
+//         for (int i = 0; i < 1000; i++)
+//         {
+//             Send($"#g bite.best.ws.date.{i}");
+//             Send($"s bite.best.ws.date.{i} {date}");
+//             Send($"g bite.best.ws.date.{i}");
+//             Send($"d bite.best.ws.date.{i}");
+//         }
+//     }
+// }
