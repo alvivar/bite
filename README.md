@@ -3,7 +3,29 @@
 Key-Value database with subscriptions, aimed to real time multiplayer
 applications.
 
-    _...DEMO in progress_
+To set a value, use s.
+
+s somekeyname Some string as a value
+
+> OK
+
+To set a value, but only if the key doesn't exist, use s?.
+
+s? somekeyname Update if the key doesn't exists
+
+> OK
+
+To get a value, use g.
+
+g somekey
+
+> Some string as a value
+
+g keywithoutvalue
+
+>
+
+More commands are available, check the [**TUTORIAL.md**](TUTORIAL.md) for more.
 
 ## C# Library
 
