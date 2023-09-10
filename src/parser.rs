@@ -159,7 +159,7 @@ impl Parser {
                                 }))
                                 .unwrap();
 
-                            data_tx.send(SetList(key, data)).unwrap();
+                            data_tx.send(SetList(key, data, from_id, msg_id)).unwrap();
                         }
 
                         // Makes the value an integer and increase it in 1.
