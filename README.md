@@ -8,11 +8,6 @@ To set a value, use s.
     s somekeyname Some string as a value
     > OK
 
-To set a value, but only if the key doesn't exist, use s?.
-
-    s? somekeyname Update if the key doesn't exists
-    > OK
-
 To get a value, use g.
 
     g somekey
@@ -21,7 +16,18 @@ To get a value, use g.
     g keywithoutvalue
     >
 
-More commands are available, check the [**TUTORIAL.md**](TUTORIAL.md) for more.
+You can subscribe to a key to receive values on changes. With **#g** you receive
+the value.
+
+    #g parent.child
+    > OK
+
+    s parent.child Some value
+    > OK
+
+    > Some value (*On all subscribers)
+
+And more commands available, check the [**TUTORIAL**](TUTORIAL.md) for more.
 
 ## C# Library
 
