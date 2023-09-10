@@ -1,5 +1,7 @@
 # Tutorial
 
+## Operators
+
 To set a value, use **s**.
 
     s somekeyname Some string as a value
@@ -94,9 +96,16 @@ Use **j** to get the json without the full path.
     j data.why
     > "Simplest database ever"
 
+Finally, let's say that you want to set multiples keys and values in one
+operation. Use **sl <separator>**.
+
+    sl | data.name BITE|data.why Simplest database ever|data.author.name Andrés Villalobos|data.author.twitter matnesis
+
+"|" will be the separator in this case, but it could be any byte you specify.
+
 Everything will be stored sorted on **data/DB.json**.
 
-### Subscriptions
+## Subscriptions
 
 You can subscribe to a key to receive values on changes.
 
