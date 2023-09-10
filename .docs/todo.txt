@@ -1,29 +1,26 @@
 
+    Document the environment variables required to run the server.
+
     Use a temporary map to store the values and then extend the original map, this way we don't need to lock the original map.
 
     What happens when someone wants to set a variable with lots of spaces at the beginning of the value?
-    Use only one space on the parser to allow spaces as values
+    Use only one space on the parser to allow spaces as values (?)
 
     s <key1> <value1>, <key2> <value2>, <key3> <value3>
-
-    Document the environment variables required to run the server.
 
     Think about how condvars could be used to improve the performance of the server.
     What about using / instead of . for the key?
     Use to_vec instead of to_owned on Vec types.
 
     Should we validate the end of a message for more safety or maybe a crc somewhere?
-    Should we validate a timeout for the client, or that's already built inside Tcp stuff and need configuration?
 
     Explore the casting between u32 and related values.
 
-    Auth by password.
+    Auth by password?
 
-    Maybe unsubscriptions for each subscription?
+    Maybe unsubscriptions for each subscription type?
     Maybe you should be able to subscribe to all the content when you don't specify the key?
     Extract kv range into his own function
-
-    Handle casting, int, float, bool?
 
     Trim '.' at the end to avoid weird formats?
 
@@ -40,12 +37,15 @@
     Thread waiting for q! in the input to quit.
     Improve serialization so it can be written in blocks like a good BTreeMap on file?
 
-    Connection handles needs to be a module?
-
     A way to handle lists, maybe user.likes.1 or something?
     Push # value should insert into a list, transform normal values
     Pop # should return and delete a value
 
+
+10 September 2023
+    x Should we validate a timeout for the client, or that's already built inside Tcp stuff and need configuration?
+    x Handle casting, int, float, bool?
+    x Connection handles needs to be a module?
 
 5 March 2023
     x IP and port by environment
