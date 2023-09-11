@@ -1,14 +1,15 @@
 FROM rust:1.72.0 as build-env
 
 WORKDIR /app
-RUN USER=root cargo new --bin bite
+RUN cargo new --bin bite
 COPY ./Cargo.toml ./Cargo.lock ./bite/
+
 WORKDIR /app/bite
 RUN cargo build --release
-RUN rm src/*.rs
-
-ADD . .
+RUN rm ./src/*.rs
 RUN rm ./target/release/deps/bite*
+
+COPY ./src ./src
 RUN cargo build --release
 
 FROM gcr.io/distroless/cc-debian12
