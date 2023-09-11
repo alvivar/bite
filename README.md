@@ -74,9 +74,8 @@ binary on **Docker**.
 
 ## Things that I would like to add
 
--   Auth (Soon, working on a Tokio/Warp proxy with security)
--   The BTree on disk, serialized correctly instead of json
--   "Only on memory" should be optional
--   A small query language (so fun)
+-   Auth .
+-   The BTree on disk, serialized correctly instead of json.
+-   "Only on memory" should be an option.
 -   Maybe some kind of lists?
--   Support ints, floats and bools, not just strings (?)
+-   A small query language?
