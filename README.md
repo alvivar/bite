@@ -48,9 +48,9 @@ Ready to run on **127.0.0.1:1984**.
 handle sockets events, storing on a **BTreeMap** serialized into a json file
 with **Serde**.
 
-Uses [Google Container
-Tools](https://github.com/GoogleContainerTools/distroless/blob/master/examples/rust/Dockerfile)
-to run the binary on **Docker**.
+Uses Google Container Tools
+[distroless](https://github.com/GoogleContainerTools/distroless) to run the
+binary on **Docker**.
 
 ## Things that I would like to add
 
