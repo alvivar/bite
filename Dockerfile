@@ -11,6 +11,6 @@ ADD . .
 RUN rm ./target/release/deps/bite*
 RUN cargo build --release
 
-FROM gcr.io/distroless/cc
+FROM gcr.io/distroless/cc-debian12
 COPY --from=build-env /app/bite/target/release/bite /
 CMD ["./bite"]
