@@ -96,20 +96,19 @@ Use **j** to get the json without the full path.
     j data.why
     > "Simplest database ever"
 
-Finally, let's say that you want to set multiples keys and values in one
-operation. Use **sl <separator>**.
+Finally, if you want to set multiple keys and values in one operation, use
+**sl** followed by a separator.
 
     sl | data.name BITE|data.why Simplest database ever|data.author.name Andrés Villalobos|data.author.twitter matnesis
 
-"|" will be the separator in this case, but it could be any byte you specify.
+In this case, **"|"** will be the separator, but you can specify any byte as the separator.
 
 Everything will be stored sorted on **data/DB.json**.
 
 ## Subscriptions
 
-You can subscribe to a key to receive values on changes.
-
-With **#g** you receive the value.
+You can subscribe to a key to get updates when values change. Use **#g** to
+receive the value.
 
     #g parent.child
     > OK

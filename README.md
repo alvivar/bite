@@ -1,14 +1,13 @@
 # BITE
 
-Key-Value database with subscriptions, aimed to real time multiplayer
-applications.
+Key-Value database with subscriptions, designed for real-time multiplayer applications.
 
-To set a value, use s.
+To set a value, use **s**.
 
     s somekeyname Some string as a value
     > OK
 
-To get a value, use g.
+To get a value, use **g**.
 
     g somekey
     > Some string as a value
@@ -16,8 +15,8 @@ To get a value, use g.
     g keywithoutvalue
     >
 
-You can subscribe to a key to receive values on changes. With **#g** you receive
-the value.
+You can subscribe to a key to get updates when values change. Use **#g** to
+receive the value.
 
     #g parent.child
     > OK
@@ -31,8 +30,7 @@ And more commands available, check the [**TUTORIAL**](TUTORIAL.md) for more.
 
 ## C# Library
 
-Check out [**.csharp**](https://github.com/alvivar/bite/tree/master/.csharp) for
-a simple **C#** client library and a **Unity** example.
+Check out [**.csharp**](/.csharp/) for a simple **C#** client library.
 
 ## Docker
 
@@ -43,22 +41,6 @@ server.
     docker-compose up -d
 
 Ready to run on **127.0.0.1:1984**.
-
-## Rust
-
-The server runs on **0.0.0.0:1984**, you can send/receive messages with any TCP
-connection, just send complete lines (0xA). @todo Check this.
-
-    cargo run --release --p server
-
-The client is a simple test that connects to **127.0.0.1:1984**, write and hit
-enter to send/receive.
-
-    cargo run --release --p client
-
-You could use the first argument to specify a different address.
-
-    cargo run --release -p client -- 123.45.678.90:1234
 
 ## Tech
 
