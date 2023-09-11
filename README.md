@@ -26,7 +26,7 @@ receive the value.
 
     > Some value (*On all subscribers)
 
-And more commands available, check the [**TUTORIAL**](TUTORIAL.md) for more.
+And more commands available, check the [**commands**](Commands.md) for more.
 
 ## C# Library
 
