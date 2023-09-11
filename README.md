@@ -32,15 +32,35 @@ And more commands available, check the [**commands**](Commands.md) for more.
 
 Check out [**.csharp**](/.csharp/) for a simple **C#** client library.
 
+## Environment variables config
+
+The endpoint where the server will listen:
+
+    SERVER=127.0.0.1:1984
+
+If you want to see logs in your console, set the **RUST_LOG** environment to **info**.
+
+    RUST_LOG=info
+
 ## Docker
 
 It includes the **docker-compose** and **Dockerfile** to build and run the
-server.
+server. Just take a look to change the environment variables and security
+settings to your needs.
 
-    docker-compose build
-    docker-compose up -d
+    docker-compose up -d --build
 
-Ready to run on **127.0.0.1:1984**.
+Ready to run on **0.0.0.0:1984** (Docker all available interfaces).
+
+## BITE Protocol
+
+6 bytes as header, then a maximum of 65529 bytes of data, a total of 65535 bytes
+together.
+
+    [  2 Bytes  ][  2 Bytes   ][ 2 Bytes ][ Max 65535 - 6 ]
+    [ Client Id ][ Message Id ][   Size  ][   Data Bytes  ]
+
+Check out the [**protocol**](Protocol.md) for more details.
 
 ## Tech
 
