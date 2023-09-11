@@ -1,0 +1,26 @@
+version: '3.8'
+services:
+    bite:
+        container_name: bite
+        build: https://github.com/alvivar/bite.git
+        ports:
+            - '127.0.0.1:1984:1984'
+        volumes:
+            - ./data:/data
+        environment:
+            - SERVER=0.0.0.0:1984
+            - RUST_LOG=info
+        restart: unless-stopped
+
+    bitews:
+        container_name: bitews
+        build: https://github.com/alvivar/bitews.git
+        ports:
+            - '127.0.0.1:1985:1984'
+        depends_on:
+            - bite
+        environment:
+            - SERVER=0.0.0.0:1984
+            - PROXY=bite:1984
+            - RUST_LOG=info
+        restart: unless-stopped
