@@ -2,16 +2,12 @@ version: '3.8'
 services:
     bite:
         container_name: bite
-        build:
-            context: ./
-            dockerfile: Dockerfile
+        build: https://github.com/alvivar/bite.git
         ports:
-            - '1984:1984'
+            - '127.0.0.1:1984:1984'
         volumes:
-            - type: bind
-              source: ./data
-              target: /data
+            - ./data:/data
         environment:
-            - RUST_LOG=info
             - SERVER=0.0.0.0:1984
+            - RUST_LOG=info
         restart: unless-stopped
