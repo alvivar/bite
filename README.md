@@ -52,6 +52,8 @@ settings to your needs.
 
 Ready to run on **0.0.0.0:1984** (Docker all available interfaces).
 
+Also checkout the folder [**.docker**](/.docker/) for WebSockets support.
+
 ## BITE Protocol
 
 6 bytes as header, then a maximum of 65529 bytes of data, a total of 65535 bytes
@@ -72,9 +74,9 @@ Uses Google Container Tools
 [distroless](https://github.com/GoogleContainerTools/distroless) to run the
 binary on **Docker**.
 
-## Things that I would like to add
+## To do
 
--   Auth .
+-   Auth.
 -   The BTree on disk, serialized correctly instead of json.
 -   "Only on memory" should be an option.
 -   Maybe some kind of lists?
