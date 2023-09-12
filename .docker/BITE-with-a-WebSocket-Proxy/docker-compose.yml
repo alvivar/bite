@@ -4,7 +4,7 @@ services:
         container_name: bite
         build: https://github.com/alvivar/bite.git
         ports:
-            - '127.0.0.1:1984:1984'
+            - '1984:1984'
         volumes:
             - ./data:/data
         environment:
@@ -16,7 +16,7 @@ services:
         container_name: bitews
         build: https://github.com/alvivar/bitews.git
         ports:
-            - '127.0.0.1:1985:1984'
+            - '1985:1984'
         depends_on:
             - bite
         environment:
