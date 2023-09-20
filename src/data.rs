@@ -1,12 +1,18 @@
-use std::collections::BTreeMap;
-use std::io::Cursor;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::BTreeMap,
+    io::Cursor,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        mpsc::{channel, Receiver, Sender},
+        Arc, Mutex,
+    },
+};
 
-use crate::parser::{next_word, remaining};
-use crate::subs::{self, Action::Call};
-use crate::writer::{self, Action::Queue, Order};
+use crate::{
+    parser::{next_word, remaining},
+    subs::{self, Action::Call},
+    writer::{self, Action::Queue, Order},
+};
 
 use serde_json::{self, json, Value};
 

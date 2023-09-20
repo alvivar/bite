@@ -1,9 +1,12 @@
-use std::collections::HashMap;
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::{
+    collections::HashMap,
+    sync::mpsc::{channel, Receiver, Sender},
+};
 
-use crate::parser::Command;
-use crate::writer::Action::QueueAll;
-use crate::writer::{self, Order};
+use crate::{
+    parser::Command,
+    writer::{self, Action::QueueAll, Order},
+};
 
 use serde_json::json;
 

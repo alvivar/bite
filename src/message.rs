@@ -1,5 +1,7 @@
-use std::cmp::Ordering;
-use std::io::{self, Error, ErrorKind};
+use std::{
+    cmp::Ordering,
+    io::{self, Error, ErrorKind},
+};
 
 pub enum Received {
     None,

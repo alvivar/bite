@@ -1,9 +1,15 @@
-use std::collections::{HashMap, VecDeque};
-use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::{HashMap, VecDeque},
+    sync::{
+        mpsc::{channel, Receiver, Sender},
+        Arc, Mutex,
+    },
+};
 
-use crate::connection::Connection;
-use crate::subs::{self, Action::DelAll};
+use crate::{
+    connection::Connection,
+    subs::{self, Action::DelAll},
+};
 
 use polling::Poller;
 

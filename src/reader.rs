@@ -1,12 +1,18 @@
-use std::collections::HashMap;
-use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::{Arc, Mutex};
-use std::time::Instant;
+use std::{
+    collections::HashMap,
+    sync::{
+        mpsc::{channel, Receiver, Sender},
+        Arc, Mutex,
+    },
+    time::Instant,
+};
 
-use crate::connection::Connection;
-use crate::message::{Message, Messages, Received};
-use crate::parser::Action::Parse;
-use crate::{cleaner, parser};
+use crate::{
+    cleaner,
+    connection::Connection,
+    message::{Message, Messages, Received},
+    parser::{self, Action::Parse},
+};
 
 use polling::{Event, Poller};
 

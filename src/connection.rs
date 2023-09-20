@@ -1,7 +1,12 @@
-use std::io::ErrorKind::{BrokenPipe, Interrupted, WouldBlock};
-use std::io::{self, Read, Write};
-use std::net::{SocketAddr, TcpStream};
-use std::time::Instant;
+use std::{
+    io::{
+        self,
+        ErrorKind::{BrokenPipe, Interrupted, WouldBlock},
+        Read, Write,
+    },
+    net::{SocketAddr, TcpStream},
+    time::Instant,
+};
 
 const BUFFER_SIZE: usize = 4096;
 

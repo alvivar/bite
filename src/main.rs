@@ -1,10 +1,3 @@
-use std::collections::{HashMap, VecDeque};
-use std::env;
-use std::io;
-use std::net::TcpListener;
-use std::sync::{Arc, Mutex};
-use std::thread;
-
 mod cleaner;
 mod connection;
 mod data;
@@ -16,16 +9,28 @@ mod reader;
 mod subs;
 mod writer;
 
-use crate::cleaner::Cleaner;
-use crate::connection::Connection;
-use crate::data::Data;
-use crate::db::DB;
-use crate::heartbeat::Heartbeat;
-use crate::parser::Parser;
-use crate::reader::{Action::Read, Reader};
-use crate::subs::Subs;
-use crate::writer::Action::{Queue, Write};
-use crate::writer::{Order, Writer};
+use std::{
+    collections::{HashMap, VecDeque},
+    env, io,
+    net::TcpListener,
+    sync::{Arc, Mutex},
+    thread,
+};
+
+use crate::{
+    cleaner::Cleaner,
+    connection::Connection,
+    data::Data,
+    db::DB,
+    heartbeat::Heartbeat,
+    parser::Parser,
+    reader::{Action::Read, Reader},
+    subs::Subs,
+    writer::{
+        Action::{Queue, Write},
+        Order, Writer,
+    },
+};
 
 use polling::{Event, Poller};
 

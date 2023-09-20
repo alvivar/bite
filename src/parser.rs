@@ -1,16 +1,22 @@
 use core::fmt::{Debug, Display, Formatter, Result};
-use std::io::Cursor;
-use std::net::SocketAddr;
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::{
+    io::Cursor,
+    net::SocketAddr,
+    sync::mpsc::{channel, Receiver, Sender},
+};
 
-use crate::data;
-use crate::data::Action::{Append, Delete, Get, Inc, Json, Jtrim, KeyValue};
-use crate::data::Action::{Set, SetIfNone, SetList};
-use crate::message::Message;
-use crate::subs;
-use crate::subs::Action::{Add, Call, Del};
-use crate::writer::Order;
-use crate::writer::{self, Action::Queue};
+use crate::{
+    data::{
+        self,
+        Action::{Append, Delete, Get, Inc, Json, Jtrim, KeyValue, Set, SetIfNone, SetList},
+    },
+    message::Message,
+    subs::{
+        self,
+        Action::{Add, Call, Del},
+    },
+    writer::{self, Action::Queue, Order},
+};
 
 const OK: &str = "OK";
 const NO: &str = "NO";
