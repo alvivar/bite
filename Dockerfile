@@ -1,4 +1,4 @@
-FROM rust:1.72.0 as build-env
+FROM rust:1.72.1 as build-env
 
 WORKDIR /app
 RUN cargo new --bin bite
