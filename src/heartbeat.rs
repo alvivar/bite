@@ -1,9 +1,10 @@
-use std::collections::HashMap;
-use std::net::Shutdown;
-use std::sync::mpsc::Sender;
-use std::sync::{Arc, Mutex};
-use std::thread::sleep;
-use std::time::Duration;
+use std::{
+    collections::HashMap,
+    net::Shutdown,
+    sync::{mpsc::Sender, Arc, Mutex},
+    thread::sleep,
+    time::Duration,
+};
 
 use crate::connection::Connection;
 use crate::writer::{self, Action::QueueAll, Order};
@@ -26,14 +27,15 @@ impl Heartbeat {
 
     pub fn handle(&self, writer_tx: Sender<writer::Action>) {
         loop {
-            self.handle_unfinished_readers();
-            self.handle_idle_writers(&writer_tx);
+            sleep(Duration::from_secs(TIMEOUT_30));
+            self.drop_idle_readers();
+
+            sleep(Duration::from_secs(TIMEOUT_30));
+            self.ping_idle_writers(&writer_tx);
         }
     }
 
-    fn handle_unfinished_readers(&self) {
-        sleep(Duration::from_secs(TIMEOUT_30));
-
+    fn drop_idle_readers(&self) {
         let mut readers = self.readers.lock().unwrap();
 
         for (id, connection) in readers.iter_mut() {
@@ -47,9 +49,7 @@ impl Heartbeat {
         }
     }
 
-    fn handle_idle_writers(&self, writer_tx: &Sender<writer::Action>) {
-        sleep(Duration::from_secs(TIMEOUT_30));
-
+    fn ping_idle_writers(&self, writer_tx: &Sender<writer::Action>) {
         let mut messages = Vec::<Order>::new();
         let mut writers = self.writers.lock().unwrap();
 
