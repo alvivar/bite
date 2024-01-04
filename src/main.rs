@@ -32,7 +32,7 @@ use crate::{
     },
 };
 
-use polling::{Event, Poller};
+use polling::{Event, Events, Poller};
 
 #[macro_use]
 extern crate log;
@@ -56,7 +56,9 @@ fn main() -> io::Result<()> {
     server.set_nonblocking(true)?;
 
     let poller = Poller::new()?;
-    poller.add(&server, Event::readable(0))?; // 0 is the server.
+    unsafe {
+        poller.add(&server, Event::readable(0))?; // 0 is the server.
+    }
     let poller = Arc::new(poller);
 
     // The connections
@@ -122,13 +124,13 @@ fn main() -> io::Result<()> {
 
     // Connections and events via smol Poller.
     let mut id_count: usize = 1; // 0 belongs to the main TcpListener.
-    let mut events = Vec::new();
+    let mut events = Events::new();
 
     loop {
         events.clear();
         poller.wait(&mut events, None)?;
 
-        for ev in &events {
+        for ev in events.iter() {
             match ev.key {
                 0 => {
                     let (reader, addr) = server.accept()?;
@@ -151,14 +153,18 @@ fn main() -> io::Result<()> {
                     poller.modify(&server, Event::readable(0))?;
 
                     // Register the reader socket for reading events.
-                    poller.add(&reader, Event::readable(client_id))?;
+                    unsafe {
+                        poller.add(&reader, Event::readable(client_id))?;
+                    }
                     readers
                         .lock()
                         .unwrap()
                         .insert(client_id, Connection::new(client_id, reader, addr));
 
                     // Save the writer socket for later use.
-                    poller.add(&writer, Event::none(client_id))?;
+                    unsafe {
+                        poller.add(&writer, Event::none(client_id))?;
+                    }
                     writers
                         .lock()
                         .unwrap()
