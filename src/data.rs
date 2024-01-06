@@ -77,8 +77,10 @@ impl Data {
                     }
                 }
 
-                // Experimental: The first char of the key will be used as
-                // separator: sl , somekey A, other.key B, key C, 1.2 D
+                // This code sets multiple keys at once.
+                // The first character in the command value will also be used as
+                // a separator for the rest of the message.
+                //     sl , somekey value 1, other.key value 2, key value 3, 1.2 value 4
                 Action::SetList(key, val, from_id, msg_id) => {
                     let separator = key.chars().next().unwrap() as u8;
                     let set_list = val.split(|x| *x == separator);

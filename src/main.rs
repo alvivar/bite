@@ -49,7 +49,7 @@ fn main() -> io::Result<()> {
         Err(_) => "0.0.0.0:1984".into(),
     };
 
-    info!("Running at {server} | To change the address use the SERVER environment variable");
+    info!("Running at {server} | To change the address, use the SERVER environment variable");
 
     // The server and the smol Poller.
     let server = TcpListener::bind(server)?;
