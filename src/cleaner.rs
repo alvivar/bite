@@ -2,7 +2,7 @@ use std::{
     collections::{HashMap, VecDeque},
     sync::{
         mpsc::{channel, Receiver, Sender},
-        Arc, Mutex, RwLock,
+        Arc, RwLock,
     },
 };
 
@@ -21,7 +21,7 @@ pub struct Cleaner {
     poller: Arc<Poller>,
     readers: Arc<RwLock<HashMap<usize, Connection>>>,
     writers: Arc<RwLock<HashMap<usize, Connection>>>,
-    used_ids: Arc<Mutex<VecDeque<usize>>>,
+    used_ids: Arc<RwLock<VecDeque<usize>>>,
     pub tx: Sender<Action>,
     rx: Receiver<Action>,
 }
@@ -31,7 +31,7 @@ impl Cleaner {
         poller: Arc<Poller>,
         readers: Arc<RwLock<HashMap<usize, Connection>>>,
         writers: Arc<RwLock<HashMap<usize, Connection>>>,
-        used_ids: Arc<Mutex<VecDeque<usize>>>,
+        used_ids: Arc<RwLock<VecDeque<usize>>>,
     ) -> Cleaner {
         let (tx, rx) = channel::<Action>();
 
@@ -52,7 +52,7 @@ impl Cleaner {
                     let reader = self.readers.write().unwrap().remove(&id);
                     if let Some(reader) = reader {
                         self.poller.delete(&reader.socket).unwrap();
-                        self.used_ids.lock().unwrap().push_back(id);
+                        self.used_ids.write().unwrap().push_back(id);
                         subs_tx.send(DelAll(id)).unwrap();
                     }
 

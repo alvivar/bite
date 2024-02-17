@@ -13,7 +13,7 @@ use std::{
     collections::{HashMap, VecDeque},
     env, io,
     net::TcpListener,
-    sync::{Arc, Mutex, RwLock},
+    sync::{Arc, RwLock},
     thread,
 };
 
@@ -66,7 +66,7 @@ fn main() -> io::Result<()> {
     let readers = Arc::new(RwLock::new(readers));
     let writers = HashMap::<usize, Connection>::new();
     let writers = Arc::new(RwLock::new(writers));
-    let used_ids = Arc::new(Mutex::new(VecDeque::<usize>::new()));
+    let used_ids = Arc::new(RwLock::new(VecDeque::<usize>::new()));
 
     // The reader
     let mut reader = Reader::new(poller.clone(), readers.clone());
@@ -138,7 +138,7 @@ fn main() -> io::Result<()> {
                     let writer = reader.try_clone().unwrap();
 
                     // Reusing ids.
-                    let used_id = used_ids.lock().unwrap().pop_front();
+                    let used_id = used_ids.write().unwrap().pop_front();
                     let client_id = if let Some(id) = used_id {
                         id
                     } else {
