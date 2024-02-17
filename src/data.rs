@@ -4,7 +4,7 @@ use std::{
     sync::{
         atomic::{AtomicBool, Ordering},
         mpsc::{channel, Receiver, Sender},
-        Arc, Mutex,
+        Arc, RwLock,
     },
 };
 
@@ -30,7 +30,7 @@ pub enum Action {
 }
 
 pub struct Data {
-    pub map: Arc<Mutex<BTreeMap<String, Vec<u8>>>>,
+    pub map: Arc<RwLock<BTreeMap<String, Vec<u8>>>>,
     writer_tx: Sender<writer::Action>,
     subs_tx: Sender<subs::Action>,
     pub tx: Sender<Action>,
@@ -39,7 +39,7 @@ pub struct Data {
 
 impl Data {
     pub fn new(writer_tx: Sender<writer::Action>, subs_tx: Sender<subs::Action>) -> Data {
-        let map = Arc::new(Mutex::new(BTreeMap::<String, Vec<u8>>::new()));
+        let map = Arc::new(RwLock::new(BTreeMap::<String, Vec<u8>>::new()));
         let (tx, rx) = channel::<Action>();
 
         Data {
@@ -55,13 +55,13 @@ impl Data {
         loop {
             match self.rx.recv().unwrap() {
                 Action::Set(key, val) => {
-                    self.map.lock().unwrap().insert(key, val);
+                    self.map.write().unwrap().insert(key, val);
 
                     db_modified.swap(true, Ordering::Relaxed);
                 }
 
                 Action::SetIfNone(key, val, from_id, msg_id) => {
-                    let mut map = self.map.lock().unwrap();
+                    let mut map = self.map.write().unwrap();
 
                     match map.contains_key(&key) {
                         true => continue,
@@ -85,7 +85,7 @@ impl Data {
                     let separator = key.chars().next().unwrap() as u8;
                     let set_list = val.split(|x| *x == separator);
 
-                    let mut map = self.map.lock().unwrap();
+                    let mut map = self.map.write().unwrap();
                     for key_val in set_list {
                         let mut cursor = Cursor::new(key_val);
                         let key = String::from_utf8_lossy(next_word(&mut cursor));
@@ -104,7 +104,7 @@ impl Data {
 
                 Action::Inc(key, from_id, msg_id) => {
                     let inc_vec = {
-                        let mut map = self.map.lock().unwrap();
+                        let mut map = self.map.write().unwrap();
 
                         let inc = match map.get(&key) {
                             Some(val) => vec_to_u64(val) + 1,
@@ -135,7 +135,7 @@ impl Data {
                 }
 
                 Action::Append(key, data, from_id, msg_id) => {
-                    let mut map = self.map.lock().unwrap();
+                    let mut map = self.map.write().unwrap();
                     let value = map.entry(key.to_owned()).or_insert_with(Vec::new);
                     value.extend_from_slice(&data);
                     drop(map);
@@ -146,13 +146,13 @@ impl Data {
                 }
 
                 Action::Delete(key) => {
-                    if self.map.lock().unwrap().remove(&key).is_some() {
+                    if self.map.write().unwrap().remove(&key).is_some() {
                         db_modified.swap(true, Ordering::Relaxed);
                     }
                 }
 
                 Action::Get(key, from_id, msg_id) => {
-                    let message = match self.map.lock().unwrap().get(&key) {
+                    let message = match self.map.write().unwrap().get(&key) {
                         Some(value) => value.to_vec(),
                         None => [].into(),
                     };
@@ -168,7 +168,7 @@ impl Data {
                 }
 
                 Action::KeyValue(key, from_id, msg_id) => {
-                    let map = self.map.lock().unwrap();
+                    let map = self.map.write().unwrap();
                     let range = map.range(key.to_owned()..);
 
                     let key_value: Vec<_> = range
@@ -203,7 +203,7 @@ impl Data {
                 }
 
                 Action::Jtrim(key, from_id, msg_id) => {
-                    let map = self.map.lock().unwrap();
+                    let map = self.map.write().unwrap();
                     let range = map.range(key.to_owned()..);
 
                     let key_value: Vec<_> = range
@@ -235,7 +235,7 @@ impl Data {
                 }
 
                 Action::Json(key, from_id, msg_id) => {
-                    let map = self.map.lock().unwrap();
+                    let map = self.map.write().unwrap();
                     let range = map.range(key.to_owned()..);
 
                     let key_value: Vec<_> = range
