@@ -13,7 +13,7 @@ use std::{
     collections::{HashMap, VecDeque},
     env, io,
     net::TcpListener,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, RwLock},
     thread,
 };
 
@@ -63,7 +63,7 @@ fn main() -> io::Result<()> {
 
     // The connections
     let readers = HashMap::<usize, Connection>::new();
-    let readers = Arc::new(Mutex::new(readers));
+    let readers = Arc::new(RwLock::new(readers));
     let writers = HashMap::<usize, Connection>::new();
     let writers = Arc::new(Mutex::new(writers));
     let used_ids = Arc::new(Mutex::new(VecDeque::<usize>::new()));
@@ -157,7 +157,7 @@ fn main() -> io::Result<()> {
                         poller.add(&reader, Event::readable(client_id))?;
                     }
                     readers
-                        .lock()
+                        .write()
                         .unwrap()
                         .insert(client_id, Connection::new(client_id, reader, addr));
 

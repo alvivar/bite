@@ -2,7 +2,7 @@ use std::{
     collections::HashMap,
     sync::{
         mpsc::{channel, Receiver, Sender},
-        Arc, Mutex,
+        Arc, RwLock,
     },
     time::Instant,
 };
@@ -22,14 +22,14 @@ pub enum Action {
 
 pub struct Reader {
     poller: Arc<Poller>,
-    readers: Arc<Mutex<HashMap<usize, Connection>>>,
+    readers: Arc<RwLock<HashMap<usize, Connection>>>,
     messages: HashMap<usize, Messages>,
     pub tx: Sender<Action>,
     rx: Receiver<Action>,
 }
 
 impl Reader {
-    pub fn new(poller: Arc<Poller>, readers: Arc<Mutex<HashMap<usize, Connection>>>) -> Reader {
+    pub fn new(poller: Arc<Poller>, readers: Arc<RwLock<HashMap<usize, Connection>>>) -> Reader {
         let messages = HashMap::<usize, Messages>::new();
         let (tx, rx) = channel::<Action>();
 
@@ -52,7 +52,7 @@ impl Reader {
                 Action::Read(id) => {
                     let mut closed = false;
 
-                    if let Some(connection) = self.readers.lock().unwrap().get_mut(&id) {
+                    if let Some(connection) = self.readers.write().unwrap().get_mut(&id) {
                         loop {
                             // Loop because "received" could have more than one
                             // message in the same read.

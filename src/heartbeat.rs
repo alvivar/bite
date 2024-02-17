@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     net::Shutdown,
-    sync::{mpsc::Sender, Arc, Mutex},
+    sync::{mpsc::Sender, Arc, Mutex, RwLock},
     thread::sleep,
     time::Duration,
 };
@@ -13,13 +13,13 @@ const TIMEOUT_30: u64 = 30;
 const TIMEOUT_60: u64 = 60;
 
 pub struct Heartbeat {
-    readers: Arc<Mutex<HashMap<usize, Connection>>>,
+    readers: Arc<RwLock<HashMap<usize, Connection>>>,
     writers: Arc<Mutex<HashMap<usize, Connection>>>,
 }
 
 impl Heartbeat {
     pub fn new(
-        readers: Arc<Mutex<HashMap<usize, Connection>>>,
+        readers: Arc<RwLock<HashMap<usize, Connection>>>,
         writers: Arc<Mutex<HashMap<usize, Connection>>>,
     ) -> Heartbeat {
         Heartbeat { readers, writers }
@@ -36,7 +36,7 @@ impl Heartbeat {
     }
 
     fn drop_idle_readers(&self) {
-        let mut readers = self.readers.lock().unwrap();
+        let mut readers = self.readers.write().unwrap();
 
         for (id, connection) in readers.iter_mut() {
             let elapsed = connection.last_read.elapsed().as_secs();
