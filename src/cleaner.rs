@@ -20,7 +20,7 @@ pub enum Action {
 pub struct Cleaner {
     poller: Arc<Poller>,
     readers: Arc<RwLock<HashMap<usize, Connection>>>,
-    writers: Arc<Mutex<HashMap<usize, Connection>>>,
+    writers: Arc<RwLock<HashMap<usize, Connection>>>,
     used_ids: Arc<Mutex<VecDeque<usize>>>,
     pub tx: Sender<Action>,
     rx: Receiver<Action>,
@@ -30,7 +30,7 @@ impl Cleaner {
     pub fn new(
         poller: Arc<Poller>,
         readers: Arc<RwLock<HashMap<usize, Connection>>>,
-        writers: Arc<Mutex<HashMap<usize, Connection>>>,
+        writers: Arc<RwLock<HashMap<usize, Connection>>>,
         used_ids: Arc<Mutex<VecDeque<usize>>>,
     ) -> Cleaner {
         let (tx, rx) = channel::<Action>();
@@ -56,7 +56,7 @@ impl Cleaner {
                         subs_tx.send(DelAll(id)).unwrap();
                     }
 
-                    let writer = self.writers.lock().unwrap().remove(&id);
+                    let writer = self.writers.write().unwrap().remove(&id);
                     if let Some(writer) = writer {
                         self.poller.delete(&writer.socket).unwrap();
                     }

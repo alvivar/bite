@@ -65,7 +65,7 @@ fn main() -> io::Result<()> {
     let readers = HashMap::<usize, Connection>::new();
     let readers = Arc::new(RwLock::new(readers));
     let writers = HashMap::<usize, Connection>::new();
-    let writers = Arc::new(Mutex::new(writers));
+    let writers = Arc::new(RwLock::new(writers));
     let used_ids = Arc::new(Mutex::new(VecDeque::<usize>::new()));
 
     // The reader
@@ -166,7 +166,7 @@ fn main() -> io::Result<()> {
                         poller.add(&writer, Event::none(client_id))?;
                     }
                     writers
-                        .lock()
+                        .write()
                         .unwrap()
                         .insert(client_id, Connection::new(client_id, writer, addr));
 

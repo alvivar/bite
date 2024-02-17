@@ -2,7 +2,7 @@ use std::{
     collections::HashMap,
     sync::{
         mpsc::{channel, Receiver, Sender},
-        Arc, Mutex,
+        Arc, RwLock,
     },
     time::Instant,
 };
@@ -26,13 +26,13 @@ pub struct Order {
 
 pub struct Writer {
     poller: Arc<Poller>,
-    writers: Arc<Mutex<HashMap<usize, Connection>>>,
+    writers: Arc<RwLock<HashMap<usize, Connection>>>,
     pub tx: Sender<Action>,
     rx: Receiver<Action>,
 }
 
 impl Writer {
-    pub fn new(poller: Arc<Poller>, writers: Arc<Mutex<HashMap<usize, Connection>>>) -> Writer {
+    pub fn new(poller: Arc<Poller>, writers: Arc<RwLock<HashMap<usize, Connection>>>) -> Writer {
         let (tx, rx) = channel::<Action>();
 
         Writer {
@@ -47,7 +47,7 @@ impl Writer {
         loop {
             match self.rx.recv().unwrap() {
                 Action::Queue(order) => {
-                    if let Some(connection) = self.writers.lock().unwrap().get_mut(&order.to_id) {
+                    if let Some(connection) = self.writers.write().unwrap().get_mut(&order.to_id) {
                         connection.send_queue.push(stamp_header(
                             order.data,
                             order.from_id as u32,
@@ -59,7 +59,7 @@ impl Writer {
                 }
 
                 Action::QueueAll(orders) => {
-                    let mut writers = self.writers.lock().unwrap();
+                    let mut writers = self.writers.write().unwrap();
                     for order in orders {
                         if let Some(connection) = writers.get_mut(&order.to_id) {
                             connection.send_queue.push(stamp_header(
@@ -76,7 +76,7 @@ impl Writer {
                 Action::Write(id) => {
                     let mut closed = false;
 
-                    if let Some(connection) = self.writers.lock().unwrap().get_mut(&id) {
+                    if let Some(connection) = self.writers.write().unwrap().get_mut(&id) {
                         if !connection.send_queue.is_empty() {
                             let data = connection.send_queue.remove(0);
 
