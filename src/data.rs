@@ -136,7 +136,7 @@ impl Data {
 
                 Action::Append(key, data, from_id, msg_id) => {
                     let mut map = self.map.lock().unwrap();
-                    let value = map.entry(key.to_owned()).or_insert_with(Vec::new);
+                    let value = map.entry(key.to_owned()).or_default();
                     value.extend_from_slice(&data);
                     drop(map);
 

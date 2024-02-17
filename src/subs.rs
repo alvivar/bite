@@ -47,13 +47,13 @@ impl Subs {
         loop {
             match self.rx.recv().unwrap() {
                 Action::Add(key, id, command) => {
-                    let keys = self.id_keys.entry(id).or_insert_with(Vec::new);
+                    let keys = self.id_keys.entry(id).or_default();
 
                     if !keys.contains(&key) {
                         keys.push(key.to_owned());
                     }
 
-                    let subs = self.key_subs.entry(key).or_insert_with(Vec::new);
+                    let subs = self.key_subs.entry(key).or_default();
 
                     if subs.iter().any(|x| x.id == id && x.command == command) {
                         continue;
@@ -63,14 +63,14 @@ impl Subs {
                 }
 
                 Action::Del(key, id) => {
-                    let subs = self.key_subs.entry(key).or_insert_with(Vec::new);
+                    let subs = self.key_subs.entry(key).or_default();
                     subs.retain(|x| x.id != id);
                 }
 
                 Action::DelAll(id) => {
                     if let Some(keys) = self.id_keys.remove(&id) {
                         for key in keys {
-                            let subs = self.key_subs.entry(key).or_insert_with(Vec::new);
+                            let subs = self.key_subs.entry(key).or_default();
                             subs.retain(|x| x.id != id);
                         }
                     }
