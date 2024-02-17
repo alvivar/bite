@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     net::Shutdown,
-    sync::{mpsc::Sender, Arc, RwLock},
+    sync::{mpsc::Sender, Arc, Mutex},
     thread::sleep,
     time::Duration,
 };
@@ -13,14 +13,14 @@ const TIMEOUT_30: u64 = 30;
 const TIMEOUT_60: u64 = 60;
 
 pub struct Heartbeat {
-    readers: Arc<RwLock<HashMap<usize, Connection>>>,
-    writers: Arc<RwLock<HashMap<usize, Connection>>>,
+    readers: Arc<Mutex<HashMap<usize, Connection>>>,
+    writers: Arc<Mutex<HashMap<usize, Connection>>>,
 }
 
 impl Heartbeat {
     pub fn new(
-        readers: Arc<RwLock<HashMap<usize, Connection>>>,
-        writers: Arc<RwLock<HashMap<usize, Connection>>>,
+        readers: Arc<Mutex<HashMap<usize, Connection>>>,
+        writers: Arc<Mutex<HashMap<usize, Connection>>>,
     ) -> Heartbeat {
         Heartbeat { readers, writers }
     }
@@ -36,7 +36,7 @@ impl Heartbeat {
     }
 
     fn drop_idle_readers(&self) {
-        let mut readers = self.readers.write().unwrap();
+        let mut readers = self.readers.lock().unwrap();
 
         for (id, connection) in readers.iter_mut() {
             let elapsed = connection.last_read.elapsed().as_secs();
@@ -51,7 +51,7 @@ impl Heartbeat {
 
     fn ping_idle_writers(&self, writer_tx: &Sender<writer::Action>) {
         let mut messages = Vec::<Order>::new();
-        let mut writers = self.writers.write().unwrap();
+        let mut writers = self.writers.lock().unwrap();
 
         for (id, connection) in writers.iter_mut() {
             if connection.last_write.elapsed().as_secs() > TIMEOUT_60 {

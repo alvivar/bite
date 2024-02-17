@@ -13,7 +13,7 @@ use std::{
     collections::{HashMap, VecDeque},
     env, io,
     net::TcpListener,
-    sync::{Arc, RwLock},
+    sync::{Arc, Mutex},
     thread,
 };
 
@@ -63,10 +63,10 @@ fn main() -> io::Result<()> {
 
     // The connections
     let readers = HashMap::<usize, Connection>::new();
-    let readers = Arc::new(RwLock::new(readers));
+    let readers = Arc::new(Mutex::new(readers));
     let writers = HashMap::<usize, Connection>::new();
-    let writers = Arc::new(RwLock::new(writers));
-    let used_ids = Arc::new(RwLock::new(VecDeque::<usize>::new()));
+    let writers = Arc::new(Mutex::new(writers));
+    let used_ids = Arc::new(Mutex::new(VecDeque::<usize>::new()));
 
     // The reader
     let mut reader = Reader::new(poller.clone(), readers.clone());
@@ -138,7 +138,7 @@ fn main() -> io::Result<()> {
                     let writer = reader.try_clone().unwrap();
 
                     // Reusing ids.
-                    let used_id = used_ids.write().unwrap().pop_front();
+                    let used_id = used_ids.lock().unwrap().pop_front();
                     let client_id = if let Some(id) = used_id {
                         id
                     } else {
@@ -157,7 +157,7 @@ fn main() -> io::Result<()> {
                         poller.add(&reader, Event::readable(client_id))?;
                     }
                     readers
-                        .write()
+                        .lock()
                         .unwrap()
                         .insert(client_id, Connection::new(client_id, reader, addr));
 
@@ -166,7 +166,7 @@ fn main() -> io::Result<()> {
                         poller.add(&writer, Event::none(client_id))?;
                     }
                     writers
-                        .write()
+                        .lock()
                         .unwrap()
                         .insert(client_id, Connection::new(client_id, writer, addr));
 

@@ -4,7 +4,7 @@ use std::{
     io::{Read, Write},
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc, RwLock,
+        Arc, Mutex,
     },
     thread::sleep,
     time::Duration,
@@ -15,12 +15,12 @@ const DB_FILE: &str = "./data/db.bin";
 const DB_NAME: &str = "db.bin";
 
 pub struct DB {
-    data: Arc<RwLock<BTreeMap<String, Vec<u8>>>>,
+    data: Arc<Mutex<BTreeMap<String, Vec<u8>>>>,
     pub modified: Arc<AtomicBool>,
 }
 
 impl DB {
-    pub fn new(data: Arc<RwLock<BTreeMap<String, Vec<u8>>>>) -> DB {
+    pub fn new(data: Arc<Mutex<BTreeMap<String, Vec<u8>>>>) -> DB {
         let modified = Arc::new(AtomicBool::new(false));
 
         DB { data, modified }
@@ -53,7 +53,7 @@ impl DB {
         }
 
         if let Ok(data) = bincode::deserialize::<BTreeMap<String, Vec<u8>>>(&content[..]) {
-            *self.data.write().unwrap() = data;
+            *self.data.lock().unwrap() = data;
         }
     }
 
@@ -65,7 +65,7 @@ impl DB {
             .truncate(true)
             .open(DB_FILE);
 
-        let data: Vec<u8> = bincode::serialize(&*self.data.read().unwrap()).unwrap();
+        let data: Vec<u8> = bincode::serialize(&*self.data.lock().unwrap()).unwrap();
         file.unwrap().write_all(&data[..]).unwrap();
 
         info!("{DB_NAME} saved");

@@ -2,7 +2,7 @@ use std::{
     collections::{HashMap, VecDeque},
     sync::{
         mpsc::{channel, Receiver, Sender},
-        Arc, RwLock,
+        Arc, Mutex,
     },
 };
 
@@ -19,9 +19,9 @@ pub enum Action {
 
 pub struct Cleaner {
     poller: Arc<Poller>,
-    readers: Arc<RwLock<HashMap<usize, Connection>>>,
-    writers: Arc<RwLock<HashMap<usize, Connection>>>,
-    used_ids: Arc<RwLock<VecDeque<usize>>>,
+    readers: Arc<Mutex<HashMap<usize, Connection>>>,
+    writers: Arc<Mutex<HashMap<usize, Connection>>>,
+    used_ids: Arc<Mutex<VecDeque<usize>>>,
     pub tx: Sender<Action>,
     rx: Receiver<Action>,
 }
@@ -29,9 +29,9 @@ pub struct Cleaner {
 impl Cleaner {
     pub fn new(
         poller: Arc<Poller>,
-        readers: Arc<RwLock<HashMap<usize, Connection>>>,
-        writers: Arc<RwLock<HashMap<usize, Connection>>>,
-        used_ids: Arc<RwLock<VecDeque<usize>>>,
+        readers: Arc<Mutex<HashMap<usize, Connection>>>,
+        writers: Arc<Mutex<HashMap<usize, Connection>>>,
+        used_ids: Arc<Mutex<VecDeque<usize>>>,
     ) -> Cleaner {
         let (tx, rx) = channel::<Action>();
 
@@ -49,14 +49,14 @@ impl Cleaner {
         loop {
             match self.rx.recv().unwrap() {
                 Action::Drop(id) => {
-                    let reader = self.readers.write().unwrap().remove(&id);
+                    let reader = self.readers.lock().unwrap().remove(&id);
                     if let Some(reader) = reader {
                         self.poller.delete(&reader.socket).unwrap();
-                        self.used_ids.write().unwrap().push_back(id);
+                        self.used_ids.lock().unwrap().push_back(id);
                         subs_tx.send(DelAll(id)).unwrap();
                     }
 
-                    let writer = self.writers.write().unwrap().remove(&id);
+                    let writer = self.writers.lock().unwrap().remove(&id);
                     if let Some(writer) = writer {
                         self.poller.delete(&writer.socket).unwrap();
                     }
