@@ -51,9 +51,9 @@ impl Heartbeat {
 
     fn ping_idle_writers(&self, writer_tx: &Sender<writer::Action>) {
         let mut messages = Vec::<Order>::new();
-        let mut writers = self.writers.lock().unwrap();
+        let writers = self.writers.lock().unwrap();
 
-        for (id, connection) in writers.iter_mut() {
+        for (id, connection) in writers.iter() {
             if connection.last_write.elapsed().as_secs() > TIMEOUT_60 {
                 messages.push(Order {
                     from_id: 0,
