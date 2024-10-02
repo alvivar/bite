@@ -1,0 +1,1873 @@
+# cleaner.rs
+
+use std::{
+    collections::{HashMap, VecDeque},
+    sync::{
+        mpsc::{channel, Receiver, Sender},
+        Arc, Mutex,
+    },
+};
+
+use crate::{
+    connection::Connection,
+    subs::{self, Action::DelAll},
+};
+
+use polling::Poller;
+
+pub enum Action {
+    Drop(usize),
+}
+
+pub struct Cleaner {
+    poller: Arc<Poller>,
+    readers: Arc<Mutex<HashMap<usize, Connection>>>,
+    writers: Arc<Mutex<HashMap<usize, Connection>>>,
+    used_ids: Arc<Mutex<VecDeque<usize>>>,
+    pub tx: Sender<Action>,
+    rx: Receiver<Action>,
+}
+
+impl Cleaner {
+    pub fn new(
+        poller: Arc<Poller>,
+        readers: Arc<Mutex<HashMap<usize, Connection>>>,
+        writers: Arc<Mutex<HashMap<usize, Connection>>>,
+        used_ids: Arc<Mutex<VecDeque<usize>>>,
+    ) -> Cleaner {
+        let (tx, rx) = channel::<Action>();
+
+        Cleaner {
+            poller,
+            writers,
+            readers,
+            used_ids,
+            tx,
+            rx,
+        }
+    }
+
+    pub fn handle(&self, subs_tx: Sender<subs::Action>) {
+        loop {
+            match self.rx.recv().unwrap() {
+                Action::Drop(id) => {
+                    let reader = self.readers.lock().unwrap().remove(&id);
+                    if let Some(reader) = reader {
+                        self.poller.delete(&reader.socket).unwrap();
+                        self.used_ids.lock().unwrap().push_back(id);
+                        subs_tx.send(DelAll(id)).unwrap();
+                    }
+
+                    let writer = self.writers.lock().unwrap().remove(&id);
+                    if let Some(writer) = writer {
+                        self.poller.delete(&writer.socket).unwrap();
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+# connection.rs
+
+use std::{
+    io::{
+        self,
+        ErrorKind::{BrokenPipe, Interrupted, WouldBlock},
+        Read, Write,
+    },
+    net::{SocketAddr, TcpStream},
+    time::Instant,
+};
+
+const BUFFER_SIZE: usize = 4096;
+
+pub struct Connection {
+    pub id: usize,
+    pub socket: TcpStream,
+    pub addr: SocketAddr,
+    pub send_queue: Vec<Vec<u8>>,
+    pub pending_read: bool,
+    pub last_read: Instant,
+    pub last_write: Instant,
+    pub closed: bool,
+}
+
+impl Connection {
+    pub fn new(id: usize, socket: TcpStream, addr: SocketAddr) -> Connection {
+        let send_queue = Vec::<Vec<u8>>::new();
+
+        Connection {
+            id,
+            socket,
+            addr,
+            send_queue,
+            pending_read: false,
+            last_read: Instant::now(),
+            last_write: Instant::now(),
+            closed: false,
+        }
+    }
+
+    pub fn try_read(&mut self) -> io::Result<Vec<u8>> {
+        match read(&mut self.socket) {
+            Ok(data) => Ok(data),
+
+            Err(err) => {
+                self.closed = true;
+
+                Err(err)
+            }
+        }
+    }
+
+    pub fn try_write(&mut self, data: Vec<u8>) -> io::Result<usize> {
+        match write(&mut self.socket, data) {
+            Ok(count) => Ok(count),
+
+            Err(err) => {
+                self.closed = true;
+
+                Err(err)
+            }
+        }
+    }
+}
+
+fn read(socket: &mut TcpStream) -> io::Result<Vec<u8>> {
+    let mut buffer = Vec::with_capacity(BUFFER_SIZE);
+
+    loop {
+        let mut chunk = vec![0; BUFFER_SIZE];
+
+        match socket.read(&mut chunk) {
+            Ok(0) => {
+                // Reading 0 bytes means the other side has closed the
+                // connection or is done writing, then so are we.
+                return Err(BrokenPipe.into());
+            }
+
+            Ok(n) => {
+                buffer.extend_from_slice(&chunk[..n]);
+
+                if n < BUFFER_SIZE {
+                    break;
+                }
+            }
+
+            // Would block "errors" are the OS's way of saying that the
+            // connection is not actually ready to perform this I/O operation.
+            Err(ref err) if err.kind() == WouldBlock => break,
+
+            // Got interrupted, we'll try again.
+            Err(ref err) if err.kind() == Interrupted => continue,
+
+            // Other errors we'll consider fatal.
+            Err(err) => return Err(err),
+        }
+    }
+
+    Ok(buffer)
+}
+
+fn write(socket: &mut TcpStream, data: Vec<u8>) -> io::Result<usize> {
+    let mut total_written = 0;
+
+    while total_written < data.len() {
+        match socket.write(&data[total_written..]) {
+            Ok(0) => {
+                // Writing 0 bytes means the other side has closed the
+                // connection or is done writing, then so are we.
+                return Err(BrokenPipe.into());
+            }
+
+            Ok(n) => total_written += n,
+
+            // Would block "errors" are the OS's way of saying that the
+            // connection is not actually ready to perform this I/O operation.
+            Err(ref err) if err.kind() == WouldBlock => return Err(WouldBlock.into()),
+
+            // Got interrupted, we'll try again.
+            Err(ref err) if err.kind() == Interrupted => continue,
+
+            // Other errors we'll consider fatal.
+            Err(err) => return Err(err),
+        }
+    }
+
+    Ok(total_written)
+}
+
+
+# data.rs
+
+use std::{
+    collections::BTreeMap,
+    io::Cursor,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        mpsc::{channel, Receiver, Sender},
+        Arc, Mutex,
+    },
+};
+
+use crate::{
+    parser::{next_word, remaining},
+    subs::{self, Action::Call},
+    writer::{self, Action::Queue, Order},
+};
+
+use serde_json::{self, json, Value};
+
+pub enum Action {
+    Set(String, Vec<u8>),
+    SetIfNone(String, Vec<u8>, usize, usize),
+    SetList(String, Vec<u8>, usize, usize),
+    Inc(String, usize, usize),
+    Append(String, Vec<u8>, usize, usize),
+    Delete(String),
+    Get(String, usize, usize),
+    KeyValue(String, usize, usize),
+    Jtrim(String, usize, usize),
+    Json(String, usize, usize),
+}
+
+pub struct Data {
+    pub map: Arc<Mutex<BTreeMap<String, Vec<u8>>>>,
+    writer_tx: Sender<writer::Action>,
+    subs_tx: Sender<subs::Action>,
+    pub tx: Sender<Action>,
+    rx: Receiver<Action>,
+}
+
+impl Data {
+    pub fn new(writer_tx: Sender<writer::Action>, subs_tx: Sender<subs::Action>) -> Data {
+        let map = Arc::new(Mutex::new(BTreeMap::<String, Vec<u8>>::new()));
+        let (tx, rx) = channel::<Action>();
+
+        Data {
+            map,
+            writer_tx,
+            subs_tx,
+            tx,
+            rx,
+        }
+    }
+
+    pub fn handle(&self, db_modified: Arc<AtomicBool>) {
+        loop {
+            match self.rx.recv().unwrap() {
+                Action::Set(key, val) => {
+                    self.map.lock().unwrap().insert(key, val);
+
+                    db_modified.swap(true, Ordering::Relaxed);
+                }
+
+                Action::SetIfNone(key, val, from_id, msg_id) => {
+                    let mut map = self.map.lock().unwrap();
+
+                    match map.contains_key(&key) {
+                        true => continue,
+
+                        false => {
+                            map.insert(key.to_owned(), val.to_owned());
+                            drop(map);
+
+                            self.subs_tx.send(Call(key, val, from_id, msg_id)).unwrap();
+
+                            db_modified.swap(true, Ordering::Relaxed);
+                        }
+                    }
+                }
+
+                // This code sets multiple keys at once.
+                // The first character in the command value will also be used as
+                // a separator for the rest of the message.
+                //     sl , somekey value 1, other.key value 2, key value 3, 1.2 value 4
+                Action::SetList(key, val, from_id, msg_id) => {
+                    let separator = key.chars().next().unwrap() as u8;
+                    let set_list = val.split(|x| *x == separator);
+
+                    let mut map = self.map.lock().unwrap();
+                    for key_val in set_list {
+                        let mut cursor = Cursor::new(key_val);
+                        let key = String::from_utf8_lossy(next_word(&mut cursor));
+                        let val = remaining(&mut cursor);
+
+                        map.insert(key.to_string(), val.to_owned());
+
+                        self.subs_tx
+                            .send(Call(key.into(), val.into(), from_id, msg_id))
+                            .unwrap();
+                    }
+                    drop(map);
+
+                    db_modified.swap(true, Ordering::Relaxed);
+                }
+
+                Action::Inc(key, from_id, msg_id) => {
+                    let inc_vec = {
+                        let mut map = self.map.lock().unwrap();
+
+                        let inc = match map.get(&key) {
+                            Some(val) => vec_to_u64(val) + 1,
+                            None => 1,
+                        };
+
+                        let inc_vec = u64_to_vec(inc);
+
+                        map.insert(key.to_owned(), inc_vec.to_owned());
+
+                        inc_vec
+                    };
+
+                    self.writer_tx
+                        .send(Queue(Order {
+                            from_id,
+                            to_id: from_id,
+                            msg_id,
+                            data: inc_vec.to_owned(),
+                        }))
+                        .unwrap();
+
+                    self.subs_tx
+                        .send(Call(key, inc_vec, from_id, msg_id))
+                        .unwrap();
+
+                    db_modified.swap(true, Ordering::Relaxed);
+                }
+
+                Action::Append(key, data, from_id, msg_id) => {
+                    let mut map = self.map.lock().unwrap();
+                    let value = map.entry(key.to_owned()).or_default();
+                    value.extend_from_slice(&data);
+                    drop(map);
+
+                    self.subs_tx.send(Call(key, data, from_id, msg_id)).unwrap();
+
+                    db_modified.swap(true, Ordering::Relaxed);
+                }
+
+                Action::Delete(key) => {
+                    if self.map.lock().unwrap().remove(&key).is_some() {
+                        db_modified.swap(true, Ordering::Relaxed);
+                    }
+                }
+
+                Action::Get(key, from_id, msg_id) => {
+                    let message = match self.map.lock().unwrap().get(&key) {
+                        Some(value) => value.to_vec(),
+                        None => [].into(),
+                    };
+
+                    self.writer_tx
+                        .send(Queue(Order {
+                            from_id,
+                            to_id: from_id,
+                            msg_id,
+                            data: message,
+                        }))
+                        .unwrap();
+                }
+
+                Action::KeyValue(key, from_id, msg_id) => {
+                    let map = self.map.lock().unwrap();
+                    let range = map.range(key.to_owned()..);
+
+                    let key_value: Vec<_> = range
+                        .take_while(|(k, _)| k.starts_with(&key))
+                        .map(|(k, v)| (k.as_str(), v.to_vec()))
+                        .collect();
+
+                    let mut message = Vec::<u8>::new();
+                    for (key, mut value) in key_value {
+                        let key = key.split('.').last().unwrap();
+                        message.extend(key.as_bytes());
+                        message.extend(b" ");
+                        message.append(&mut value);
+                        message.extend(b"\0");
+                    }
+
+                    // The Rust way
+                    if let Some(last) = message.iter().last() {
+                        if last == &b'\0' {
+                            message.pop();
+                        }
+                    }
+
+                    self.writer_tx
+                        .send(Queue(Order {
+                            from_id,
+                            to_id: from_id,
+                            msg_id,
+                            data: message,
+                        }))
+                        .unwrap();
+                }
+
+                Action::Jtrim(key, from_id, msg_id) => {
+                    let map = self.map.lock().unwrap();
+                    let range = map.range(key.to_owned()..);
+
+                    let key_value: Vec<_> = range
+                        .take_while(|(k, _)| k.starts_with(&key))
+                        .map(|(k, v)| (k.as_str(), v))
+                        .collect();
+
+                    let json = kv_to_json(&key_value);
+
+                    // Returns the pointer.
+                    // Always returns everything when the key is empty.
+                    let pointr = format!("/{}", key.replace('.', "/"));
+                    let message = match json.pointer(pointr.as_str()) {
+                        Some(value) => value.to_string(),
+                        None => {
+                            let message = if pointr.len() <= 1 { json } else { json!({}) };
+                            message.to_string()
+                        }
+                    };
+
+                    self.writer_tx
+                        .send(Queue(Order {
+                            from_id,
+                            to_id: from_id,
+                            msg_id,
+                            data: message.into(),
+                        }))
+                        .unwrap();
+                }
+
+                Action::Json(key, from_id, msg_id) => {
+                    let map = self.map.lock().unwrap();
+                    let range = map.range(key.to_owned()..);
+
+                    let key_value: Vec<_> = range
+                        .take_while(|(k, _)| k.starts_with(&key))
+                        .map(|(k, v)| (k.as_str(), v))
+                        .collect();
+
+                    let json = kv_to_json(&key_value);
+
+                    // Returns the json, but only if the pointer is real.
+                    // Always returns everything when the key is empty.
+                    let pointr = format!("/{}", key.replace('.', "/"));
+                    let message = match json.pointer(pointr.as_str()) {
+                        Some(_) => json.to_string(),
+                        None => {
+                            let message = if pointr.len() <= 1 { json } else { json!({}) };
+                            message.to_string()
+                        }
+                    };
+
+                    self.writer_tx
+                        .send(Queue(Order {
+                            from_id,
+                            to_id: from_id,
+                            msg_id,
+                            data: message.into(),
+                        }))
+                        .unwrap();
+                }
+            }
+        }
+    }
+}
+
+// @todo I don't really understand this, I took this code from a Discord chat
+// when I asked for help. I wanted to merge json values with the same parent.
+pub fn kv_to_json(kv: &[(&str, &Vec<u8>)]) -> Value {
+    let mut merged_json = json!({});
+
+    // NOTE(Wojciech): Unfinished alternative.
+    // kv.iter().map(|(k, v)| k.split(".").map(|name| {}));
+
+    for (k, v) in kv.iter().rev() {
+        json_insert(&mut merged_json, k, json!(v));
+    }
+
+    merged_json
+}
+
+fn json_insert(mut json: &mut Value, key: &str, val: Value) {
+    for k in key.split('.') {
+        json = json
+            .as_object_mut()
+            .unwrap()
+            .entry(k)
+            .or_insert_with(|| json!({}));
+    }
+
+    if json == &json!({}) {
+        *json = val;
+    }
+}
+
+/// Transforms a byte array into a u64. Tries to parse from string when the size
+/// isn't 64 bits, but this means that "12345678" will be considered a u64 and
+/// not a string, because it has a length of 8 bytes. Pretty simple but inexact
+/// rule.
+fn vec_to_u64(vec: &[u8]) -> u64 {
+    if vec.len() != 8 {
+        let utf8 = String::from_utf8_lossy(vec);
+        return utf8.parse::<u64>().unwrap_or(0);
+    }
+
+    let vec64 = vec[0..8].try_into().unwrap_or(&[0; 8]);
+    u64::from_be_bytes(*vec64)
+}
+
+fn u64_to_vec(n: u64) -> Vec<u8> {
+    n.to_be_bytes().to_vec()
+}
+
+
+# db.rs
+
+use std::{
+    collections::BTreeMap,
+    fs::{self, OpenOptions},
+    io::{Read, Write},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
+    thread::sleep,
+    time::Duration,
+};
+
+const DB_PATH: &str = "./data";
+const DB_FILE: &str = "./data/db.bin";
+const DB_NAME: &str = "db.bin";
+
+pub struct DB {
+    data: Arc<Mutex<BTreeMap<String, Vec<u8>>>>,
+    pub modified: Arc<AtomicBool>,
+}
+
+impl DB {
+    pub fn new(data: Arc<Mutex<BTreeMap<String, Vec<u8>>>>) -> DB {
+        let modified = Arc::new(AtomicBool::new(false));
+
+        DB { data, modified }
+    }
+
+    pub fn handle(&mut self, throttle: u64) {
+        loop {
+            sleep(Duration::new(throttle, 0));
+
+            if self.modified.swap(false, Ordering::Relaxed) {
+                self.save_to_file();
+            }
+        }
+    }
+
+    pub fn load_from_file(&self) {
+        fs::create_dir_all(DB_PATH).unwrap();
+
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(DB_FILE);
+
+        let mut content = Vec::<u8>::new();
+        file.unwrap().read_to_end(&mut content).unwrap();
+
+        if content.is_empty() {
+            return;
+        }
+
+        if let Ok(data) = bincode::deserialize::<BTreeMap<String, Vec<u8>>>(&content[..]) {
+            *self.data.lock().unwrap() = data;
+        }
+    }
+
+    pub fn save_to_file(&self) {
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(DB_FILE);
+
+        let data: Vec<u8> = bincode::serialize(&*self.data.lock().unwrap()).unwrap();
+        file.unwrap().write_all(&data[..]).unwrap();
+
+        info!("{DB_NAME} saved");
+    }
+}
+
+
+# heartbeat.rs
+
+use std::{
+    collections::HashMap,
+    net::Shutdown,
+    sync::{mpsc::Sender, Arc, Mutex},
+    thread::sleep,
+    time::Duration,
+};
+
+use crate::connection::Connection;
+use crate::writer::{self, Action::QueueAll, Order};
+
+const TIMEOUT_30: u64 = 30;
+const TIMEOUT_60: u64 = 60;
+
+pub struct Heartbeat {
+    readers: Arc<Mutex<HashMap<usize, Connection>>>,
+    writers: Arc<Mutex<HashMap<usize, Connection>>>,
+}
+
+impl Heartbeat {
+    pub fn new(
+        readers: Arc<Mutex<HashMap<usize, Connection>>>,
+        writers: Arc<Mutex<HashMap<usize, Connection>>>,
+    ) -> Heartbeat {
+        Heartbeat { readers, writers }
+    }
+
+    pub fn handle(&self, writer_tx: Sender<writer::Action>) {
+        loop {
+            sleep(Duration::from_secs(TIMEOUT_30));
+            self.drop_idle_readers();
+
+            sleep(Duration::from_secs(TIMEOUT_30));
+            self.ping_idle_writers(&writer_tx);
+        }
+    }
+
+    fn drop_idle_readers(&self) {
+        let mut readers = self.readers.lock().unwrap();
+
+        for (id, connection) in readers.iter_mut() {
+            let elapsed = connection.last_read.elapsed().as_secs();
+            if connection.pending_read && elapsed > TIMEOUT_30 {
+                connection.closed = true;
+                connection.socket.shutdown(Shutdown::Both).unwrap();
+
+                info!("Shutting down Reader #{id}, timed out");
+            }
+        }
+    }
+
+    fn ping_idle_writers(&self, writer_tx: &Sender<writer::Action>) {
+        let mut messages = Vec::<Order>::new();
+        let writers = self.writers.lock().unwrap();
+
+        for (id, connection) in writers.iter() {
+            if connection.last_write.elapsed().as_secs() > TIMEOUT_60 {
+                messages.push(Order {
+                    from_id: 0,
+                    to_id: *id,
+                    msg_id: 0,
+                    data: [].into(),
+                });
+
+                info!("PING sent to Connection #{id}");
+            }
+        }
+
+        drop(writers);
+
+        if !messages.is_empty() {
+            writer_tx.send(QueueAll(messages)).unwrap();
+        }
+    }
+}
+
+
+# main.rs
+
+mod cleaner;
+mod connection;
+mod data;
+mod db;
+mod heartbeat;
+mod message;
+mod parser;
+mod reader;
+mod subs;
+mod writer;
+
+use std::{
+    collections::{HashMap, VecDeque},
+    env, io,
+    net::TcpListener,
+    sync::{Arc, Mutex},
+    thread,
+};
+
+use crate::{
+    cleaner::Cleaner,
+    connection::Connection,
+    data::Data,
+    db::DB,
+    heartbeat::Heartbeat,
+    parser::Parser,
+    reader::{Action::Read, Reader},
+    subs::Subs,
+    writer::{
+        Action::{Queue, Write},
+        Order, Writer,
+    },
+};
+
+use polling::{Event, Events, Poller};
+
+#[macro_use]
+extern crate log;
+extern crate pretty_env_logger;
+
+fn main() -> io::Result<()> {
+    pretty_env_logger::init();
+
+    info!("BIT:E");
+
+    // Address by config if needed.
+    let server = match env::var("SERVER") {
+        Ok(var) => var,
+        Err(_) => "0.0.0.0:1984".into(),
+    };
+
+    info!("Running at {server} | To change the address, use the SERVER environment variable");
+
+    // The server and the smol Poller.
+    let server = TcpListener::bind(server)?;
+    server.set_nonblocking(true)?;
+
+    let poller = Poller::new()?;
+    unsafe {
+        poller.add(&server, Event::readable(0))?; // 0 is the server.
+    }
+    let poller = Arc::new(poller);
+
+    // The connections
+    let readers = HashMap::<usize, Connection>::new();
+    let readers = Arc::new(Mutex::new(readers));
+    let writers = HashMap::<usize, Connection>::new();
+    let writers = Arc::new(Mutex::new(writers));
+    let used_ids = Arc::new(Mutex::new(VecDeque::<usize>::new()));
+
+    // The reader
+    let mut reader = Reader::new(poller.clone(), readers.clone());
+    let reader_tx = reader.tx.clone();
+
+    // The writer
+    let writer = Writer::new(poller.clone(), writers.clone());
+    let writer_tx = writer.tx.clone();
+    let subs_writer_tx = writer.tx.clone();
+    let data_writer_tx = writer.tx.clone();
+    let parser_writer_tx = writer.tx.clone();
+    let heartbeat_writer_tx = writer.tx.clone();
+
+    // The parser
+    let parser = Parser::new();
+    let reader_parser_tx = parser.tx.clone();
+
+    // Subs
+    let mut subs = Subs::new();
+    let data_subs_tx = subs.tx.clone();
+    let parser_subs_tx = subs.tx.clone();
+    let cleaner_subs_tx = subs.tx.clone();
+
+    // Data & DB
+    let data = Data::new(data_writer_tx, data_subs_tx);
+    let data_map = data.map.clone();
+    let parser_data_tx = data.tx.clone();
+
+    let mut db = DB::new(data_map);
+    let db_modified = db.modified.clone();
+    db.load_from_file();
+
+    // Cleaner
+    let cleaner = Cleaner::new(
+        poller.clone(),
+        readers.clone(),
+        writers.clone(),
+        used_ids.clone(),
+    );
+    let reader_cleaner_tx = cleaner.tx.clone();
+    let writer_cleaner_tx = cleaner.tx.clone();
+
+    // Heartbeat
+    let heartbeat = Heartbeat::new(readers.clone(), writers.clone());
+
+    // Threads
+    thread::spawn(move || reader.handle(reader_parser_tx, reader_cleaner_tx));
+    thread::spawn(move || writer.handle(writer_cleaner_tx));
+    thread::spawn(move || parser.handle(parser_data_tx, parser_writer_tx, parser_subs_tx));
+    thread::spawn(move || subs.handle(subs_writer_tx));
+    thread::spawn(move || data.handle(db_modified));
+    thread::spawn(move || db.handle(4));
+    thread::spawn(move || cleaner.handle(cleaner_subs_tx));
+    thread::spawn(move || heartbeat.handle(heartbeat_writer_tx));
+
+    // Connections and events via smol Poller.
+    let mut id_count: usize = 1; // 0 belongs to the main TcpListener.
+    let mut events = Events::new();
+
+    loop {
+        events.clear();
+        poller.wait(&mut events, None)?;
+
+        for ev in events.iter() {
+            match ev.key {
+                0 => {
+                    let (reader, addr) = server.accept()?;
+                    reader.set_nonblocking(true)?;
+                    let writer = reader.try_clone().unwrap();
+
+                    // Reusing ids.
+                    let used_id = used_ids.lock().unwrap().pop_front();
+                    let client_id = if let Some(id) = used_id {
+                        id
+                    } else {
+                        let id = id_count;
+                        id_count += 1;
+                        id
+                    };
+
+                    info!("Connection #{client_id} from {addr}");
+
+                    // The server continues listening for more clients, always 0.
+                    poller.modify(&server, Event::readable(0))?;
+
+                    // Register the reader socket for reading events.
+                    unsafe {
+                        poller.add(&reader, Event::readable(client_id))?;
+                    }
+                    readers
+                        .lock()
+                        .unwrap()
+                        .insert(client_id, Connection::new(client_id, reader, addr));
+
+                    // Save the writer socket for later use.
+                    unsafe {
+                        poller.add(&writer, Event::none(client_id))?;
+                    }
+                    writers
+                        .lock()
+                        .unwrap()
+                        .insert(client_id, Connection::new(client_id, writer, addr));
+
+                    // The first message to the client is his id, so it can add
+                    // it on all his messages or it would get disconnected.
+                    writer_tx
+                        .send(Queue(Order {
+                            from_id: client_id,
+                            to_id: client_id,
+                            msg_id: 0,
+                            data: [].into(),
+                        }))
+                        .unwrap();
+                }
+
+                id if ev.readable => reader_tx.send(Read(id)).unwrap(),
+
+                id if ev.writable => writer_tx.send(Write(id)).unwrap(),
+
+                _ => unreachable!(),
+            }
+        }
+    }
+}
+
+
+# message.rs
+
+use std::{
+    cmp::Ordering,
+    io::{self, Error, ErrorKind},
+};
+
+pub enum Received {
+    None,
+    Complete(Vec<u8>),
+    Pending(Vec<u8>),
+    Error(io::Error),
+}
+
+pub struct Message {
+    pub from: u32,
+    pub id: u32,
+    pub size: u32,
+    pub data: Vec<u8>,
+}
+
+impl Message {
+    pub fn from_protocol(mut data: Vec<u8>) -> io::Result<Message> {
+        if data.len() < 6 {
+            return Err(smaller_size_than_protocol());
+        }
+
+        if data.len() > 65535 {
+            return Err(bigger_size_than_protocol());
+        }
+
+        let from = get_u32(&data[0..2]);
+        let id = get_u32(&data[2..4]);
+        let size = get_u32(&data[4..6]);
+        data.drain(0..6);
+
+        Ok(Message {
+            from,
+            id,
+            size,
+            data,
+        })
+    }
+}
+
+pub struct Messages {
+    buffer: Vec<u8>,
+}
+
+impl Messages {
+    pub fn new() -> Messages {
+        Messages { buffer: Vec::new() }
+    }
+
+    /// Appends the data acting like a buffer to return complete messages
+    /// assumming is part of the protocol. You need to call this function in a
+    /// loop and retry when Received::Pending is returned.
+    pub fn feed(&mut self, mut data: Vec<u8>) -> Received {
+        self.buffer.append(&mut data);
+        let buffer_len = self.buffer.len() as u32;
+
+        if buffer_len < 6 {
+            self.buffer.clear();
+            return Received::Error(smaller_size_than_protocol());
+        }
+
+        if buffer_len > 65535 {
+            self.buffer.clear();
+            return Received::Error(bigger_size_than_protocol());
+        }
+
+        // The message size.
+        let size = get_u32(&self.buffer[4..6]);
+        match size.cmp(&buffer_len) {
+            Ordering::Equal => {
+                // Message complete, just send it and break.
+
+                let result = self.buffer.to_owned();
+                self.buffer.clear();
+
+                Received::Complete(result)
+            }
+
+            Ordering::Less => {
+                // The message received contains more than one message.
+                // Let's split, send the first part and deal with the
+                // rest on the next iteration.
+
+                let split = self.buffer.split_off(size as usize);
+                let result = self.buffer.to_owned();
+                self.buffer = split;
+
+                Received::Pending(result)
+            }
+
+            Ordering::Greater => {
+                // The loop should only happen when we need to unpack
+                // more than one message received in the same read, else
+                // break to deal with the buffer or new messages.
+
+                Received::None
+            }
+        }
+    }
+}
+
+pub fn get_u32(bytes: &[u8]) -> u32 {
+    (bytes[0] as u32) << 8 | bytes[1] as u32
+}
+
+/// Protocol: Client id, message id and full size, 2 bytes eachs, from the first
+/// 6 bytes of the message.
+fn get_header(from: u32, id: u32, size: u32) -> [u8; 6] {
+    let byte0 = ((from & 0xFF00) >> 8) as u8;
+    let byte1 = (from & 0x00FF) as u8;
+
+    let byte2 = ((id & 0xFF00) >> 8) as u8;
+    let byte3 = (id & 0x00FF) as u8;
+
+    let byte4 = ((size & 0xFF00) >> 8) as u8;
+    let byte5 = (size & 0x00FF) as u8;
+
+    [byte0, byte1, byte2, byte3, byte4, byte5]
+}
+
+pub fn stamp_header(mut data: Vec<u8>, from: u32, id: u32) -> Vec<u8> {
+    let size = (data.len() + 6) as u32;
+    data.splice(0..0, get_header(from, id, size));
+    data
+}
+
+fn smaller_size_than_protocol() -> io::Error {
+    Error::new(
+        ErrorKind::Unsupported,
+        "Message received is smaller than 6 bytes and thats the size of the protocol.",
+    )
+}
+
+fn bigger_size_than_protocol() -> io::Error {
+    Error::new(
+        ErrorKind::Unsupported,
+        "Message received is bigger than 65535 bytes and the protocol uses only 2 bytes to represent the size.",
+    )
+}
+
+
+# parser.rs
+
+use core::fmt::{Debug, Display, Formatter, Result};
+use std::{
+    io::Cursor,
+    net::SocketAddr,
+    sync::mpsc::{channel, Receiver, Sender},
+};
+
+use crate::{
+    data::{
+        self,
+        Action::{Append, Delete, Get, Inc, Json, Jtrim, KeyValue, Set, SetIfNone, SetList},
+    },
+    message::Message,
+    subs::{
+        self,
+        Action::{Add, Call, Del},
+    },
+    writer::{self, Action::Queue, Order},
+};
+
+const OK: &str = "OK";
+const NO: &str = "NO";
+
+pub enum Action {
+    Parse(Message, SocketAddr),
+}
+
+pub struct Parsed {
+    pub command: Command,
+    pub key: String,
+    pub data: Vec<u8>,
+}
+
+#[derive(PartialEq, Debug)]
+pub enum Command {
+    No,
+    Set,
+    SetIfNone,
+    SetList,
+    Inc,
+    Append,
+    Delete,
+    Get,
+    KeyValue,
+    Jtrim,
+    Json,
+    SubGet,
+    SubKeyValue,
+    SubJson,
+    Unsub,
+    SubCall,
+}
+
+impl Display for Command {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        Debug::fmt(self, f)
+    }
+}
+
+pub struct Parser {
+    pub tx: Sender<Action>,
+    rx: Receiver<Action>,
+}
+
+impl Parser {
+    pub fn new() -> Parser {
+        let (tx, rx) = channel::<Action>();
+
+        Parser { tx, rx }
+    }
+
+    pub fn handle(
+        &self,
+        data_tx: Sender<data::Action>,
+        writer_tx: Sender<writer::Action>,
+        subs_tx: Sender<subs::Action>,
+    ) {
+        loop {
+            match self.rx.recv().unwrap() {
+                Action::Parse(message, addr) => {
+                    let utf8 = String::from_utf8_lossy(&message.data);
+                    let mut text = utf8.to_string();
+
+                    let limit = 128;
+                    if utf8.len() > limit {
+                        text = truncate(&utf8, limit).into();
+                        let add = format!(" (..{limit})");
+                        text.push_str(&add);
+                    };
+
+                    info!("{addr} ({} bytes): {text}", message.data.len());
+
+                    let from_id = message.from as usize;
+                    let msg_id = message.id as usize;
+
+                    let parsed = parse(&message.data);
+                    let command = parsed.command;
+                    let key = parsed.key;
+                    let data = parsed.data;
+
+                    match command {
+                        // Commands that doesn't make sense without key.
+                        _ if key.is_empty() && needs_key(&command) => {
+                            writer_tx
+                                .send(Queue(Order {
+                                    from_id,
+                                    to_id: from_id,
+                                    msg_id,
+                                    data: NO.into(),
+                                }))
+                                .unwrap();
+                        }
+
+                        // No
+                        Command::No => {
+                            writer_tx
+                                .send(Queue(Order {
+                                    from_id,
+                                    to_id: from_id,
+                                    msg_id,
+                                    data: NO.into(),
+                                }))
+                                .unwrap();
+                        }
+
+                        // Set
+                        Command::Set => {
+                            writer_tx
+                                .send(Queue(Order {
+                                    from_id,
+                                    to_id: from_id,
+                                    msg_id,
+                                    data: OK.into(),
+                                }))
+                                .unwrap();
+
+                            subs_tx
+                                .send(Call(key.to_owned(), data.to_owned(), from_id, msg_id))
+                                .unwrap();
+
+                            data_tx.send(Set(key, data)).unwrap();
+                        }
+
+                        // Set only if the key doesn't exists.
+                        Command::SetIfNone => {
+                            writer_tx
+                                .send(Queue(Order {
+                                    from_id,
+                                    to_id: from_id,
+                                    msg_id,
+                                    data: OK.into(),
+                                }))
+                                .unwrap();
+
+                            data_tx.send(SetIfNone(key, data, from_id, msg_id)).unwrap();
+                        }
+
+                        Command::SetList => {
+                            writer_tx
+                                .send(Queue(Order {
+                                    from_id,
+                                    to_id: from_id,
+                                    msg_id,
+                                    data: OK.into(),
+                                }))
+                                .unwrap();
+
+                            data_tx.send(SetList(key, data, from_id, msg_id)).unwrap();
+                        }
+
+                        // Makes the value an integer and increase it in 1.
+                        Command::Inc => {
+                            data_tx.send(Inc(key, from_id, msg_id)).unwrap();
+                        }
+
+                        // Appends the value.
+                        Command::Append => {
+                            writer_tx
+                                .send(Queue(Order {
+                                    from_id,
+                                    to_id: from_id,
+                                    msg_id,
+                                    data: OK.into(),
+                                }))
+                                .unwrap();
+
+                            data_tx.send(Append(key, data, from_id, msg_id)).unwrap();
+                        }
+
+                        // Delete!
+                        Command::Delete => {
+                            writer_tx
+                                .send(Queue(Order {
+                                    from_id,
+                                    to_id: from_id,
+                                    msg_id,
+                                    data: OK.into(),
+                                }))
+                                .unwrap();
+
+                            data_tx.send(Delete(key)).unwrap();
+                        }
+
+                        // Get
+                        Command::Get => {
+                            data_tx.send(Get(key, from_id, msg_id)).unwrap();
+                        }
+
+                        // 0x0 separated key value enumeration: key value\0x0key2 value2
+                        Command::KeyValue => {
+                            data_tx.send(KeyValue(key, from_id, msg_id)).unwrap();
+                        }
+
+                        // Trimmed Json (just the data).
+                        Command::Jtrim => {
+                            data_tx.send(Jtrim(key, from_id, msg_id)).unwrap();
+                        }
+
+                        // Json (full path).
+                        Command::Json => {
+                            data_tx.send(Json(key, from_id, msg_id)).unwrap();
+                        }
+
+                        // A generic "bite" subscription. Subscribers also receive their key: "key value"
+                        // Also a first message if value is available.
+                        Command::SubGet | Command::SubKeyValue | Command::SubJson => {
+                            writer_tx
+                                .send(Queue(Order {
+                                    from_id,
+                                    to_id: from_id,
+                                    msg_id,
+                                    data: OK.into(),
+                                }))
+                                .unwrap();
+
+                            subs_tx.send(Add(key.to_owned(), from_id, command)).unwrap();
+
+                            if !data.is_empty() {
+                                subs_tx.send(Call(key, data, from_id, msg_id)).unwrap()
+                            }
+                        }
+
+                        // A unsubscription and a last message if value is available.
+                        Command::Unsub => {
+                            writer_tx
+                                .send(Queue(Order {
+                                    from_id,
+                                    to_id: from_id,
+                                    msg_id,
+                                    data: OK.into(),
+                                }))
+                                .unwrap();
+
+                            if !data.is_empty() {
+                                subs_tx
+                                    .send(Call(key.to_owned(), data, from_id, msg_id))
+                                    .unwrap();
+                            }
+
+                            subs_tx.send(Del(key, from_id)).unwrap();
+                        }
+
+                        // Calls key subscribers with the new value without data modifications.
+                        Command::SubCall => {
+                            writer_tx
+                                .send(Queue(Order {
+                                    from_id,
+                                    to_id: from_id,
+                                    msg_id,
+                                    data: OK.into(),
+                                }))
+                                .unwrap();
+
+                            subs_tx.send(Call(key, data, from_id, msg_id)).unwrap();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Returns a Message with the first characters found as command, the next word
+/// as key, and the rest as value.
+
+/// This text: + hello world is a pretty old meme
+/// Returns: Message { Command::Append, "hello", "world is a pretty old meme" }
+
+pub fn parse(message: &[u8]) -> Parsed {
+    let mut cursor = Cursor::new(message);
+    let instruction = String::from_utf8_lossy(next_word(&mut cursor));
+    let key = String::from_utf8_lossy(next_word(&mut cursor));
+    let data = remaining(&mut cursor);
+
+    let command = match instruction.to_lowercase().trim_end() {
+        "s" => Command::Set,
+        "s?" => Command::SetIfNone,
+        "sl" => Command::SetList,
+        "+1" => Command::Inc,
+        "+" => Command::Append,
+        "d" => Command::Delete,
+        "g" => Command::Get,
+        "k" => Command::KeyValue,
+        "j" => Command::Jtrim,
+        "js" => Command::Json,
+        "#g" => Command::SubGet,
+        "#k" => Command::SubKeyValue,
+        "#j" => Command::SubJson,
+        "#-" => Command::Unsub,
+        "!" => Command::SubCall,
+        _ => Command::No,
+    };
+
+    let key: String = key.trim_end().into();
+
+    Parsed {
+        command,
+        key,
+        data: data.into(),
+    }
+}
+
+pub fn needs_key(command: &Command) -> bool {
+    match command {
+        Command::No | Command::KeyValue | Command::Jtrim | Command::Json => false,
+
+        Command::Set
+        | Command::SetIfNone
+        | Command::SetList
+        | Command::Inc
+        | Command::Append
+        | Command::Delete
+        | Command::Get
+        | Command::SubGet
+        | Command::SubKeyValue
+        | Command::SubJson
+        | Command::Unsub
+        | Command::SubCall => true,
+    }
+}
+
+#[allow(dead_code)]
+pub fn next_line<'a>(cursor: &mut Cursor<&'a [u8]>) -> Option<&'a [u8]> {
+    let mut start = cursor.position() as usize;
+    let mut end = cursor.get_ref().len();
+
+    if start >= end {
+        return None;
+    }
+
+    while is_newline(cursor.get_ref()[start]) {
+        start += 1;
+
+        if start >= end {
+            return None;
+        }
+    }
+
+    for i in start..end {
+        if is_newline(cursor.get_ref()[i]) {
+            end = i;
+            break;
+        }
+    }
+
+    cursor.set_position(end as u64);
+
+    Some(&cursor.get_ref()[start..end])
+}
+
+pub fn next_word<'a>(src: &mut Cursor<&'a [u8]>) -> &'a [u8] {
+    let mut start = src.position() as usize;
+    let mut end = src.get_ref().len();
+
+    if start >= end {
+        return &[];
+    }
+
+    while is_space(src.get_ref()[start]) {
+        start += 1;
+
+        if start >= end {
+            return &[];
+        }
+    }
+
+    for i in start..end {
+        if is_space(src.get_ref()[i]) {
+            end = i;
+            break;
+        }
+    }
+
+    src.set_position(end as u64);
+
+    &src.get_ref()[start..end]
+}
+
+pub fn remaining<'a>(src: &mut Cursor<&'a [u8]>) -> &'a [u8] {
+    let mut start = src.position() as usize;
+    let end = src.get_ref().len();
+
+    if start >= end {
+        return &[];
+    }
+
+    while is_space(src.get_ref()[start]) {
+        start += 1;
+
+        if start >= end {
+            return &[];
+        }
+    }
+
+    &src.get_ref()[start..end]
+}
+
+fn is_newline(c: u8) -> bool {
+    c == b'\r' || c == b'\n'
+}
+
+fn is_space(c: u8) -> bool {
+    c == b' '
+}
+
+fn truncate(s: &str, max_chars: usize) -> &str {
+    match s.char_indices().nth(max_chars) {
+        None => s,
+        Some((i, _)) => &s[..i],
+    }
+}
+
+
+# reader.rs
+
+use std::{
+    collections::HashMap,
+    sync::{
+        mpsc::{channel, Receiver, Sender},
+        Arc, Mutex,
+    },
+    time::Instant,
+};
+
+use crate::{
+    cleaner,
+    connection::Connection,
+    message::{Message, Messages, Received},
+    parser::{self, Action::Parse},
+};
+
+use polling::{Event, Poller};
+
+pub enum Action {
+    Read(usize),
+}
+
+pub struct Reader {
+    poller: Arc<Poller>,
+    readers: Arc<Mutex<HashMap<usize, Connection>>>,
+    messages: HashMap<usize, Messages>,
+    pub tx: Sender<Action>,
+    rx: Receiver<Action>,
+}
+
+impl Reader {
+    pub fn new(poller: Arc<Poller>, readers: Arc<Mutex<HashMap<usize, Connection>>>) -> Reader {
+        let messages = HashMap::<usize, Messages>::new();
+        let (tx, rx) = channel::<Action>();
+
+        Reader {
+            poller,
+            readers,
+            messages,
+            tx,
+            rx,
+        }
+    }
+
+    pub fn handle(
+        &mut self,
+        parser_tx: Sender<parser::Action>,
+        cleaner_tx: Sender<cleaner::Action>,
+    ) {
+        loop {
+            match self.rx.recv().unwrap() {
+                Action::Read(id) => {
+                    let mut closed = false;
+
+                    if let Some(connection) = self.readers.lock().unwrap().get_mut(&id) {
+                        loop {
+                            // Loop because "received" could have more than one
+                            // message in the same read.
+
+                            let data = match connection.try_read() {
+                                Ok(received) => received,
+
+                                Err(err) => {
+                                    // connection.closed = true;
+                                    // ^ This is already hapenning inside try_read() on errors.
+
+                                    info!("Connection #{id} closed, read failed: {err}");
+
+                                    break;
+                                }
+                            };
+
+                            let mut pending = false;
+                            let messages = self.messages.entry(id).or_insert_with(Messages::new);
+
+                            let received = match messages.feed(data) {
+                                Received::None => break,
+
+                                Received::Complete(received) => {
+                                    connection.pending_read = false;
+                                    connection.last_read = Instant::now();
+                                    received
+                                }
+
+                                Received::Pending(received) => {
+                                    pending = true;
+                                    connection.pending_read = true;
+                                    connection.last_read = Instant::now();
+
+                                    received
+                                }
+
+                                Received::Error(err) => {
+                                    connection.closed = true;
+
+                                    info!("Connection #{id} closed, feed failed: {err}");
+
+                                    break;
+                                }
+                            };
+
+                            let message = match Message::from_protocol(received) {
+                                Ok(message) if message.from != id as u32 => {
+                                    connection.closed = true;
+
+                                    let err = format!("message client id #{} is wrong", message.id);
+                                    info!("Connection #{id} closed, bad message: {err}");
+
+                                    break;
+                                }
+
+                                Ok(message) => message,
+
+                                Err(err) => {
+                                    connection.closed = true;
+
+                                    info!("Connection #{id} closed, bad message: {err}");
+
+                                    break;
+                                }
+                            };
+
+                            parser_tx.send(Parse(message, connection.addr)).unwrap();
+
+                            if !pending {
+                                break;
+                            }
+                        }
+
+                        if connection.closed {
+                            closed = true;
+                        } else {
+                            self.poller
+                                .modify(&connection.socket, Event::readable(id))
+                                .unwrap();
+                        }
+                    }
+
+                    if closed {
+                        self.messages.remove(&id);
+                        cleaner_tx.send(cleaner::Action::Drop(id)).unwrap();
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+# subs.rs
+
+use std::{
+    collections::HashMap,
+    sync::mpsc::{channel, Receiver, Sender},
+};
+
+use crate::{
+    parser::Command,
+    writer::{self, Action::QueueAll, Order},
+};
+
+use serde_json::json;
+
+pub enum Action {
+    Add(String, usize, Command),
+    Del(String, usize),
+    DelAll(usize),
+    Call(String, Vec<u8>, usize, usize),
+}
+
+pub struct Sub {
+    id: usize,
+    command: Command,
+}
+
+pub struct Subs {
+    key_subs: HashMap<String, Vec<Sub>>,
+    id_keys: HashMap<usize, Vec<String>>,
+    pub tx: Sender<Action>,
+    rx: Receiver<Action>,
+}
+
+impl Subs {
+    pub fn new() -> Subs {
+        let key_subs = HashMap::<String, Vec<Sub>>::new();
+        let id_keys = HashMap::<usize, Vec<String>>::new();
+        let (tx, rx) = channel::<Action>();
+
+        Subs {
+            key_subs,
+            id_keys,
+            tx,
+            rx,
+        }
+    }
+
+    pub fn handle(&mut self, writer_tx: Sender<writer::Action>) {
+        loop {
+            match self.rx.recv().unwrap() {
+                Action::Add(key, id, command) => {
+                    let keys = self.id_keys.entry(id).or_default();
+
+                    if !keys.contains(&key) {
+                        keys.push(key.to_owned());
+                    }
+
+                    let subs = self.key_subs.entry(key).or_default();
+
+                    if subs.iter().any(|x| x.id == id && x.command == command) {
+                        continue;
+                    } else {
+                        subs.push(Sub { id, command })
+                    }
+                }
+
+                Action::Del(key, id) => {
+                    let subs = self.key_subs.entry(key).or_default();
+                    subs.retain(|x| x.id != id);
+                }
+
+                Action::DelAll(id) => {
+                    if let Some(keys) = self.id_keys.remove(&id) {
+                        for key in keys {
+                            let subs = self.key_subs.entry(key).or_default();
+                            subs.retain(|x| x.id != id);
+                        }
+                    }
+                }
+
+                Action::Call(key, data, from_id, msg_id) => {
+                    let mut messages = Vec::<Order>::new();
+
+                    for alt_key in get_key_combinations(key.as_str()) {
+                        if let Some(subs) = self.key_subs.get(&alt_key) {
+                            for sub in subs {
+                                let data = match sub.command {
+                                    Command::SubGet => data.to_owned(),
+
+                                    Command::SubKeyValue => {
+                                        let key = key.split('.').last().unwrap();
+                                        let mut message = Vec::<u8>::new();
+
+                                        message.extend(key.as_bytes());
+                                        message.extend(" ".as_bytes());
+                                        message.extend(&data);
+                                        message
+                                    }
+
+                                    Command::SubJson => {
+                                        let key = key.split('.').last().unwrap();
+                                        let message = String::from_utf8_lossy(&data);
+                                        json!({ key: message }).to_string().into_bytes()
+                                    }
+
+                                    _ => unreachable!(),
+                                };
+
+                                messages.push(Order {
+                                    from_id,
+                                    to_id: sub.id,
+                                    msg_id,
+                                    data,
+                                });
+                            }
+                        }
+                    }
+
+                    if !messages.is_empty() {
+                        writer_tx.send(QueueAll(messages)).unwrap();
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// "data.inner.value" -> ["data.inner.value", "data.inner", "data"]
+fn get_key_combinations(key: &str) -> Vec<String> {
+    let mut parent_keys = Vec::<String>::new();
+
+    let keys: Vec<&str> = key.split('.').collect();
+    let len = keys.len();
+
+    for i in 0..len {
+        let end = len - i;
+        let str = keys[..end].join(".");
+        parent_keys.push(str);
+    }
+
+    parent_keys
+}
+
+
+# writer.rs
+
+use std::{
+    collections::HashMap,
+    sync::{
+        mpsc::{channel, Receiver, Sender},
+        Arc, Mutex,
+    },
+    time::Instant,
+};
+
+use crate::{cleaner, connection::Connection, message::stamp_header};
+
+use polling::{Event, Poller};
+
+pub enum Action {
+    Queue(Order),
+    QueueAll(Vec<Order>),
+    Write(usize),
+}
+
+pub struct Order {
+    pub from_id: usize,
+    pub to_id: usize,
+    pub msg_id: usize,
+    pub data: Vec<u8>,
+}
+
+pub struct Writer {
+    poller: Arc<Poller>,
+    writers: Arc<Mutex<HashMap<usize, Connection>>>,
+    pub tx: Sender<Action>,
+    rx: Receiver<Action>,
+}
+
+impl Writer {
+    pub fn new(poller: Arc<Poller>, writers: Arc<Mutex<HashMap<usize, Connection>>>) -> Writer {
+        let (tx, rx) = channel::<Action>();
+
+        Writer {
+            poller,
+            writers,
+            tx,
+            rx,
+        }
+    }
+
+    pub fn handle(&self, cleaner_tx: Sender<cleaner::Action>) {
+        loop {
+            match self.rx.recv().unwrap() {
+                Action::Queue(order) => {
+                    if let Some(connection) = self.writers.lock().unwrap().get_mut(&order.to_id) {
+                        connection.send_queue.push(stamp_header(
+                            order.data,
+                            order.from_id as u32,
+                            order.msg_id as u32,
+                        ));
+
+                        self.poll_writable(connection);
+                    }
+                }
+
+                Action::QueueAll(orders) => {
+                    let mut writers = self.writers.lock().unwrap();
+                    for order in orders {
+                        if let Some(connection) = writers.get_mut(&order.to_id) {
+                            connection.send_queue.push(stamp_header(
+                                order.data,
+                                order.from_id as u32,
+                                order.msg_id as u32,
+                            ));
+
+                            self.poll_writable(connection);
+                        }
+                    }
+                }
+
+                Action::Write(id) => {
+                    let mut closed = false;
+
+                    if let Some(connection) = self.writers.lock().unwrap().get_mut(&id) {
+                        if !connection.send_queue.is_empty() {
+                            let data = connection.send_queue.remove(0);
+
+                            if let Err(err) = connection.try_write(data) {
+                                info!("Connection #{id} broken, write failed: {err}");
+                            }
+
+                            connection.last_write = Instant::now();
+                        }
+
+                        if connection.closed {
+                            closed = true;
+                        } else if !connection.send_queue.is_empty() {
+                            self.poll_writable(connection);
+                        } else {
+                            self.poll_none(connection);
+                        }
+                    }
+
+                    if closed {
+                        cleaner_tx.send(cleaner::Action::Drop(id)).unwrap();
+                    }
+                }
+            }
+        }
+    }
+
+    fn poll_writable(&self, connection: &mut Connection) {
+        self.poller
+            .modify(&connection.socket, Event::writable(connection.id))
+            .unwrap();
+    }
+
+    fn poll_none(&self, connection: &mut Connection) {
+        self.poller
+            .modify(&connection.socket, Event::none(connection.id))
+            .unwrap();
+    }
+}
