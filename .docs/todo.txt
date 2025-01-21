@@ -1,6 +1,4 @@
 
-    Update polling library.
-
     Document the environment variables required to run the server.
 
     Use a temporary map to store the values and then extend the original map, this way we don't need to lock the original map.
@@ -43,6 +41,9 @@
     Push # value should insert into a list, transform normal values
     Pop # should return and delete a value
 
+
+20 January 2025
+    x Update polling library.
 
 10 September 2023
     x Should we validate a timeout for the client, or that's already built inside Tcp stuff and need configuration?
