@@ -43,6 +43,7 @@ impl DB {
             .read(true)
             .write(true)
             .create(true)
+            .truncate(false)
             .open(DB_FILE);
 
         let mut content = Vec::<u8>::new();

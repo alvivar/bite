@@ -88,10 +88,11 @@ impl Parser {
                         text.push_str(&add);
                     };
 
-                    info!("{addr} ({} bytes): {text}", message.data.len());
-
                     let from_id = message.from as usize;
                     let msg_id = message.id as usize;
+                    let size = message.size as usize;
+
+                    info!("{addr} ({} bytes): {text}", size);
 
                     let parsed = parse(&message.data);
                     let command = parsed.command;
@@ -280,12 +281,21 @@ impl Parser {
     }
 }
 
-/// Returns a Message with the first characters found as command, the next word
-/// as key, and the rest as value.
-
-/// This text: + hello world is a pretty old meme
-/// Returns: Message { Command::Append, "hello", "world is a pretty old meme" }
-
+/// Parses a message into its command, key, and data components.
+///
+/// Takes a byte slice containing the message and returns a `Parsed` struct with:
+/// - `command`: The command parsed from the first word (e.g. "s", "+", "g")
+/// - `key`: The key parsed from the second word
+/// - `data`: The remaining data after command and key
+///
+/// # Example
+/// ```
+/// let msg = b"+ hello world is a pretty old meme";
+/// let parsed = parse(msg);
+/// assert_eq!(parsed.command, Command::Append);
+/// assert_eq!(parsed.key, "hello");
+/// assert_eq!(parsed.data, b"world is a pretty old meme");
+/// ```
 pub fn parse(message: &[u8]) -> Parsed {
     let mut cursor = Cursor::new(message);
     let instruction = String::from_utf8_lossy(next_word(&mut cursor));
