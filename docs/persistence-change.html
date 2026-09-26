@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BITE · A snapshot that is never half-written</title>
+<meta name="description" content="How commit ccc2edc changed persistence in BITE: safe snapshot replacement, explicit load failures and fatal save errors.">
+<style>
+  :root {
+    --paper: #f7f5f0;
+    --paper-deep: #efebe3;
+    --ink: #1c1b19;
+    --muted: #625e56;
+    --rule: #ddd7cb;
+    --safe: #0e6656;
+    --safe-soft: #dcebe6;
+    --risk: #a13a25;
+    --risk-soft: #f3e0da;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+    --measure: 40rem;
+    --wide: 68rem;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-padding-top: 4.5rem; }
+  @media (prefers-reduced-motion: no-preference) {
+    html { scroll-behavior: smooth; }
+  }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: clamp(1.05rem, 0.98rem + 0.3vw, 1.2rem);
+    line-height: 1.65;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  a { color: inherit; text-decoration-color: var(--rule); text-underline-offset: 0.2em; text-decoration-thickness: 1px; }
+  a:hover { text-decoration-color: currentColor; }
+  a:focus-visible, summary:focus-visible { outline: 2px solid var(--safe); outline-offset: 3px; border-radius: 2px; }
+
+  code, .mono { font-family: var(--mono); font-size: 0.86em; }
+  :not(pre) > code { background: var(--paper-deep); padding: 0.08em 0.35em; border-radius: 3px; }
+
+  .skip { position: absolute; left: -999px; top: 0.5rem; background: var(--ink); color: var(--paper); padding: 0.5rem 0.9rem; font-family: var(--sans); z-index: 10; }
+  .skip:focus { left: 0.5rem; }
+
+  /* Navigation */
+  .topbar {
+    position: sticky; top: 0; z-index: 5;
+    background: var(--paper);
+    background: color-mix(in srgb, var(--paper) 92%, transparent);
+    backdrop-filter: blur(6px);
+    border-bottom: 1px solid var(--rule);
+    font-family: var(--sans);
+    font-size: 0.82rem;
+  }
+  .topbar-inner {
+    max-width: var(--wide); margin: 0 auto; padding: 0 1.25rem;
+    display: flex; align-items: center; gap: 1.5rem;
+  }
+  .brand { font-weight: 650; letter-spacing: 0.08em; white-space: nowrap; padding: 0.9rem 0; text-decoration: none; }
+  .topbar ol {
+    list-style: none; margin: 0; padding: 0;
+    display: flex; gap: 1.2rem; overflow-x: auto; scrollbar-width: none;
+    counter-reset: nav;
+  }
+  .topbar ol::-webkit-scrollbar { display: none; }
+  .topbar li { counter-increment: nav; white-space: nowrap; }
+  .topbar li a { display: block; padding: 0.9rem 0; color: var(--muted); text-decoration: none; }
+  .topbar li a::before { content: counter(nav, decimal-leading-zero) " "; color: #8a847a; font-variant-numeric: tabular-nums; }
+  .topbar li a:hover { color: var(--ink); }
+
+  /* Layout */
+  main { padding: 0 1.25rem 6rem; }
+  .measure { max-width: var(--measure); margin-left: auto; margin-right: auto; }
+  .wide { max-width: var(--wide); margin-left: auto; margin-right: auto; }
+
+  header.hero { padding: clamp(4rem, 12vw, 9rem) 0 clamp(1rem, 3vw, 2rem); }
+  .eyebrow { font-family: var(--sans); font-size: 0.78rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin: 0 0 1.5rem; }
+  h1 {
+    font-weight: 400; font-size: clamp(2.5rem, 1.6rem + 4.4vw, 5rem); line-height: 1.04;
+    letter-spacing: -0.02em; margin: 0 0 1.75rem; max-width: 14ch;
+  }
+  h1 em { font-style: italic; color: var(--safe); }
+  .lede { font-size: 1.22em; line-height: 1.5; color: var(--ink); max-width: 34rem; margin: 0 0 2.5rem; }
+  .facts {
+    display: flex; flex-wrap: wrap; gap: 0.6rem 2.25rem; margin: 0; padding: 1.25rem 0 0;
+    border-top: 1px solid var(--rule); font-family: var(--sans); font-size: 0.85rem;
+  }
+  .facts div { display: flex; flex-direction: column; }
+  .facts dt { color: var(--muted); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; }
+  .facts dd { margin: 0.15rem 0 0; font-variant-numeric: tabular-nums; }
+  .add { color: var(--safe); } .del { color: var(--risk); }
+
+  section.chapter { padding: clamp(3.5rem, 9vw, 6.5rem) 0 0; }
+  .num { font-family: var(--sans); font-size: 0.78rem; letter-spacing: 0.14em; color: var(--muted); margin: 0 0 0.75rem; font-variant-numeric: tabular-nums; }
+  h2 { font-weight: 400; font-size: clamp(1.8rem, 1.3rem + 2vw, 2.7rem); line-height: 1.12; letter-spacing: -0.01em; margin: 0 0 1.5rem; }
+  h3 { font-family: var(--sans); font-size: 0.8rem; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 650; margin: 2.5rem 0 0.75rem; }
+  p { margin: 0 0 1.15rem; }
+  .src { font-family: var(--sans); font-size: 0.8rem; color: var(--muted); }
+  .src a { color: var(--muted); }
+
+  .note {
+    border-left: 2px solid var(--safe); padding: 0.2rem 0 0.2rem 1.1rem; margin: 2rem 0;
+    color: var(--ink);
+  }
+  .note.risk { border-color: var(--risk); }
+  .note strong { font-family: var(--sans); font-size: 0.78rem; letter-spacing: 0.1em; text-transform: uppercase; display: block; margin-bottom: 0.2rem; }
+
+  pre {
+    margin: 1.5rem 0 2rem; padding: 1.1rem 1.25rem; overflow-x: auto;
+    background: var(--paper-deep); border-radius: 6px;
+    font-family: var(--mono); font-size: 0.8rem; line-height: 1.6;
+  }
+  pre .c { color: var(--muted); }
+  pre .hl-risk { color: var(--risk); font-weight: 600; }
+  pre .hl-safe { color: var(--safe); font-weight: 600; }
+  figure { margin: 2.5rem auto 3rem; }
+  .decide + figcaption { max-width: 54rem; margin-left: auto; margin-right: auto; }
+  figcaption { font-family: var(--sans); font-size: 0.82rem; color: var(--muted); margin-top: 1rem; max-width: var(--measure); }
+
+  /* Diagram: component lanes */
+  .lanes { display: grid; gap: 1.25rem; font-family: var(--sans); font-size: 0.86rem; }
+  .lane { display: grid; grid-template-columns: 9rem repeat(4, minmax(0, 1fr)); align-items: stretch; gap: 0; }
+  .lane-name { align-self: center; font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); padding-right: 1rem; }
+  .node {
+    position: relative; padding: 0.85rem 1rem; margin-right: 1.9rem;
+    background: #fff; border: 1px solid var(--rule); border-radius: 6px; line-height: 1.35;
+  }
+  .node b { display: block; font-weight: 650; margin-bottom: 0.15rem; }
+  .node span { color: var(--muted); font-size: 0.8rem; }
+  .node:not(:last-child)::after {
+    content: "→"; position: absolute; right: -1.55rem; top: 50%; transform: translateY(-50%);
+    color: var(--muted); font-size: 1rem;
+  }
+  .node:last-child { margin-right: 0; }
+  .node.shared { background: var(--paper-deep); }
+  .node.disk { border-color: var(--safe); box-shadow: inset 0 0 0 1px var(--safe); }
+  .lane.persist .node { border-style: solid; }
+  .lane-gap { grid-column: 2 / -1; font-size: 0.78rem; color: var(--muted); padding: 0.1rem 0; border-top: 1px dashed var(--rule); padding-top: 0.6rem; }
+
+  /* Diagram: file timelines */
+  .timeline { font-family: var(--sans); font-size: 0.84rem; }
+  .timeline + .timeline { margin-top: 2.5rem; }
+  .tl-head { display: flex; align-items: baseline; gap: 0.75rem; margin-bottom: 0.9rem; }
+  .tag { font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 3px; }
+  .tag.before { color: var(--risk); background: var(--risk-soft); }
+  .tag.after { color: var(--safe); background: var(--safe-soft); }
+  .tl-head span:last-child { color: var(--muted); }
+  .steps { list-style: none; margin: 0; padding: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 0.5rem; counter-reset: step; }
+  .steps > li { counter-increment: step; display: flex; flex-direction: column; gap: 0.4rem; }
+  .step-name { min-height: 3.4rem; padding: 0 0.1rem 0.5rem; border-bottom: 2px solid var(--ink); line-height: 1.3; }
+  .step-name::before { content: counter(step); display: block; font-size: 0.7rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .step-name code { font-size: 0.82em; background: none; padding: 0; }
+  .state { padding: 0.5rem 0.6rem; border-radius: 4px; line-height: 1.3; min-height: 3.1rem; background: #fff; border: 1px solid var(--rule); }
+  .state .file { display: block; font-family: var(--mono); font-size: 0.7rem; color: var(--muted); }
+  .state.good { background: var(--safe-soft); border-color: transparent; }
+  .state.bad { background: var(--risk-soft); border-color: transparent; color: var(--risk); }
+  .state.none { background: transparent; border-style: dashed; color: var(--muted); }
+  .window { margin-top: 0.8rem; font-size: 0.8rem; color: var(--muted); }
+  .window b { color: var(--ink); font-weight: 650; }
+
+  /* Diagram: story sequence */
+  .story { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; font-family: var(--sans); font-size: 0.85rem; counter-reset: s; }
+  .story li { counter-increment: s; position: relative; padding: 1.25rem 1.1rem 0 0; border-top: 2px solid var(--risk); line-height: 1.4; }
+  .story li::before { content: ""; position: absolute; top: -7px; left: 0; width: 12px; height: 12px; border-radius: 50%; background: var(--paper); border: 2px solid var(--risk); }
+  .story li:last-child::before { background: var(--risk); }
+  .story b { display: block; font-weight: 650; margin-bottom: 0.25rem; }
+  .story span { color: var(--muted); }
+
+  /* Diagram: load decisions */
+  .decide { list-style: none; margin: 0 auto; padding: 0; max-width: 54rem; font-family: var(--sans); font-size: 0.88rem; }
+  .decide li { display: grid; grid-template-columns: minmax(0, 1.1fr) 2rem minmax(0, 1fr); align-items: center; border-top: 1px solid var(--rule); padding: 0.9rem 0; }
+  .decide li:last-child { border-bottom: 1px solid var(--rule); }
+  .decide .q { line-height: 1.35; }
+  .decide .q small { display: block; color: var(--muted); font-size: 0.78rem; }
+  .decide .arrow { color: var(--muted); text-align: center; }
+  .outcome { padding: 0.45rem 0.7rem; border-radius: 4px; line-height: 1.3; }
+  .outcome.ok { background: var(--safe-soft); color: var(--safe); }
+  .outcome.fail { background: var(--risk-soft); color: var(--risk); }
+  .outcome.neutral { background: #fff; border: 1px solid var(--rule); }
+  .outcome code { background: none; padding: 0; color: inherit; }
+
+  /* Diagram: failure boundary */
+  .boundary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3rem; font-family: var(--sans); font-size: 0.86rem; }
+  .boundary h3 { margin-top: 0; }
+  .flow { list-style: none; margin: 0; padding: 0; }
+  .flow li { position: relative; padding: 0 0 1.2rem 1.6rem; line-height: 1.4; }
+  .flow li::before { content: ""; position: absolute; left: 0.3rem; top: 0.45rem; width: 7px; height: 7px; border-radius: 50%; background: var(--ink); }
+  .flow li:not(:last-child)::after { content: ""; position: absolute; left: calc(0.3rem + 3px); top: 1rem; bottom: 0.1rem; width: 1px; background: var(--rule); }
+  .flow li.end::before { background: var(--risk); width: 9px; height: 9px; left: 0.22rem; }
+  .flow li.end { color: var(--risk); }
+  .flow code { font-size: 0.82em; }
+  .flow .loc { display: block; color: var(--muted); font-size: 0.76rem; }
+  .flow li.end .loc { color: var(--risk); opacity: 0.85; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-family: var(--sans); font-size: 0.86rem; margin: 1.5rem 0 2rem; }
+  th, td { text-align: left; vertical-align: top; padding: 0.75rem 1rem 0.75rem 0; border-bottom: 1px solid var(--rule); line-height: 1.4; }
+  thead th { font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-weight: 600; border-bottom-color: var(--ink); }
+  td.before { color: var(--risk); }
+  td.after { color: var(--safe); }
+
+  /* Evidence */
+  .evidence { list-style: none; margin: 1.5rem 0 2rem; padding: 0; font-family: var(--sans); font-size: 0.88rem; }
+  .evidence li { padding: 1rem 0; border-top: 1px solid var(--rule); display: grid; grid-template-columns: minmax(0, 17rem) minmax(0, 1fr); gap: 0.35rem 2rem; }
+  .evidence li:last-child { border-bottom: 1px solid var(--rule); }
+  .evidence code { font-size: 0.8rem; background: none; padding: 0; overflow-wrap: anywhere; }
+  .evidence .lines { display: block; color: var(--muted); font-size: 0.76rem; }
+  .kind { font-family: var(--sans); font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700; }
+  .kind.code { color: var(--safe); }
+  .kind.reported { color: var(--muted); }
+
+  .unchanged { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2rem 2.5rem; margin: 2rem auto 0; font-family: var(--sans); font-size: 0.86rem; }
+  .unchanged div { border-top: 2px solid var(--ink); padding-top: 0.8rem; }
+  .unchanged dt { font-weight: 650; margin-bottom: 0.3rem; }
+  .unchanged dd { margin: 0; color: var(--muted); line-height: 1.45; }
+
+  .limits { list-style: none; margin: 1.5rem 0 0; padding: 0; counter-reset: lim; }
+  .limits li { counter-increment: lim; position: relative; padding: 0 0 1.25rem 2.5rem; }
+  .limits li::before { content: counter(lim, decimal-leading-zero); position: absolute; left: 0; top: 0.2rem; font-family: var(--sans); font-size: 0.75rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .limits b { font-weight: 600; }
+
+  footer { max-width: var(--wide); margin: 6rem auto 0; padding: 2rem 1.25rem 3rem; border-top: 1px solid var(--rule); font-family: var(--sans); font-size: 0.8rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 0.5rem 2rem; justify-content: space-between; }
+  footer a { color: var(--muted); }
+
+  /* Narrow screens: every diagram becomes a vertical sequence */
+  @media (max-width: 760px) {
+    .topbar-inner { gap: 1rem; }
+    .lane { grid-template-columns: 1fr; gap: 1.6rem; }
+    .lane-name { padding: 0; }
+    .node { margin-right: 0; }
+    .node:not(:last-child)::after { content: "↓"; right: auto; left: 1rem; top: auto; bottom: -1.45rem; transform: none; }
+    .lane-gap { grid-column: 1; }
+    .steps { grid-auto-flow: row; grid-template-columns: 1fr; gap: 1rem; }
+    .steps > li { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+    .step-name { grid-column: 1 / -1; min-height: 0; border-bottom-width: 1px; }
+    .step-name::before { display: inline; margin-right: 0.5rem; }
+    .state { min-height: 0; }
+    .steps > li > .state:nth-child(2):last-child { grid-column: 1 / -1; }
+    .story { grid-template-columns: 1fr; }
+    .story li { border-top: none; border-left: 2px solid var(--risk); padding: 0 0 1.4rem 1.4rem; }
+    .story li::before { top: 0.15rem; left: -7px; }
+    .decide li { grid-template-columns: 1fr; gap: 0.5rem; }
+    .decide .arrow { display: none; }
+    .boundary { grid-template-columns: 1fr; gap: 2rem; }
+    .evidence li { grid-template-columns: 1fr; }
+    .unchanged { grid-template-columns: 1fr; gap: 1.5rem; }
+    th, td { padding-right: 0.6rem; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+
+<nav class="topbar" aria-label="Chapters">
+  <div class="topbar-inner">
+    <a class="brand" href="#top">BIT:E</a>
+    <ol>
+      <li><a href="#where">Where</a></li>
+      <li><a href="#before">Before</a></li>
+      <li><a href="#save">Save</a></li>
+      <li><a href="#load">Load</a></li>
+      <li><a href="#failure">Failure</a></li>
+      <li><a href="#same">Unchanged</a></li>
+      <li><a href="#evidence">Evidence</a></li>
+      <li><a href="#limits">Limits</a></li>
+    </ol>
+  </div>
+</nav>
+
+<main id="content">
+  <header class="hero measure" id="top">
+    <p class="eyebrow">Change guide · Persistence</p>
+    <h1>A snapshot that is <em>never half&#8209;written</em></h1>
+    <p class="lede">Commit <code>ccc2edc</code> changes how BITE writes <code>data/db.bin</code> and what it does when the file can't be trusted. Saves now go through a temporary file that replaces the old snapshot in one step. Damaged files and failed saves now stop the server with a clear error instead of silently losing data.</p>
+    <dl class="facts">
+      <div><dt>Commit</dt><dd><code>ccc2edc</code></dd></div>
+      <div><dt>Files</dt><dd><a href="../src/db.rs">src/db.rs</a>, <a href="../src/main.rs">src/main.rs</a></dd></div>
+      <div><dt>Diff</dt><dd><span class="add">+167</span> / <span class="del">−36</span></dd></div>
+      <div><dt>New tests</dt><dd>4, all in <code>db.rs</code></dd></div>
+    </dl>
+    <p class="src" style="margin-top:1.5rem">All line numbers refer to <code>ccc2edc52a03a307444371f9faa51c9d7e37d7b0</code>. The source links open whatever version is checked out locally. To see the exact files as of this commit, run <code>git show ccc2edc:src/db.rs</code> (or <code>:src/main.rs</code>, <code>:src/data.rs</code>, and so on).</p>
+    <p class="src">This is the last of three fixes. The two before it, message framing (<code>e3a7cbb</code>) and partial writes (<code>adde98a</code>), are separate commits and are not covered here.</p>
+  </header>
+
+  <!-- 01 -->
+  <section class="chapter" id="where" aria-labelledby="where-h">
+    <div class="measure">
+      <p class="num">01</p>
+      <h2 id="where-h">Where persistence sits</h2>
+      <p>Clients never touch the disk. When the parser receives <code>s key value</code> it does two separate things. It queues the <code>OK</code> reply to the <a href="../src/writer.rs">Writer</a>, and it sends the value to the <a href="../src/data.rs">Data</a> thread. Data inserts the value into a shared <code>BTreeMap</code> and raises a <code>modified</code> flag.</p>
+      <p>A separate DB thread runs a loop: it sleeps four seconds, then checks the flag. If the flag is set, it clears it and writes the whole map to disk. While the server runs, this is the only thread that writes to disk. The change affects this thread and the load at startup.</p>
+    </div>
+
+    <figure class="wide" aria-labelledby="fig-lanes">
+      <div class="lanes">
+        <div class="lane">
+          <div class="lane-name">Reply</div>
+          <div class="node"><b>Reader</b><span>complete frame</span></div>
+          <div class="node"><b>Parser</b><span><code>Command::Set</code></span></div>
+          <div class="node"><b>Writer</b><span>queues <code>OK</code></span></div>
+          <div class="node"><b>Client</b><span>receives <code>OK</code></span></div>
+        </div>
+        <div class="lane persist">
+          <div class="lane-name">Persistence</div>
+          <div class="node"><b>Parser</b><span><code>data_tx.send(Set)</code></span></div>
+          <div class="node shared"><b>Data</b><span>insert into shared map, set <code>modified</code></span></div>
+          <div class="node"><b>DB thread</b><span>sleeps 4 s, then checks <code>modified</code></span></div>
+          <div class="node disk"><b>data/db.bin</b><span>bincode snapshot</span></div>
+        </div>
+        <div class="lane"><div class="lane-name"></div><div class="lane-gap">Both lanes start from the same parser call and never wait for each other. The latest change only touches the last two steps of the persistence lane.</div></div>
+      </div>
+      <figcaption id="fig-lanes">The two paths of a <code>set</code>. The reply is queued in <a href="../src/parser.rs">parser.rs</a> (lines 128–143), before Data even applies the value (<a href="../src/data.rs">data.rs</a> lines 57–61). Saving happens later in <a href="../src/db.rs"><code>DB::handle</code></a> (db.rs lines 37–45).</figcaption>
+    </figure>
+
+    <div class="measure">
+      <div class="note"><strong>Worth remembering</strong><code>OK</code> has never meant "saved to disk", and it still doesn't. A change that isn't in the last snapshot that was successfully written can be lost if the process dies. There is no fixed time limit counted from the <code>OK</code>.</div>
+    </div>
+  </section>
+
+  <!-- 02 -->
+  <section class="chapter" id="before" aria-labelledby="before-h">
+    <div class="measure">
+      <p class="num">02</p>
+      <h2 id="before-h">What could go wrong before</h2>
+      <p>The previous code wrote the snapshot <em>in place</em>. It first opened <code>db.bin</code> with <code>truncate(true)</code>, which empties the file immediately. Only then did it lock and serialize the map and write the new bytes. Until that write finished, the only copy on disk was empty or partial.</p>
+<pre tabindex="0" aria-label="Previous save and load code"><span class="c">// src/db.rs before ccc2edc, save_to_file (abridged)</span>
+let file = OpenOptions::new()<span class="c"> … </span>.<span class="hl-risk">truncate(true)</span>.open(DB_FILE);
+let data: Vec&lt;u8&gt; = bincode::serialize(&amp;*self.data.lock().unwrap()).unwrap();
+file.unwrap().<span class="hl-risk">write_all(&amp;data[..])</span>.unwrap();
+
+<span class="c">// load_from_file</span>
+<span class="hl-risk">if let Ok(data)</span> =
+    bincode::deserialize::&lt;BTreeMap&lt;String, Vec&lt;u8&gt;&gt;&gt;(&amp;content[..])
+{
+    *self.data.lock().unwrap() = data;
+}   <span class="c">// on error: nothing, no log</span></pre>
+      <p>The loader made it worse. If deserializing failed, it did nothing: no error, no log, and the server started with an empty map. The next change raised the dirty flag, and the next save wrote that small map over the damaged file. At that point nothing was left to recover.</p>
+    </div>
+
+    <figure class="wide" aria-labelledby="fig-story">
+      <ol class="story">
+        <li><b>Save interrupted</b><span>The process is killed between <code>truncate</code> and the end of <code>write_all</code>.</span></li>
+        <li><b>Partial file</b><span><code>db.bin</code> holds a cut-off snapshot.</span></li>
+        <li><b>Silent restart</b><span>Deserialization fails; <code>if let Ok</code> skips it. The map is empty.</span></li>
+        <li><b>First write</b><span>A client sets a key. <code>modified</code> becomes true.</span></li>
+        <li><b>Overwritten</b><span>On the next save after that change, the DB thread writes the tiny map over the damaged file. Everything else is gone.</span></li>
+      </ol>
+      <figcaption id="fig-story">How one interrupted save could lead to losing all data, with no error at any step. Also, save errors were <code>unwrap()</code>: a panic stopped only the DB thread, while the rest of the server kept accepting changes it would never save.</figcaption>
+    </figure>
+  </section>
+
+  <!-- 03 -->
+  <section class="chapter" id="save" aria-labelledby="save-h">
+    <div class="measure">
+      <p class="num">03</p>
+      <h2 id="save-h">The new save: build aside, then swap</h2>
+      <p><a href="../src/db.rs"><code>save_to_file</code></a> (db.rs lines 76–88) never opens the real snapshot for writing. It serializes the map while holding the lock, writes the full result to <code>db.bin.tmp</code> in the same directory, and flushes it to disk. Then <code>fs::rename</code> replaces <code>db.bin</code> with it. The old file is never deleted first; the rename replaces it directly.</p>
+    </div>
+
+    <figure class="wide" aria-labelledby="fig-save">
+      <div class="timeline">
+        <div class="tl-head"><span class="tag before">Before</span><span>one file, rewritten in place</span></div>
+        <ol class="steps">
+          <li><div class="step-name">Open with <code>truncate(true)</code></div><div class="state bad"><span class="file">db.bin</span>empty</div></li>
+          <li><div class="step-name">Lock and serialize</div><div class="state bad"><span class="file">db.bin</span>still empty</div></li>
+          <li><div class="step-name"><code>write_all</code> in progress</div><div class="state bad"><span class="file">db.bin</span>partial</div></li>
+          <li><div class="step-name">Write finished</div><div class="state good"><span class="file">db.bin</span>new snapshot</div></li>
+        </ol>
+        <p class="window"><b>At risk:</b> steps 1–3. From the truncate until the write finishes, the only snapshot is empty or partial.</p>
+      </div>
+
+      <div class="timeline">
+        <div class="tl-head"><span class="tag after">After</span><span>a temporary file, then one rename</span></div>
+        <ol class="steps">
+          <li><div class="step-name">Lock and serialize</div><div class="state none"><span class="file">db.bin.tmp</span>—</div><div class="state good"><span class="file">db.bin</span>previous</div></li>
+          <li><div class="step-name"><code>File::create</code></div><div class="state"><span class="file">db.bin.tmp</span>empty (a leftover temp is truncated)</div><div class="state good"><span class="file">db.bin</span>previous</div></li>
+          <li><div class="step-name"><code>write_all</code></div><div class="state"><span class="file">db.bin.tmp</span>complete bytes</div><div class="state good"><span class="file">db.bin</span>previous</div></li>
+          <li><div class="step-name"><code>sync_all</code></div><div class="state"><span class="file">db.bin.tmp</span>flushed to disk</div><div class="state good"><span class="file">db.bin</span>previous</div></li>
+          <li><div class="step-name">Close</div><div class="state"><span class="file">db.bin.tmp</span>closed</div><div class="state good"><span class="file">db.bin</span>previous</div></li>
+          <li><div class="step-name"><code>fs::rename</code></div><div class="state none"><span class="file">db.bin.tmp</span>gone</div><div class="state good"><span class="file">db.bin</span>new snapshot</div></li>
+        </ol>
+        <p class="window"><b>At risk:</b> never a partial <code>db.bin</code>. Before step 6 the previous snapshot is still in place. A leftover <code>db.bin.tmp</code> is never loaded and is overwritten on the next save.</p>
+      </div>
+      <figcaption id="fig-save">State of each file after each step. Steps 2–5 are the helper <a href="../src/db.rs"><code>write_synced</code></a> (db.rs lines 92–96); the file closes when it returns. The lock is held only for the serialize line (line 77), not for the disk I/O.</figcaption>
+    </figure>
+
+    <div class="measure">
+<pre tabindex="0" aria-label="New save_to_file code"><span class="c">// src/db.rs, lines 76–83 (long lines wrapped here)</span>
+pub fn save_to_file(&amp;self) -&gt; io::Result&lt;()&gt; {
+    let data = bincode::serialize(&amp;*self.data.lock().unwrap())
+        .map_err(io::Error::other)?;
+
+    let temp = self.dir.join(DB_TEMP_NAME);
+    <span class="hl-safe">write_synced(&amp;temp, &amp;data)</span>
+        .map_err(|err| with_path(err, "could not write", &amp;temp))?;
+
+    let file = self.dir.join(DB_NAME);
+    <span class="hl-safe">fs::rename(&amp;temp, &amp;file)</span>
+        .map_err(|err| with_path(err, "could not replace", &amp;file))?;</pre>
+      <p>Every step returns an <code>io::Result</code>. The small <a href="../src/db.rs"><code>with_path</code></a> helper (lines 98–100) keeps the original error kind and adds what was being done and to which path, e.g. <code>could not write ./data/db.bin.tmp: …</code>.</p>
+    </div>
+  </section>
+
+  <!-- 04 -->
+  <section class="chapter" id="load" aria-labelledby="load-h">
+    <div class="measure">
+      <p class="num">04</p>
+      <h2 id="load-h">The new load: trust it or refuse it</h2>
+      <p><a href="../src/db.rs"><code>load_from_file</code></a> (db.rs lines 50–72) now separates <em>nothing saved yet</em> from <em>something is wrong</em>. The shared map is replaced in exactly one place, line 69, and only after the snapshot deserialized successfully. If anything fails, the map and the file are both left alone.</p>
+    </div>
+
+    <figure class="wide" aria-labelledby="fig-load">
+      <ol class="decide">
+        <li><div class="q">Create the data directory<small><code>fs::create_dir_all(dir)</code> fails</small></div><div class="arrow" aria-hidden="true">→</div><div class="outcome fail">Error <code>could not create …</code></div></li>
+        <li><div class="q">Read <code>db.bin</code><small>not found</small></div><div class="arrow" aria-hidden="true">→</div><div class="outcome neutral">Start empty. No file is created; the old code created an empty one.</div></li>
+        <li><div class="q">Read <code>db.bin</code><small>any other read error</small></div><div class="arrow" aria-hidden="true">→</div><div class="outcome fail">Error <code>could not read …</code></div></li>
+        <li><div class="q">File is zero bytes<small>same as before</small></div><div class="arrow" aria-hidden="true">→</div><div class="outcome neutral">Start empty</div></li>
+        <li><div class="q">Deserialize as <code>BTreeMap&lt;String, Vec&lt;u8&gt;&gt;</code><small>corrupt or truncated</small></div><div class="arrow" aria-hidden="true">→</div><div class="outcome fail"><code>InvalidData</code>: <code>could not deserialize …</code>. Map and file untouched.</div></li>
+        <li><div class="q">Deserialize succeeds</div><div class="arrow" aria-hidden="true">→</div><div class="outcome ok">Replace the shared map</div></li>
+      </ol>
+      <figcaption id="fig-load">The checks in the order the code runs them. Only the last one changes the in-memory data.</figcaption>
+    </figure>
+  </section>
+
+  <!-- 05 -->
+  <section class="chapter" id="failure" aria-labelledby="failure-h">
+    <div class="measure">
+      <p class="num">05</p>
+      <h2 id="failure-h">Failure is now a process decision</h2>
+      <p>Returning errors is only half of it. Someone has to decide what an error means. The change puts that decision in <a href="../src/main.rs">main.rs</a> and nowhere else: a persistence failure stops the whole process with a message. There is no global panic hook, and the other workers' <code>unwrap()</code> calls are unchanged.</p>
+    </div>
+
+    <figure class="wide" aria-labelledby="fig-boundary">
+      <div class="boundary">
+        <div>
+          <h3>At startup</h3>
+          <ol class="flow">
+            <li>Bind the TCP listener<span class="loc">main.rs line 57</span></li>
+            <li>Set up the connection maps, the workers and <code>DB::new(map, Path::new(DB_PATH))</code><span class="loc">lines 66–101</span></li>
+            <li><code>db.load_from_file()?</code><span class="loc">line 102, before any worker thread is started</span></li>
+            <li class="end">On error, <code>main</code> returns it: Rust prints the error and the process exits with a nonzero code<span class="loc">no connections are accepted yet; the file is not modified</span></li>
+          </ol>
+        </div>
+        <div>
+          <h3>While running</h3>
+          <ol class="flow">
+            <li><code>DB::handle(4)</code> loops: sleep, check <code>modified</code>, save<span class="loc">db.rs lines 37–45</span></li>
+            <li><code>save_to_file()?</code> returns the first error<span class="loc">the loop's only way out</span></li>
+            <li>The thread closure matches <code>Err(err)</code><span class="loc">main.rs lines 124–131</span></li>
+            <li class="end"><code>eprintln!</code> then <code>process::exit(1)</code><span class="loc">the whole process stops, not just this thread</span></li>
+          </ol>
+        </div>
+      </div>
+      <figcaption id="fig-boundary">Both exits are in one place. Before, a failed save panicked only the DB thread, and the server kept acknowledging changes it would never save.</figcaption>
+    </figure>
+
+    <div class="measure">
+      <table>
+        <thead><tr><th scope="col">Situation</th><th scope="col">Before</th><th scope="col">After</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Corrupt <code>db.bin</code> at startup</th><td class="before">Starts empty; the next change and save overwrite it</td><td class="after">Exits nonzero; file kept</td></tr>
+          <tr><th scope="row">Save fails while running</th><td class="before">DB thread panics; server keeps running</td><td class="after">Message on stderr, <code>exit(1)</code></td></tr>
+          <tr><th scope="row">Process killed during save</th><td class="before">Partial snapshot possible</td><td class="after">A complete snapshot: the old one, or the new one if the rename already happened</td></tr>
+          <tr><th scope="row">Missing or empty file</th><td>Start empty</td><td>Start empty</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 06 -->
+  <section class="chapter" id="same" aria-labelledby="same-h">
+    <div class="measure">
+      <p class="num">06</p>
+      <h2 id="same-h">What deliberately stays the same</h2>
+      <p>This change is limited to how the snapshot is stored. Clients and existing data files notice no difference.</p>
+    </div>
+    <dl class="unchanged wide">
+      <div><dt>Wire protocol and commands</dt><dd>Same frames, same replies. <code>OK</code> is still sent before the value is saved.</dd></div>
+      <div><dt>Snapshot format</dt><dd>Still bincode of <code>BTreeMap&lt;String, Vec&lt;u8&gt;&gt;</code>. Existing <code>db.bin</code> files load as before.</dd></div>
+      <div><dt>Save timing</dt><dd><code>db.handle(4)</code>: the loop sleeps four seconds, then saves if the <code>modified</code> flag was raised.</dd></div>
+      <div><dt>Location</dt><dd><code>DB_PATH = "./data"</code>, file <code>db.bin</code>. The directory is now a parameter of <code>DB::new</code>, so tests can use their own directories.</dd></div>
+      <div><dt>Other threads</dt><dd>Reader, Writer, Parser, Subs, Cleaner and Heartbeat are unchanged.</dd></div>
+      <div><dt>Data thread</dt><dd>Still only inserts into the map and sets the flag; it never writes to disk.</dd></div>
+    </dl>
+  </section>
+
+  <!-- 07 -->
+  <section class="chapter" id="evidence" aria-labelledby="evidence-h">
+    <div class="measure">
+      <p class="num">07</p>
+      <h2 id="evidence-h">Evidence</h2>
+      <p>Two kinds of evidence, labeled separately. <em>Tests</em> are in the repository and anyone can re-run them. <em>Reported</em> results come from a manual run of the real server during implementation and are not reproducible from the repository.</p>
+
+      <h3>Regression tests in <a href="../src/db.rs">src/db.rs</a></h3>
+      <ul class="evidence">
+        <li><div><span class="kind code">Test</span><br><code>save_replaces_existing_snapshot</code><span class="lines">lines 126–140</span></div><div>Saves <code>{old}</code>, then <code>{new}</code> over it. Loading gives exactly <code>{new}</code>, and no <code>db.bin.tmp</code> is left.</div></li>
+        <li><div><span class="kind code">Test</span><br><code>missing_or_empty_file_loads_nothing</code><span class="lines">lines 142–159</span></div><div>A missing nested directory is created. With no file, and then with an empty file, the map already in memory is unchanged.</div></li>
+        <li><div><span class="kind code">Test</span><br><code>corrupt_file_fails_and_keeps_data</code><span class="lines">lines 161–180</span></div><div>A valid snapshot missing its last byte fails with <code>InvalidData</code>. The in-memory map and the file bytes are unchanged.</div></li>
+        <li><div><span class="kind code">Test</span><br><code>failed_save_keeps_previous_snapshot</code><span class="lines">lines 182–195</span></div><div>A directory placed at <code>db.bin.tmp</code> makes the save fail. <code>db.bin</code> is byte-for-byte the previous snapshot.</div></li>
+        <li><div><span class="kind code">Suite</span><br><code>cargo test</code></div><div>16 passed, 0 failed, re-run while writing this page. The count includes the earlier framing and write tests.</div></li>
+      </ul>
+
+      <h3>Reported manual runs (Windows, temporary working directory)</h3>
+      <ul class="evidence">
+        <li><div><span class="kind reported">Reported</span><br>Restart</div><div><code>s k v</code>, wait for the save, restart: <code>g k</code> returns <code>v</code>.</div></li>
+        <li><div><span class="kind reported">Reported</span><br>Corrupt at startup</div><div>A truncated <code>db.bin</code> made the server exit with code 1; the file's hash was unchanged.</div></li>
+        <li><div><span class="kind reported">Reported</span><br>Save fails while running</div><div>After creating a directory at <code>data/db.bin.tmp</code>, the next change made the process exit with code 1 and print <code>Saving the database failed, exiting: could not write ./data\db.bin.tmp: Access is denied. (os error 5)</code>. <code>db.bin</code> was unchanged.</div></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 08 -->
+  <section class="chapter" id="limits" aria-labelledby="limits-h">
+    <div class="measure">
+      <p class="num">08</p>
+      <h2 id="limits-h">What this does not promise</h2>
+      <p>The goal is narrow: an interrupted save no longer breaks the snapshot, and errors are reported instead of hidden. Some limits remain:</p>
+      <ol class="limits">
+        <li><b>Recent changes can still be lost.</b> If the process dies, any change that isn't in the last snapshot that was successfully written is lost, even if it was acknowledged. There is no fixed time limit counted from the <code>OK</code>.</li>
+        <li><b>Not safe against power loss.</b> The temporary file is flushed with <code>sync_all</code>, but the directory is not flushed after the rename, so after a power cut the rename itself may not have reached the disk.</li>
+        <li><b>Linux is untested.</b> Replacing an existing snapshot was tested on Windows only. Linux uses the same standard-library <code>rename</code>, but no Linux run was done. There is no platform-specific code.</li>
+        <li><b>One server per data directory.</b> The temporary file name is fixed, so two servers sharing <code>./data</code> would overwrite each other's temporary file.</li>
+        <li><b>A locked file stops the server.</b> On Windows, if another program has <code>db.bin</code> open, the rename can fail. The server now exits with an error instead of corrupting the file.</li>
+      </ol>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <span>BITE · change guide for <code>ccc2edc</code> · <em>fix: replace database snapshots safely and fail on persistence errors</em></span>
+  <span>Sources: <a href="../src/db.rs">src/db.rs</a> · <a href="../src/main.rs">src/main.rs</a> · <a href="../REVIEW.md">REVIEW.md §3</a></span>
+</footer>
+</body>
+</html>
