@@ -1,8 +1,8 @@
 # Code review — BITE (v0.3.1)
 
-Actualizado sobre `0f9f278`. Las referencias `archivo:línea` corresponden a ese
-commit. Lo pendiente está ordenado por prioridad; lo terminado está al final, en
-[Completado](#completado).
+Actualizado sobre `c6dd594` más la corrección de #11. Las referencias
+`archivo:línea` corresponden a ese estado. Lo pendiente está ordenado por
+prioridad; lo terminado está al final, en [Completado](#completado).
 
 Los puntos marcados con **[verificado]** se reprodujeron en la revisión original
 (código de `ac405f5`) con un cliente Python contra el binario. No se han vuelto
@@ -38,7 +38,7 @@ secuencia de números:
     s data.name BITE  →  OK
     j data            →  {"name":[66,73,84,69]}      (Commands.md promete {"name":"BITE"})
 
-En cambio `#j` (`src/subs.rs:98-102`) usa `String::from_utf8_lossy` y devuelve
+En cambio `#j` (`src/subs.rs:74-78`) usa `String::from_utf8_lossy` y devuelve
 strings. Las dos rutas no coinciden entre sí, ni con la documentación. Es un
 resto de la migración "BITE is full bytes now" (8/2022).
 
@@ -122,14 +122,6 @@ principal.
   silencio `size` si una respuesta supera 65529 bytes. Puede pasar con las
   respuestas agregadas de `k`/`j`/`js` y rompería el framing del cliente.
 
-### 11. Fugas de memoria en `subs.rs`
-
-`src/subs.rs:65-68`
-
-`Del` usa `entry(key).or_default()`, así que cada `#- claveinexistente` crea un
-`Vec` vacío que nunca se elimina. Conviene usar `get_mut`. Además, `id_keys`
-tampoco se limpia en `Del`, solo en `DelAll`.
-
 ### 12. `SetList`: separador multibyte y clave vacía
 
 `src/data.rs:84-103` (separador en la línea 85)
@@ -180,7 +172,7 @@ abstracción, la quita.
   responden `OK`, `NO` o nada.
 - **`src/data.rs:172, 207, 239`:** el mismo `range + take_while + collect` tres
   veces (`todo.txt` ya lo anota). Conviene resolverlo junto con #13.
-- **`src/subs.rs:22,104`:** `Sub.command: Command` obliga a un
+- **`src/subs.rs:22,80`:** `Sub.command: Command` obliga a un
   `_ => unreachable!()`. Un `enum SubKind { Get, KeyValue, Json }` pondría el
   contrato en el tipo.
 - **`src/parser.rs:352-353`:** `next_line` con `#[allow(dead_code)]`, se puede
@@ -200,14 +192,14 @@ abstracción, la quita.
   es un motivo válido, pero conviene hacerlo explícito (con un comentario o con
   dos structs).
 - **Clippy:** `.split('.').last()` debería ser `.next_back()`
-  (`src/data.rs:181`, `src/subs.rs:89,99`). Son los 3 únicos warnings actuales.
+  (`src/data.rs:181`, `src/subs.rs:65,75`). Son los 3 únicos warnings actuales.
 
 ---
 
 ## P4 — Higiene del repo y documentación
 
-- `src/concat.py` y `src/concat.txt` (una copia del código) siguen en `src/` y
-  trackeados. Conviene mover el script fuera de `src` e ignorar `concat.txt`.
+- `src/concat.py` y `src/concat.txt`: el usuario los retiró localmente; la
+  eliminación aún no está registrada en git y queda fuera de este cambio.
 - La documentación dice JSON, pero el formato es bincode en `data/db.bin`:
   - README:70: "serialized into a json file". Además, el TODO de README:80
     ("serialized correctly instead of json") está desactualizado.
@@ -219,7 +211,7 @@ abstracción, la quita.
   `.dockerignore`. Ninguna de las dos cosas impide construir; cambiarlas no
   está decidido.
 - **Tests:** solo se justifican ante un riesgo concreto. Al resolver #4, #5,
-  #11, #12 o #13, conviene añadir un test del comportamiento elegido. No hace
+  #12 o #13, conviene añadir un test del comportamiento elegido. No hace
   falta un proyecto de cobertura general.
 - `docs/persistence-change.html` explica solo #3. El usuario pidió aplazar su
   ampliación a todos los P0.
@@ -231,7 +223,7 @@ abstracción, la quita.
 1. Decidir los contratos de #4 y #5 (y documentar #14), después implementar.
 2. #8, #9 y #10: cambios pequeños con riesgo concreto. Decidir la política de
    #7.
-3. #11, #12 y #13, junto con la simplificación de búsqueda de hijos (P3).
+3. #12 y #13, junto con la simplificación de búsqueda de hijos (P3).
 4. P3/P4 cuando se toquen esos archivos.
 
 ---
@@ -247,8 +239,8 @@ abstracción, la quita.
 - El flag atómico `modified` con guardado periódico es simple y suficiente.
 - `parser.rs` trabaja en `&[u8]` con cursor y lifetimes en vez de copiar
   strings.
-- Framing, escritura y persistencia tienen tests de regresión deterministas
-  (16 en total).
+- Framing, escritura, persistencia y suscripciones tienen tests de regresión
+  deterministas (20 en total).
 
 ---
 
@@ -358,13 +350,41 @@ El runtime distroless Debian 12 (glibc 2.36) es compatible con el binario
 actual, que requiere como máximo `GLIBC_2.34`. El builder es Debian 13, así que
 una dependencia futura podría requerir un glibc más nuevo; hoy no ocurre.
 
+### 11. Fugas de memoria en `subs.rs`
+
+Resuelto junto con esta actualización de la revisión.
+
+**Problema (original):**
+- `Del` usaba `entry(key).or_default()`, así que cada `#- claveinexistente`
+  creaba un `Vec` vacío que nunca se eliminaba.
+- `Del` no limpiaba `id_keys`, así que un `DelAll` posterior (desconexión)
+  volvía a crear esas claves vacías.
+
+**Solución (`src/subs.rs`):**
+- `unsubscribe` y `unsubscribe_all` comparten `remove_subs`, que usa `get_mut`,
+  quita todas las suscripciones del cliente a la clave y borra la clave si
+  queda vacía.
+- `unsubscribe` también quita la clave de `id_keys`, y la entrada del cliente
+  cuando era su última clave.
+- `subscribe` mantiene la lógica anterior (un `Sub` por id y formato).
+
+**Evidencia:** 4 tests en `subs.rs`:
+- desuscripción desconocida o repetida sin cambios,
+- todos los formatos de un cliente eliminados sin tocar a otros,
+- última clave eliminada de ambos mapas,
+- desconexión después de `Del` que limpia el resto sin afectar a otros
+  clientes.
+
+Los 4 fallan con la lógica anterior.
+
 ### Tests
 
-"Tests: cero" ya no aplica. Hay 16 tests de regresión:
+"Tests: cero" ya no aplica. Hay 20 tests de regresión:
 - 6 de framing (`message.rs`),
 - 1 de lectura (`reader.rs`),
 - 5 de escritura (`connection.rs`),
-- 4 de persistencia (`db.rs`).
+- 4 de persistencia (`db.rs`),
+- 4 de suscripciones (`subs.rs`).
 
 ### Guía de persistencia — `0f9f278`
 
