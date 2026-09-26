@@ -1,11 +1,11 @@
 use std::{
     collections::HashMap,
-    net::Shutdown,
     sync::{mpsc::Sender, Arc, Mutex},
     thread::sleep,
     time::Duration,
 };
 
+use crate::cleaner;
 use crate::connection::Connection;
 use crate::writer::{self, Action::QueueAll, Order};
 
@@ -25,26 +25,28 @@ impl Heartbeat {
         Heartbeat { readers, writers }
     }
 
-    pub fn handle(&self, writer_tx: Sender<writer::Action>) {
+    pub fn handle(&self, writer_tx: Sender<writer::Action>, cleaner_tx: Sender<cleaner::Action>) {
         loop {
             sleep(Duration::from_secs(TIMEOUT_30));
-            self.drop_idle_readers();
+            self.drop_idle_readers(&cleaner_tx);
 
             sleep(Duration::from_secs(TIMEOUT_30));
             self.ping_idle_writers(&writer_tx);
         }
     }
 
-    fn drop_idle_readers(&self) {
+    /// Drops readers that stopped sending bytes in the middle of a message.
+    /// Closed readers were already sent to the cleaner by whoever closed them.
+    fn drop_idle_readers(&self, cleaner_tx: &Sender<cleaner::Action>) {
         let mut readers = self.readers.lock().unwrap();
 
         for (id, connection) in readers.iter_mut() {
             let elapsed = connection.last_read.elapsed().as_secs();
-            if connection.pending_read && elapsed > TIMEOUT_30 {
+            if !connection.closed && connection.messages.is_incomplete() && elapsed > TIMEOUT_30 {
                 connection.closed = true;
-                connection.socket.shutdown(Shutdown::Both).unwrap();
+                cleaner_tx.send(cleaner::Action::Drop(*id)).unwrap();
 
-                info!("Shutting down Reader #{id}, timed out");
+                info!("Dropping Reader #{id}, incomplete message timed out");
             }
         }
     }

@@ -8,6 +8,8 @@ use std::{
     time::Instant,
 };
 
+use crate::message::Messages;
+
 const BUFFER_SIZE: usize = 4096;
 
 pub struct Connection {
@@ -15,7 +17,7 @@ pub struct Connection {
     pub socket: TcpStream,
     pub addr: SocketAddr,
     pub send_queue: Vec<Vec<u8>>,
-    pub pending_read: bool,
+    pub messages: Messages,
     pub last_read: Instant,
     pub last_write: Instant,
     pub closed: bool,
@@ -30,7 +32,7 @@ impl Connection {
             socket,
             addr,
             send_queue,
-            pending_read: false,
+            messages: Messages::new(),
             last_read: Instant::now(),
             last_write: Instant::now(),
             closed: false,

@@ -69,7 +69,7 @@ fn main() -> io::Result<()> {
     let used_ids = Arc::new(Mutex::new(VecDeque::<usize>::new()));
 
     // The reader
-    let mut reader = Reader::new(poller.clone(), readers.clone());
+    let reader = Reader::new(poller.clone(), readers.clone());
     let reader_tx = reader.tx.clone();
 
     // The writer
@@ -108,6 +108,7 @@ fn main() -> io::Result<()> {
     );
     let reader_cleaner_tx = cleaner.tx.clone();
     let writer_cleaner_tx = cleaner.tx.clone();
+    let heartbeat_cleaner_tx = cleaner.tx.clone();
 
     // Heartbeat
     let heartbeat = Heartbeat::new(readers.clone(), writers.clone());
@@ -120,7 +121,7 @@ fn main() -> io::Result<()> {
     thread::spawn(move || data.handle(db_modified));
     thread::spawn(move || db.handle(4));
     thread::spawn(move || cleaner.handle(cleaner_subs_tx));
-    thread::spawn(move || heartbeat.handle(heartbeat_writer_tx));
+    thread::spawn(move || heartbeat.handle(heartbeat_writer_tx, heartbeat_cleaner_tx));
 
     // Connections and events via smol Poller.
     let mut id_count: usize = 1; // 0 belongs to the main TcpListener.

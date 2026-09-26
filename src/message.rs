@@ -1,44 +1,12 @@
-use std::{
-    cmp::Ordering,
-    io::{self, Error, ErrorKind},
-};
+use std::io::{self, Error, ErrorKind};
 
-pub enum Received {
-    None,
-    Complete(Vec<u8>),
-    Pending(Vec<u8>),
-    Error(io::Error),
-}
+const HEADER_SIZE: usize = 6;
 
 pub struct Message {
     pub from: u32,
     pub id: u32,
     pub size: u32,
     pub data: Vec<u8>,
-}
-
-impl Message {
-    pub fn from_protocol(mut data: Vec<u8>) -> io::Result<Message> {
-        if data.len() < 6 {
-            return Err(smaller_size_than_protocol());
-        }
-
-        if data.len() > 65535 {
-            return Err(bigger_size_than_protocol());
-        }
-
-        let from = get_u32(&data[0..2]);
-        let id = get_u32(&data[2..4]);
-        let size = get_u32(&data[4..6]);
-        data.drain(0..6);
-
-        Ok(Message {
-            from,
-            id,
-            size,
-            data,
-        })
-    }
 }
 
 pub struct Messages {
@@ -50,55 +18,44 @@ impl Messages {
         Messages { buffer: Vec::new() }
     }
 
-    /// Appends the data acting like a buffer to return complete messages
-    /// assumming is part of the protocol. You need to call this function in a
-    /// loop and retry when Received::Pending is returned.
-    pub fn feed(&mut self, mut data: Vec<u8>) -> Received {
-        self.buffer.append(&mut data);
-        let buffer_len = self.buffer.len() as u32;
+    /// Appends bytes read from the socket, which may contain any part of one
+    /// or more messages.
+    pub fn feed(&mut self, data: &[u8]) {
+        self.buffer.extend_from_slice(data);
+    }
 
-        if buffer_len < 6 {
-            self.buffer.clear();
-            return Received::Error(smaller_size_than_protocol());
+    /// Removes and returns the next complete message, or `None` when more
+    /// bytes are needed. Fails when the header declares a size smaller than
+    /// the header itself.
+    pub fn next_message(&mut self) -> io::Result<Option<Message>> {
+        if self.buffer.len() < HEADER_SIZE {
+            return Ok(None);
         }
 
-        if buffer_len > 65535 {
-            self.buffer.clear();
-            return Received::Error(bigger_size_than_protocol());
+        let size = get_u32(&self.buffer[4..6]) as usize;
+
+        if size < HEADER_SIZE {
+            return Err(smaller_size_than_protocol());
         }
 
-        // The message size.
-        let size = get_u32(&self.buffer[4..6]);
-        match size.cmp(&buffer_len) {
-            Ordering::Equal => {
-                // Message complete, just send it and break.
-
-                let result = self.buffer.to_owned();
-                self.buffer.clear();
-
-                Received::Complete(result)
-            }
-
-            Ordering::Less => {
-                // The message received contains more than one message.
-                // Let's split, send the first part and deal with the
-                // rest on the next iteration.
-
-                let split = self.buffer.split_off(size as usize);
-                let result = self.buffer.to_owned();
-                self.buffer = split;
-
-                Received::Pending(result)
-            }
-
-            Ordering::Greater => {
-                // The loop should only happen when we need to unpack
-                // more than one message received in the same read, else
-                // break to deal with the buffer or new messages.
-
-                Received::None
-            }
+        if self.buffer.len() < size {
+            return Ok(None);
         }
+
+        let message = Message {
+            from: get_u32(&self.buffer[0..2]),
+            id: get_u32(&self.buffer[2..4]),
+            size: size as u32,
+            data: self.buffer[HEADER_SIZE..size].to_vec(),
+        };
+        self.buffer.drain(..size);
+
+        Ok(Some(message))
+    }
+
+    /// True while the buffer holds part of a message.
+    pub fn is_incomplete(&self) -> bool {
+        !self.buffer.is_empty()
     }
 }
 
@@ -130,13 +87,106 @@ pub fn stamp_header(mut data: Vec<u8>, from: u32, id: u32) -> Vec<u8> {
 fn smaller_size_than_protocol() -> io::Error {
     Error::new(
         ErrorKind::Unsupported,
-        "Message received is smaller than 6 bytes and thats the size of the protocol.",
+        "Message size is smaller than 6 bytes and thats the size of the protocol header.",
     )
 }
 
-fn bigger_size_than_protocol() -> io::Error {
-    Error::new(
-        ErrorKind::Unsupported,
-        "Message received is bigger than 65535 bytes and the protocol uses only 2 bytes to represent the size.",
-    )
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn frame(from: u32, id: u32, data: &[u8]) -> Vec<u8> {
+        stamp_header(data.to_vec(), from, id)
+    }
+
+    #[test]
+    fn waits_for_split_header() {
+        let bytes = frame(1, 2, b"hello");
+        let mut messages = Messages::new();
+
+        messages.feed(&bytes[..3]);
+        assert!(messages.next_message().unwrap().is_none());
+        assert!(messages.is_incomplete());
+
+        messages.feed(&bytes[3..]);
+        let message = messages.next_message().unwrap().unwrap();
+        assert_eq!(message.from, 1);
+        assert_eq!(message.id, 2);
+        assert_eq!(message.size, 11);
+        assert_eq!(message.data, b"hello");
+        assert!(!messages.is_incomplete());
+    }
+
+    #[test]
+    fn waits_for_split_body() {
+        let bytes = frame(1, 2, b"hello");
+        let mut messages = Messages::new();
+
+        messages.feed(&bytes[..8]);
+        assert!(messages.next_message().unwrap().is_none());
+        assert!(messages.is_incomplete());
+
+        messages.feed(&bytes[8..]);
+        let message = messages.next_message().unwrap().unwrap();
+        assert_eq!(message.data, b"hello");
+        assert!(!messages.is_incomplete());
+    }
+
+    #[test]
+    fn extracts_coalesced_messages_larger_than_one_frame() {
+        let first = vec![b'a'; 40_000];
+        let second = vec![b'b'; 40_000];
+        let mut bytes = frame(1, 1, &first);
+        bytes.extend(frame(1, 2, &second));
+        assert!(bytes.len() > 65535);
+
+        let mut messages = Messages::new();
+        messages.feed(&bytes);
+
+        let message = messages.next_message().unwrap().unwrap();
+        assert_eq!((message.id, message.data), (1, first));
+        let message = messages.next_message().unwrap().unwrap();
+        assert_eq!((message.id, message.data), (2, second));
+        assert!(messages.next_message().unwrap().is_none());
+        assert!(!messages.is_incomplete());
+    }
+
+    #[test]
+    fn keeps_partial_header_after_complete_message() {
+        let next = frame(1, 2, b"next");
+        let mut bytes = frame(1, 1, b"first");
+        bytes.extend_from_slice(&next[..2]);
+
+        let mut messages = Messages::new();
+        messages.feed(&bytes);
+
+        let message = messages.next_message().unwrap().unwrap();
+        assert_eq!(message.data, b"first");
+        assert!(messages.next_message().unwrap().is_none());
+        assert!(messages.is_incomplete());
+
+        messages.feed(&next[2..]);
+        let message = messages.next_message().unwrap().unwrap();
+        assert_eq!(message.data, b"next");
+        assert!(!messages.is_incomplete());
+    }
+
+    #[test]
+    fn rejects_declared_size_smaller_than_header() {
+        let mut messages = Messages::new();
+        messages.feed(&[0, 1, 0, 2, 0, 5]);
+
+        assert!(messages.next_message().is_err());
+    }
+
+    #[test]
+    fn accepts_header_only_message() {
+        let mut messages = Messages::new();
+        messages.feed(&[0, 1, 0, 2, 0, 6]);
+
+        let message = messages.next_message().unwrap().unwrap();
+        assert_eq!(message.size, 6);
+        assert!(message.data.is_empty());
+        assert!(!messages.is_incomplete());
+    }
 }
