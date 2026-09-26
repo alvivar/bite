@@ -13,6 +13,8 @@ use std::{
     collections::{HashMap, VecDeque},
     env, io,
     net::TcpListener,
+    path::Path,
+    process,
     sync::{Arc, Mutex},
     thread,
 };
@@ -21,7 +23,7 @@ use crate::{
     cleaner::Cleaner,
     connection::Connection,
     data::Data,
-    db::DB,
+    db::{DB, DB_PATH},
     heartbeat::Heartbeat,
     parser::Parser,
     reader::{Action::Read, Reader},
@@ -95,9 +97,9 @@ fn main() -> io::Result<()> {
     let data_map = data.map.clone();
     let parser_data_tx = data.tx.clone();
 
-    let mut db = DB::new(data_map);
+    let mut db = DB::new(data_map, Path::new(DB_PATH));
     let db_modified = db.modified.clone();
-    db.load_from_file();
+    db.load_from_file()?;
 
     // Cleaner
     let cleaner = Cleaner::new(
@@ -119,7 +121,14 @@ fn main() -> io::Result<()> {
     thread::spawn(move || parser.handle(parser_data_tx, parser_writer_tx, parser_subs_tx));
     thread::spawn(move || subs.handle(subs_writer_tx));
     thread::spawn(move || data.handle(db_modified));
-    thread::spawn(move || db.handle(4));
+    thread::spawn(move || {
+        if let Err(err) = db.handle(4) {
+            // Keeping the server running would accept changes that are never
+            // saved.
+            eprintln!("Saving the database failed, exiting: {err}");
+            process::exit(1);
+        }
+    });
     thread::spawn(move || cleaner.handle(cleaner_subs_tx));
     thread::spawn(move || heartbeat.handle(heartbeat_writer_tx, heartbeat_cleaner_tx));
 
