@@ -1,8 +1,8 @@
 # Code review — BITE (v0.3.1)
 
-Actualizado sobre `c6dd594` más la corrección de #11. Las referencias
-`archivo:línea` corresponden a ese estado. Lo pendiente está ordenado por
-prioridad; lo terminado está al final, en [Completado](#completado).
+Actualizado sobre `14feb2a`. Las referencias `archivo:línea` corresponden a ese
+commit. Lo pendiente está ordenado por prioridad; lo terminado está al final, en
+[Completado](#completado).
 
 Los puntos marcados con **[verificado]** se reprodujeron en la revisión original
 (código de `ac405f5`) con un cliente Python contra el binario. No se han vuelto
@@ -11,10 +11,11 @@ a reproducir desde entonces, salvo donde se indica.
 **Resumen:** los tres P0 originales (framing TCP, escritura no bloqueante y
 persistencia) están resueltos, con tests de regresión, y el Dockerfile ya
 construía antes de la revisión. No queda pendiente ninguno de los tres P0 de
-esta revisión. Lo pendiente es:
+esta revisión. También están resueltos `+1` (#5) y las fugas de `subs.rs` (#11).
+Lo pendiente es:
 
-- **P1:** dos contratos de `Commands.md` que la implementación no cumple. Hay
-  que decidir el comportamiento antes de escribir código.
+- **P1:** la salida JSON (#4) no cumple `Commands.md`. Hay que decidir el
+  comportamiento antes de escribir código.
 - **P2:** fallos que se enmascaran o matan partes del proceso.
 - **P3/P4:** simplificaciones e higiene. Conviene hacerlas junto con cambios que
   ya toquen esos archivos, no como una refactorización aparte.
@@ -23,14 +24,14 @@ esta revisión. Lo pendiente es:
 
 ## P1 — La implementación no coincide con `Commands.md`
 
-Ambos puntos requieren una decisión antes de implementar. BITE almacena bytes,
-no texto, así que ni el protocolo ni la documentación resuelven por sí solos
-cuál debe ser el comportamiento. Hay que acordar la compatibilidad con clientes
-existentes y qué hacer con valores no UTF-8 o que no son números.
+Requiere una decisión antes de implementar. BITE almacena bytes, no texto, así
+que ni el protocolo ni la documentación resuelven por sí solos cuál debe ser el
+comportamiento. Hay que acordar la compatibilidad con clientes existentes y qué
+hacer con valores no UTF-8.
 
 ### 4. `j`/`js` devuelven arrays de bytes, no strings **[verificado]**
 
-`src/data.rs` `kv_to_json` (líneas 275–286, `json!(v)` en la 282)
+`src/data.rs` `kv_to_json` (líneas 281–292, `json!(v)` en la 288)
 
 `kv_to_json` hace `json!(v)` con `v: &Vec<u8>`, que serde serializa como una
 secuencia de números:
@@ -49,26 +50,6 @@ resto de la migración "BITE is full bytes now" (8/2022).
 
 En ambos casos cambia la respuesta que reciben los clientes actuales de una de
 las dos rutas.
-
-### 5. `+1` almacena y devuelve 8 bytes binarios **[verificado]**
-
-`src/data.rs` `Action::Inc` (líneas 105–135), `vec_to_u64` (302–314),
-`u64_to_vec` (316–318)
-
-    +1 num  →  b'\x00\x00\x00\x00\x00\x00\x00\x01'
-    g num   →  b'\x00\x00\x00\x00\x00\x00\x00\x01'
-
-Commands.md dice `+1 numberkey → 10`. Además:
-- La heurística de `vec_to_u64` es inexacta, como reconoce su propio
-  comentario: el texto `"12345678"` se interpreta como un u64 binario.
-- Un valor que no es un número se trata en silencio como 0 (`unwrap_or(0)`).
-- `+ 1` sobre `u64::MAX` no está controlado.
-
-**A decidir:**
-- ¿Número como texto (coherente con `s numberkey 9`) o binario documentado?
-- ¿Qué pasa con los valores de 8 bytes que ya estén guardados en `db.bin`?
-- ¿Error o 0 para valores inválidos?
-- ¿Qué hacer con el desbordamiento?
 
 ---
 
@@ -132,7 +113,7 @@ principal.
 
 ### 13. Búsqueda de hijos por prefijo de string, no de path
 
-`src/data.rs:172-176` (`k`), `207-211` (`jtrim`), `239-243` (`j`/`js`)
+`src/data.rs:178-182` (`k`), `213-217` (`jtrim`), `245-249` (`j`/`js`)
 
 `range(key..).take_while(starts_with(key))` hace que `k user` también devuelva
 `username`. Si la intención es "hijos", el filtro debería ser
@@ -170,8 +151,8 @@ abstracción, la quita.
   aparece 10 veces (8 con `OK`, 2 con `NO`). Un closure local
   `let reply = |data: &str| ...` lo reduciría y haría visible qué comandos
   responden `OK`, `NO` o nada.
-- **`src/data.rs:172, 207, 239`:** el mismo `range + take_while + collect` tres
-  veces (`todo.txt` ya lo anota). Conviene resolverlo junto con #13.
+- **`src/data.rs:178, 213, 245`:** el mismo `range + take_while + collect` tres
+  veces (`.docs/todo.txt` ya lo anota). Conviene resolverlo junto con #13.
 - **`src/subs.rs:22,80`:** `Sub.command: Command` obliga a un
   `_ => unreachable!()`. Un `enum SubKind { Get, KeyValue, Json }` pondría el
   contrato en el tipo.
@@ -182,7 +163,7 @@ abstracción, la quita.
   (bytes) con un límite en caracteres.
 - **`src/connection.rs:70`:** `vec![0; BUFFER_SIZE]` se asigna en cada
   iteración de `read`; `chunk` se puede declarar fuera del loop.
-- **`src/data.rs:188-194`:** el `if let Some(last) ... pop()` para quitar el
+- **`src/data.rs:195-199`:** el `if let Some(last) ... pop()` para quitar el
   `\0` final se puede reemplazar construyendo el mensaje con `join`.
 - **`src/main.rs:39-41`:** `#[macro_use] extern crate log; extern crate pretty_env_logger;`
   sobra en edition 2021.
@@ -192,27 +173,25 @@ abstracción, la quita.
   es un motivo válido, pero conviene hacerlo explícito (con un comentario o con
   dos structs).
 - **Clippy:** `.split('.').last()` debería ser `.next_back()`
-  (`src/data.rs:181`, `src/subs.rs:65,75`). Son los 3 únicos warnings actuales.
+  (`src/data.rs:187`, `src/subs.rs:65,75`). Son los 3 únicos warnings actuales.
 
 ---
 
 ## P4 — Higiene del repo y documentación
 
-- `src/concat.py` y `src/concat.txt`: el usuario los retiró localmente; la
-  eliminación aún no está registrada en git y queda fuera de este cambio.
 - La documentación dice JSON, pero el formato es bincode en `data/db.bin`:
   - README:70: "serialized into a json file". Además, el TODO de README:80
     ("serialized correctly instead of json") está desactualizado.
-  - Commands.md:106: "data/DB.json".
-  - Además, Commands.md:57 usa `b data.author` para el comando `k`.
+  - Commands.md:107: "data/DB.json".
+  - Además, Commands.md:58 usa `b data.author` para el comando `k`.
 - `docker-compose.yml` y `.docker/BITE-with-a-WebSocket-Proxy/docker-compose.yml`
   construyen desde GitHub (`build: https://github.com/alvivar/bite.git`), así
   que `docker-compose up --build` no usa el código local. Tampoco hay
   `.dockerignore`. Ninguna de las dos cosas impide construir; cambiarlas no
   está decidido.
-- **Tests:** solo se justifican ante un riesgo concreto. Al resolver #4, #5,
-  #12 o #13, conviene añadir un test del comportamiento elegido. No hace
-  falta un proyecto de cobertura general.
+- **Tests:** solo se justifican ante un riesgo concreto. Al resolver #4, #12
+  o #13, conviene añadir un test del comportamiento elegido. No hace falta un
+  proyecto de cobertura general.
 - `docs/persistence-change.html` explica solo #3. El usuario pidió aplazar su
   ampliación a todos los P0.
 
@@ -220,7 +199,7 @@ abstracción, la quita.
 
 ## Orden sugerido de trabajo
 
-1. Decidir los contratos de #4 y #5 (y documentar #14), después implementar.
+1. Decidir el contrato de #4 (y documentar #14), después implementar.
 2. #8, #9 y #10: cambios pequeños con riesgo concreto. Decidir la política de
    #7.
 3. #12 y #13, junto con la simplificación de búsqueda de hijos (P3).
@@ -239,8 +218,8 @@ abstracción, la quita.
 - El flag atómico `modified` con guardado periódico es simple y suficiente.
 - `parser.rs` trabaja en `&[u8]` con cursor y lifetimes en vez de copiar
   strings.
-- Framing, escritura, persistencia y suscripciones tienen tests de regresión
-  deterministas (20 en total).
+- Framing, escritura, persistencia, suscripciones e incremento tienen tests de
+  regresión deterministas (26 en total).
 
 ---
 
@@ -350,9 +329,9 @@ El runtime distroless Debian 12 (glibc 2.36) es compatible con el binario
 actual, que requiere como máximo `GLIBC_2.34`. El builder es Debian 13, así que
 una dependencia futura podría requerir un glibc más nuevo; hoy no ocurre.
 
-### 11. Fugas de memoria en `subs.rs`
+### 11. Fugas de memoria en `subs.rs` — `415fc08`
 
-Resuelto junto con esta actualización de la revisión.
+(`415fc08b0826d607c7af5c035cd10ef43ba10a8a`)
 
 **Problema (original):**
 - `Del` usaba `entry(key).or_default()`, así que cada `#- claveinexistente`
@@ -377,14 +356,88 @@ Resuelto junto con esta actualización de la revisión.
 
 Los 4 fallan con la lógica anterior.
 
+### 5. `+1` como texto decimal — `14feb2a`
+
+(`14feb2acb6aae4ef62e6e17434e92ebe1af79368`)
+
+**Problema (original, [verificado]):**
+- `+1` guardaba y devolvía un u64 binario de 8 bytes, aunque Commands.md
+  promete `+1 numberkey → 10`.
+- `vec_to_u64` trataba cualquier valor de 8 bytes como binario, incluido el
+  texto `"12345678"`.
+- Un valor no numérico contaba en silencio como 0, y el desbordamiento no
+  estaba controlado.
+
+**Solución (`src/data.rs`, `Commands.md`):**
+- `increment` (`src/data.rs:309`): UTF-8, `parse::<u64>()` y `checked_add(1)`.
+  Una clave inexistente pasa a `1`; `9` pasa a `10`.
+- Un valor no numérico o `u64::MAX` responde `NO`: no modifica el mapa, no
+  notifica a los suscriptores y no marca la base como modificada.
+- Si tiene éxito, la respuesta, el valor guardado y la notificación son el
+  mismo texto decimal.
+- No recorta espacios; `+7` y `007` se aceptan (dan `8`) porque así los lee
+  `parse::<u64>`.
+- Sin migración ni detección del formato anterior: se aplica el mismo parseo a
+  todos los valores. El binario antiguo probado (`00 00 00 00 00 00 00 01`)
+  responde `NO`. El usuario reinicia a mano sus claves de prueba.
+- Commands.md documenta el contrato.
+
+**Evidencia:**
+- 6 tests en `data.rs`: inexistente, `9`, `hola`, vacío, `-3` y `u64::MAX`.
+- Prueba manual antes del commit, con el mismo código de producción y un
+  servidor en un directorio temporal: respuestas y notificaciones en texto,
+  `12345678` → `12345679`, `NO` sin cambios ni notificaciones para valores
+  inválidos, desbordamiento y el binario antiguo probado, y persistencia tras
+  reiniciar solo cuando hubo éxito.
+
+### Higiene: `src/concat.py` y `src/concat.txt` — `a479e72`
+
+(`a479e72179c23ddbe0d53a9f44e6b5e6a6164abd`)
+
+El usuario eliminó de `src/` el script y la copia concatenada del código.
+
 ### Tests
 
-"Tests: cero" ya no aplica. Hay 20 tests de regresión:
+"Tests: cero" ya no aplica. Hay 26 tests de regresión en BITE (`cargo test`):
 - 6 de framing (`message.rs`),
 - 1 de lectura (`reader.rs`),
 - 5 de escritura (`connection.rs`),
 - 4 de persistencia (`db.rs`),
-- 4 de suscripciones (`subs.rs`).
+- 4 de suscripciones (`subs.rs`),
+- 6 de incremento (`data.rs`).
+
+### Suite externa BITENC — `571d769` (repositorio `bitenc`)
+
+(`571d7695a24dcc1ab9e55f6ad387086d2378fc9e`)
+
+Es el cliente de pruebas aparte, no forma parte de BITE: `cargo test` en BITE
+no la ejecuta y no cuenta entre los 26 tests.
+
+**Problema:** la suite antigua leía un buffer TCP agregado tras esperas fijas,
+usaba el puerto 1984 y la base de datos del servidor en uso, y asumía un orden
+entre respuestas de distintos workers (parser frente a data/subs). También
+fallaba en versiones antiguas de BITE por esas carreras, no por regresiones.
+
+**Solución (19 tests de integración):**
+- Los 17 escenarios históricos, con sus nombres, más `header_only_message` y
+  `header_wire_format`.
+- Cada test que necesita servidor arranca su propio BITE en un puerto local
+  libre, con una base de datos temporal. Antes de enviar comandos comprueba en
+  el log del proceso hijo que es él quien aceptó la conexión.
+- Cliente síncrono con frames completos: valida ids de cliente y de mensaje,
+  tamaño y contenido byte a byte, con datos binarios deterministas.
+- Conserva los volúmenes de 64 y 256 frames de 65535 bytes; `biggest_gets_256`
+  ahora lee y compara los 256 valores.
+- Adaptada al contrato de #5: `+1` sobre `SET` responde `NO` sin
+  notificaciones, y un incremento numérico notifica texto decimal.
+- Requiere `BITE_BIN` apuntando a un binario de BITE compilado (README de
+  bitenc).
+
+**Evidencia (antes del commit, no re-ejecutada para esta actualización):**
+19/19 contra BITE `14feb2a` compilado con `--release --locked`, en ejecuciones
+repetidas en paralelo y en la revisión independiente. Contra `a479e72` fallan
+solo los 3 escenarios de `+1`. El HEAD actual de bitenc, `0af6f59`, solo deja de
+versionar `.vscode/` y lo añade a `.gitignore`.
 
 ### Guía de persistencia — `0f9f278`
 
