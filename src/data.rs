@@ -103,32 +103,38 @@ impl Data {
                 }
 
                 Action::Inc(key, from_id, msg_id) => {
-                    let inc_vec = {
-                        let mut map = self.map.lock().unwrap();
+                    let mut map = self.map.lock().unwrap();
 
-                        let inc = match map.get(&key) {
-                            Some(val) => vec_to_u64(val) + 1,
-                            None => 1,
-                        };
+                    let Some(value) = increment(map.get(&key).map(Vec::as_slice)) else {
+                        drop(map);
 
-                        let inc_vec = u64_to_vec(inc);
+                        self.writer_tx
+                            .send(Queue(Order {
+                                from_id,
+                                to_id: from_id,
+                                msg_id,
+                                data: b"NO".to_vec(),
+                            }))
+                            .unwrap();
 
-                        map.insert(key.to_owned(), inc_vec.to_owned());
-
-                        inc_vec
+                        continue;
                     };
+
+                    let value = value.into_bytes();
+                    map.insert(key.to_owned(), value.to_owned());
+                    drop(map);
 
                     self.writer_tx
                         .send(Queue(Order {
                             from_id,
                             to_id: from_id,
                             msg_id,
-                            data: inc_vec.to_owned(),
+                            data: value.to_owned(),
                         }))
                         .unwrap();
 
                     self.subs_tx
-                        .send(Call(key, inc_vec, from_id, msg_id))
+                        .send(Call(key, value, from_id, msg_id))
                         .unwrap();
 
                     db_modified.swap(true, Ordering::Relaxed);
@@ -299,20 +305,46 @@ fn json_insert(mut json: &mut Value, key: &str, val: Value) {
     }
 }
 
-/// Transforms a byte array into a u64. Tries to parse from string when the size
-/// isn't 64 bits, but this means that "12345678" will be considered a u64 and
-/// not a string, because it has a length of 8 bytes. Pretty simple but inexact
-/// rule.
-fn vec_to_u64(vec: &[u8]) -> u64 {
-    if vec.len() != 8 {
-        let utf8 = String::from_utf8_lossy(vec);
-        return utf8.parse::<u64>().unwrap_or(0);
-    }
-
-    let vec64 = vec[0..8].try_into().unwrap_or(&[0; 8]);
-    u64::from_be_bytes(*vec64)
+/// "9" -> "10", inexistente -> "1". None si no es un u64 o desborda.
+fn increment(value: Option<&[u8]>) -> Option<String> {
+    let Some(value) = value else {
+        return Some("1".into());
+    };
+    let n: u64 = std::str::from_utf8(value).ok()?.parse().ok()?;
+    n.checked_add(1).map(|n| n.to_string())
 }
 
-fn u64_to_vec(n: u64) -> Vec<u8> {
-    n.to_be_bytes().to_vec()
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn missing_key_becomes_one() {
+        assert_eq!(increment(None), Some("1".into()));
+    }
+
+    #[test]
+    fn increments_number() {
+        assert_eq!(increment(Some(b"9")), Some("10".into()));
+    }
+
+    #[test]
+    fn rejects_text() {
+        assert_eq!(increment(Some(b"hola")), None);
+    }
+
+    #[test]
+    fn rejects_empty_value() {
+        assert_eq!(increment(Some(b"")), None);
+    }
+
+    #[test]
+    fn rejects_negative_number() {
+        assert_eq!(increment(Some(b"-3")), None);
+    }
+
+    #[test]
+    fn rejects_overflow() {
+        assert_eq!(increment(Some(u64::MAX.to_string().as_bytes())), None);
+    }
 }

@@ -20,8 +20,9 @@ To get a value, use **g**.
     g keywithoutvalue
     >
 
-To increase a value by 1, use **+1**. The value become 0 if it isn't a number or
-doesn't exist, it returns the result.
+To increase a value by 1, use **+1**. The value must be a non-negative integer
+(a missing key becomes 1). Returns the new value, or **NO** if the current value
+isn't a number (the value is left untouched).
 
     s numberkey 9
     > OK
